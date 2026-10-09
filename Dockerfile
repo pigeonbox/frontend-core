@@ -20,7 +20,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Runtime（uid/gid=101 非 root，监听 8080）
-FROM nginxinc/nginx-unprivileged:1.29-alpine
+FROM nginxinc/nginx-unprivileged:1.31-alpine
 COPY --from=build /src/dist /usr/share/nginx/html
 COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 # envsubst 默认值：独立/边车模式直连本机后端；k8s 由 chart 注入 Service DNS
