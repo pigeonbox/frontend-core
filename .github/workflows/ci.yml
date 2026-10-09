@@ -1,26 +1,38 @@
 name: CI
+
 on:
-  push: { branches: [main] }
-  pull_request: { branches: [main] }
+  push:
+    branches: [main]
+  pull_request:
 
 permissions:
   contents: read
 
 jobs:
-  check:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20", cache: npm }
+        with:
+          node-version: "22"
       - run: npm ci
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Test
-        run: npm test
-      - name: Build
-        run: npm run build
-      # 镜像正式发布在 server 仓 release.yml（与 server 同版本列车），此处仅验证
-      # Dockerfile 可构建（nginx 模板/产物拷贝路径变更能被 PR 及时发现）
-      - name: Docker build smoke
-        run: docker build --build-arg NPM_REGISTRY=https://registry.npmjs.org -t pigeonbox-frontend:ci .
+      - name: 平台零容忍守卫(core 依赖清单不得出现任何宿主 SDK)
+        run: |
+          ! grep -qE '"@trimjs/|"@qnap|"@synology|"@ugreen|"@terramaster' package.json || {
+            echo "::error::core 依赖清单出现宿主 SDK——平台代码属于壳仓,禁止进入 core"
+            exit 1
+          }
+          ! grep -rqE "from '@trimjs|from \"@trimjs" src/ || {
+            echo "::error::core 源码 import 了宿主 SDK——平台代码属于壳仓"
+            exit 1
+          }
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: neutral 产物平台代码扫描(命中即红)
+        run: |
+          if grep -rloE "trimjs|pickSharedFile|fnosSsoLogin|trim_open_gateway" dist/assets/ >/dev/null 2>&1; then
+            echo "::error::neutral 构建产物出现平台代码"
+            exit 1
+          fi

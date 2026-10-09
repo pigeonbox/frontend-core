@@ -37,5 +37,11 @@
     "vitest": "^5.0.3",
     "vue-tsc": "^3.1.5"
   },
-  "description": "PigeonBox 公共前端(core):平台无关应用 + 宿主适配器 SPI;平台实现见各壳仓(frontend 等)"
+  "description": "PigeonBox 公共前端(core):平台无关应用 + 宿主适配器 SPI;平台实现见各壳仓(frontend 等)",
+  "files": [
+    "src",
+    "public",
+    "index.html",
+    "README.md"
+  ]
 }
