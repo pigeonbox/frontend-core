@@ -27,9 +27,10 @@ jobs:
             echo "::error::core 源码 import 了宿主 SDK——平台代码属于壳仓"
             exit 1
           }
+      - name: 构建(先生成 components.d.ts 再全量类型检查)
+        run: npm run build
       - run: npm run typecheck
       - run: npm test
-      - run: npm run build
       - name: neutral 产物平台代码扫描(命中即红)
         run: |
           if grep -rloE "trimjs|pickSharedFile|fnosSsoLogin|trim_open_gateway" dist/assets/ >/dev/null 2>&1; then
