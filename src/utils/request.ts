@@ -130,7 +130,9 @@ instance.interceptors.response.use(
 )
 
 export const request = <T = unknown>(config: AxiosRequestConfig): Promise<T> => {
-  return instance.request<unknown, T>(config)
+  // 断言而非裸泛型:axios 各版本 request<T,R> 返回类型形态不同(AxiosResponse /
+  // AxiosResponseResult 等),拦截器已把响应规约为 T,此处跨版本对齐
+  return instance.request(config) as unknown as Promise<T>
 }
 
 export default instance
