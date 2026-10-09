@@ -39,7 +39,7 @@ export function uninstallHost(): void {
  * 响应式视图(installHost/init 完成时会更新),视图 computed 可安全依赖。
  * 方法调用始终委托当前适配器。
  */
-export const host = {
+export const host: HostAdapter = {
   get name(): string {
     return hostName.value
   },
