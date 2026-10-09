@@ -566,7 +566,7 @@ export default {
         expireDefault: '默认过期天数',
         days: '天',
         uploadGates: '上传门禁',
-        uploadGatesHint: '匿名上传开关/上传大小/需登录/分片开关由部署配置管理（config.yaml transfer 段 / FCB_* 环境变量），不在线编辑'
+        uploadGatesHint: '匿名上传开关/上传大小/需登录/分片开关由部署配置管理（config.yaml transfer 段 / PB_* 环境变量），不在线编辑'
       },
       user: {
         save: '保存用户配置',
@@ -589,7 +589,7 @@ export default {
         burst: '突发容量 Burst',
         blockSeconds: '触发封禁时长（秒）',
         redisShared: 'Redis 共享计数',
-        redisHint: '由部署配置决定（rate_limit.use_redis / FCB_RATE_LIMIT_USE_REDIS），此处不可改',
+        redisHint: '由部署配置决定（rate_limit.use_redis / PB_RATE_LIMIT_USE_REDIS），此处不可改',
         save: '保存限流配置',
         saved: '限流配置已保存并热更新',
         viewStatus: '查看运行状态',

@@ -141,7 +141,7 @@
             </el-form-item>
             <el-form-item :label="t('admin.configPage.ratelimit.redisShared')">
               <!-- 契约无 use_redis 字段（GET 不返回/PUT 不采纳），由部署配置
-                   rate_limit.use_redis / FCB_RATE_LIMIT_USE_REDIS 决定 -->
+                   rate_limit.use_redis / PB_RATE_LIMIT_USE_REDIS 决定 -->
               <span class="form-hint" style="color: var(--color-text-secondary)">
                 {{ t('admin.configPage.ratelimit.redisHint') }}
               </span>

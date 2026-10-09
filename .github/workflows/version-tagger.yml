@@ -1,6 +1,7 @@
 name: Version Tagger
-# 列车 bump PR(VERSION 变更)合并后自动打同号 tag(与 server 同号,列车治理 D2)——
-# server/fnos/openwrt 的构建流程按该 ref 检出前端,保证产物可复现。
+# 列车 bump PR(VERSION 变更)合并后自动打同号 tag——frontend-core 为库线独立
+# semver(hub release/train.yaml lib.frontend-core),下游(fnos/qnap 的 web/ 与
+# frontend 壳)以 Release tgz URL 钉版消费,不按 ref 检出。
 # 门禁: 仅 commit message 以 "train:" 开头的 VERSION 变更才打 tag。
 # 本仓无下游工作流,无跨仓写,GITHUB_TOKEN 即可(无需 PAT)。
 on:

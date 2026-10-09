@@ -8,9 +8,9 @@ import { readFileSync } from 'node:fs'
 // 前端构建版本注入首页/仪表盘版本页脚（对齐发布列车,发版随 server 同号）
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8')) as { version: string }
 
-// 后端地址，dev 下所有 API 请求代理到这里（FCB_API_TARGET 可覆盖，便于指向本地多实例）
+// 后端地址，dev 下所有 API 请求代理到这里（PB_API_TARGET 可覆盖，便于指向本地多实例）
 const proxyTarget = {
-  target: process.env.FCB_API_TARGET || 'http://localhost:12345',
+  target: process.env.PB_API_TARGET || 'http://localhost:12345',
   changeOrigin: true,
 }
 

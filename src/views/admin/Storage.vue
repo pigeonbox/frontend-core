@@ -34,7 +34,7 @@
         <p class="quota-text">{{ formatFileSize(used) }} / {{ formatFileSize(quota) }}（统计口径：存活分享合计，未完成分片会话不计入）</p>
       </template>
       <template v-else>
-        <p class="quota-text">未启用站点级配额（storage.quota / FCB_STORAGE_QUOTA，0=不限）。</p>
+        <p class="quota-text">未启用站点级配额（storage.quota / PB_STORAGE_QUOTA，0=不限）。</p>
       </template>
       <p class="quota-used">当前已用：{{ formatFileSize(used) }}</p>
     </el-card>
