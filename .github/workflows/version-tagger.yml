@@ -1,0 +1,31 @@
+name: Version Tagger
+# 列车 bump PR(VERSION 变更)合并后自动打同号 tag(与 server 同号,列车治理 D2)——
+# server/fnos/openwrt 的构建流程按该 ref 检出前端,保证产物可复现。
+# 门禁: 仅 commit message 以 "train:" 开头的 VERSION 变更才打 tag。
+# 本仓无下游工作流,无跨仓写,GITHUB_TOKEN 即可(无需 PAT)。
+on:
+  push:
+    branches: [main]
+    paths: ["VERSION"]
+permissions:
+  contents: write
+concurrency: version-tagger
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 2 }
+      - name: 校验并打 tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MSG=$(git log -1 --format=%s)
+          case "$MSG" in train:*) ;; *) echo "跳过:commit '${MSG}' 非列车 bump(仅 train: 前缀触发)"; exit 0;; esac
+          VER=$(cat VERSION); TAG="v${VER}"
+          if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then echo "tag ${TAG} 已存在,跳过"; exit 0; fi
+          PV=$(grep -m1 '"version":' package.json | sed 's/[^0-9.]*//g')
+          [ "$PV" = "$VER" ] || { echo "::error::package.json version=$PV ≠ VERSION=$VER——发版走 hub 列车 bump"; exit 1; }
+          git config user.name "$GITHUB_ACTOR"; git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+          git tag "$TAG"; git push origin "refs/tags/${TAG}"
+          echo "✓ 已打 tag ${TAG}(server/fnos/openwrt 构建将按此 ref 钉前端)"

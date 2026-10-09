@@ -1,0 +1,26 @@
+name: CI
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20", cache: npm }
+      - run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      # 镜像正式发布在 server 仓 release.yml（与 server 同版本列车），此处仅验证
+      # Dockerfile 可构建（nginx 模板/产物拷贝路径变更能被 PR 及时发现）
+      - name: Docker build smoke
+        run: docker build --build-arg NPM_REGISTRY=https://registry.npmjs.org -t pigeonbox-frontend:ci .
