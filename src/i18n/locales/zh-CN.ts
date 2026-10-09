@@ -367,6 +367,7 @@ export default {
     noShares: '暂无分享记录',
     createFirstShare: '创建第一个分享',
     shares: {
+      filesUnit: '个文件',
       title: '我的分享',
       subtitle: '管理你创建的所有分享（批量删除/延期/恢复）',
       tabAll: '全部',
