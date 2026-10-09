@@ -23,6 +23,6 @@ jobs:
       - name: Pack 源码包
         run: npm pack --pack-destination .
       - name: Upload to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: pigeonbox-frontend-core-*.tgz
