@@ -1,6 +1,21 @@
 import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { appBase } from '@/utils/base'
+import { host } from '@/host'
+
+/**
+ * 鉴权端点豁免:登录/刷新本身 + 宿主 SSO 登录端点(适配器经 SPI ssoLoginPaths
+ * 声明,core 零平台字面量)。这些 URL 的 401 是「凭据本身失败」,绝不能触发
+ * token 刷新/跳登录页(否则匿名访客被弹去登录表单——2026-10-09 真机白屏根因)。
+ */
+export function isAuthEndpointUrl(url: string): boolean {
+  return (
+    url.includes('/user/login') ||
+    url.includes('/admin/login') ||
+    url.includes('/user/refresh') ||
+    (host.ssoLoginPaths ?? []).some((p) => url.includes(p))
+  )
+}
 
 const instance: AxiosInstance = axios.create({
   // 默认走「页面所在前缀」的相对路径:根路径部署 appBase()='' 与原行为一致;
@@ -58,16 +73,9 @@ instance.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config
-    // 401 且未重试且非登录/刷新接口本身 → 尝试刷新 token
+    // 401 且未重试且非登录/刷新/宿主 SSO 端点 → 尝试刷新 token
     const url: string = originalRequest?.url || ''
-    const isAuthEndpoint =
-      url.includes('/user/login') ||
-      url.includes('/admin/login') ||
-      url.includes('/user/refresh') ||
-      // 宿主适配器 SSO 登录端点(fnos/qnap 等):401=SSO 不可用的预期安全失败,
-      // 绝不能触发会话刷新/跳登录页(否则匿名访客被弹去登录表单)
-      url.includes('/api/fnos/login') ||
-      url.includes('/api/qnap/login')
+    const isAuthEndpoint = isAuthEndpointUrl(url)
     // 业务语义 401（2026-10-05 浏览器 E2E 发现的历史 bug）：取件/下载端点的
     // 401 表示"需要密码/密码错误/缺下载令牌"，与会话无关——绝不能触发刷新
     // 或跳登录（否则匿名取件人会被踢去登录页、密码输入框永远不出现）

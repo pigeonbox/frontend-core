@@ -6,6 +6,7 @@ import type { HostAdapter } from './spi'
 export const defaultHostAdapter: HostAdapter = {
   name: '',
   capabilities: { sso: false, sharedDirs: false, fileActions: false, appSettings: false },
+  ssoLoginPaths: [],
   async initFollow() {},
   async setTitle() {},
   async ssoLogin() {

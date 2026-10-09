@@ -34,6 +34,13 @@ export interface HostAdapter {
    * 后把最终值同步进视图层的响应式能力对象。
    */
   readonly capabilities: HostCapabilities
+  /**
+   * 宿主 SSO 登录端点路径(如 '/api/fnos/login')。其 401 是「SSO 不可用」的
+   * 预期安全失败,请求层据此豁免 token 刷新/跳登录页(否则匿名访客被弹去
+   * 登录表单——2026-10-09 真机白屏根因)。由各宿主适配器自行声明,
+   * core 保持零平台字面量(neutral 产物守卫要求)。
+   */
+  readonly ssoLoginPaths?: readonly string[]
   /** 异步初始化(探测平台能力/预载 SDK);可选 */
   init?(): Promise<void>
   /** 主题/语言跟随宿主(初始化读取 + 持续监听) */

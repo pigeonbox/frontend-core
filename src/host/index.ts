@@ -46,6 +46,9 @@ export const host: HostAdapter = {
   get capabilities(): HostCapabilities {
     return reactiveCaps
   },
+  get ssoLoginPaths(): readonly string[] {
+    return impl.ssoLoginPaths ?? []
+  },
   initFollow: (h) => impl.initFollow(h),
   setTitle: (t) => impl.setTitle(t),
   ssoLogin: () => impl.ssoLogin(),
