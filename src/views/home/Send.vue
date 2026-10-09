@@ -83,8 +83,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   Upload, Document,
@@ -108,11 +108,15 @@ const configStore = useConfigStore()
 const localeStore = useLocaleStore()
 const { t, locale } = useI18n()
 
-// ?tab=file|text 深链直达,非法值回退 file
-const activeTab = ref<'file' | 'text'>((() => {
-  const q = new URLSearchParams(window.location.hash.split('?')[1] || '').get('tab')
-  return q === 'text' ? 'text' : 'file'
-})())
+// ?tab=file|text 深链直达,非法值回退 file;watch route 保证 URL 变化(前进/后退/页内深链)时页面同步响应
+const route = useRoute()
+const activeTab = ref<'file' | 'text'>(route.query.tab === 'text' ? 'text' : 'file')
+watch(
+  () => route.query.tab,
+  (tab) => {
+    activeTab.value = tab === 'text' ? 'text' : 'file'
+  },
+)
 
 const setTab = (tab: 'file' | 'text') => {
   activeTab.value = tab
