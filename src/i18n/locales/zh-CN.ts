@@ -212,6 +212,7 @@ export default {
     paste_hint: '提示：可直接 Ctrl/Cmd + V 粘贴图片',
     presign_hint: '大文件将走对象存储直传通道',
     presign: '直传准备中…',
+    visitorDisabled: '访客上传已关闭，请登录后再上传',
     prepare: '准备上传…',
     chunk_size: '分片大小',
     expires: '有效期',
@@ -609,7 +610,6 @@ export default {
         saved: '外观已保存并全站生效'
       },
       upload: {
-    visitorDisabled: '访客上传已关闭，请登录后再上传',
         openUpload: '允许访客（未登录）上传',
         openUploadHint: '关闭后仅登录用户可上传，访客上传入口同步隐藏',
         requireLogin: '上传需登录',
