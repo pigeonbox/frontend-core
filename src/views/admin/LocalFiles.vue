@@ -129,7 +129,7 @@ const loading = ref(false)
 // 功能未启用(服务端 upload.local_import.enabled=false):展示配置引导而非报错
 const featureDisabled = ref(false)
 // 宿主文件动作可用性(适配器能力声明;default 恒 false → 按钮不渲染)
-const hostAvailable = host.capabilities.fileActions
+const hostAvailable = computed(() => host.capabilities.fileActions)
 
 const isDisabledMessage = (msg?: string) => !!msg && msg.includes('本地文件功能未启用')
 

@@ -29,7 +29,13 @@ export interface HostFollowHandlers {
 export interface HostAdapter {
   /** 宿主展示名(如「飞牛」),供宿主能力 UI 拼接文案 */
   readonly name: string
+  /**
+   * 能力声明。可在 init() 异步探测后原地更新——installHost 会在 init 完成
+   * 后把最终值同步进视图层的响应式能力对象。
+   */
   readonly capabilities: HostCapabilities
+  /** 异步初始化(探测平台能力/预载 SDK);可选 */
+  init?(): Promise<void>
   /** 主题/语言跟随宿主(初始化读取 + 持续监听) */
   initFollow(handlers: HostFollowHandlers): Promise<void>
   /** 同步宿主窗口标题 */

@@ -104,7 +104,7 @@
 
 <script setup lang="ts">
 import { formatFileSize } from '@/utils/format'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { adminApi } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
@@ -352,10 +352,19 @@ const openDir = async (item: HostDirItem) => {
   }
 }
 
+// 能力可能由适配器异步探测( installHost→init ),watch 即便挂载时未就绪
+// 也能在能力就位后加载
+watch(
+  () => host.capabilities.sharedDirs,
+  (v) => {
+    if (v) void loadDirs()
+  },
+  { immediate: true }
+)
+
 onMounted(() => {
   resetForm()
   load()
-  if (host.capabilities.sharedDirs) loadDirs()
 })
 </script>
 

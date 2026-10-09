@@ -87,7 +87,7 @@ const configStore = useConfigStore()
 const localeStore = useLocaleStore()
 const { t, locale } = useI18n()
 // 宿主可用性(页脚「应用设置」入口显隐;default 适配器恒 false)
-const hostAppSettings = host.capabilities.appSettings
+const hostAppSettings = computed(() => host.capabilities.appSettings)
 
 // 取件专属页（2026-10-07 拆分：文件/文本分享迁往 /send,避免 tab 切换
 // 撑高卡片使取件失焦）。旧 ?tab=file|text 深链重定向到发送页
