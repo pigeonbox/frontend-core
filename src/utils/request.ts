@@ -63,7 +63,11 @@ instance.interceptors.response.use(
     const isAuthEndpoint =
       url.includes('/user/login') ||
       url.includes('/admin/login') ||
-      url.includes('/user/refresh')
+      url.includes('/user/refresh') ||
+      // 宿主适配器 SSO 登录端点(fnos/qnap 等):401=SSO 不可用的预期安全失败,
+      // 绝不能触发会话刷新/跳登录页(否则匿名访客被弹去登录表单)
+      url.includes('/api/fnos/login') ||
+      url.includes('/api/qnap/login')
     // 业务语义 401（2026-10-05 浏览器 E2E 发现的历史 bug）：取件/下载端点的
     // 401 表示"需要密码/密码错误/缺下载令牌"，与会话无关——绝不能触发刷新
     // 或跳登录（否则匿名取件人会被踢去登录页、密码输入框永远不出现）
