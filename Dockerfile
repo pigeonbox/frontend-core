@@ -11,7 +11,7 @@
 
 # Stage 1: Build(--platform 钉宿主平台: JS 产物平台无关,避免 arm64 交叉
 # 构建被扔进 qemu 致 npm ci 级慢/挂起;运行时的 nginx 段仍用目标平台)
-FROM --platform=$BUILDPLATFORM node:20-alpine AS build
+FROM --platform=$BUILDPLATFORM node:25-alpine AS build
 WORKDIR /src
 ARG NPM_REGISTRY=https://registry.npmmirror.com
 COPY package.json package-lock.json* ./
