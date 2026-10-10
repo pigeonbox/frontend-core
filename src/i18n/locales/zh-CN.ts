@@ -908,7 +908,7 @@ export default {
     submit: '取件',
     success: '取件成功',
     failed: '取件失败',
-    codeInvalid: '取件码为 6 位、分享码为 8 位字母或数字（区分大小写）',
+    codeInvalid: '取件码为 6 位字母或数字（不区分大小写），分享码为 8 位字母或数字（区分大小写）',
     noCode: '请输入取件码',
     fileName: '文件名',
     fileSize: '文件大小',
