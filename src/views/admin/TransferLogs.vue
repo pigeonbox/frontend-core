@@ -170,7 +170,10 @@ const fetchStats = async () => {
       stats.totalOperations = res.data.today_uploads || 0
       stats.uploads = res.data.today_uploads || 0
       stats.downloads = res.data.today_downloads || 0
-      stats.activeUsers = ((res.data as Record<string, unknown>).active_users as number) || 0
+      stats.activeUsers = ((res.data as unknown as Record<string, unknown>).active_users as number) || 0
+      // ^ 幻影字段记录(P1 类型切换发现):wire/契约 AdminStatsData 均无 active_users,
+      // 此读恒 undefined→0 兜底(行为零变化保守保留);"活跃用户"语义待产品定义
+      // (后端只有 total_users),如需真实数直接换 res.data.total_users
     }
   } catch (error) {
     console.error('获取统计失败:', error)

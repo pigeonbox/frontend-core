@@ -1,5 +1,6 @@
 import { request } from '@/utils/request'
 import type { ApiResponse, PaginatedResponse } from '@/types/common'
+import type { admin as adminContract } from '@pigeonbox/contracts'
 
 // 管理员配置更新类型（替代 any）
 export interface BasicConfigUpdate {
@@ -24,38 +25,21 @@ export type AdminConfigUpdate = Partial<BasicConfigUpdate & SecurityConfigUpdate
 }
 
 export const adminApi = {
-  // 管理员登录
-  login: (data: { username: string; password: string }) => {
-    return request<ApiResponse<{
-      token: string
-      user: {
-        id: number
-        username: string
-        nickname: string
-        role: string
-      }
-    }>>({
+  // 管理员登录(契约镜像 P1:core 返回 AdminLoginData{token,token_type,expires_in}——
+  // 旧手抄内联 {token,user{...}} 是照抄 /user/login 形态的幻影字段,wire 从不下发
+  // user;消费面(Login.vue)只判 code+另拉 fetchUserInfo,幻影零影响已核实)
+  login: (data: adminContract.AdminLoginReq) => {
+    return request<ApiResponse<adminContract.AdminLoginData>>({
       url: '/admin/login',
       method: 'POST',
       data,
     })
   },
 
-  // 获取系统统计
+  // 获取系统统计(契约镜像 P1:AdminStatsData 为超集,较旧内联 9 字段多
+  // latest_upload 等健康维度,消费面读子集无碍)
   getStats: () => {
-    return request<ApiResponse<{
-      total_files: number
-      total_users: number
-      total_size: number
-      today_uploads: number
-      today_downloads: number
-      // 文件健康洞察维度（2026-10-07；后端 AdminStatsData 同步暴露）
-      active_files: number
-      expired_files: number
-      expiring_soon_files: number
-      never_picked_files: number
-      forever_files: number
-    }>>({
+    return request<ApiResponse<adminContract.AdminStatsData>>({
       url: '/admin/stats',
       method: 'GET',
     })
