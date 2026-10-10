@@ -1,33 +1,15 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
+import type { share_anonymous as anonContract } from '@pigeonbox/contracts'
 
-export interface GenerateCodeData {
-  code: string // 6 位取件码
-  file_key: string
-  url: string
-  expire_seconds: number
-  max_pickup_count: number
-}
+// 契约镜像退休(P1):响应类型直取契约(字段逐一对照一致;RetrieveData 较旧手抄
+// 多 share_code?——文本分享取件跳详情页用,超集无害)。请求侧保持手抄:generate
+// 走 form 绑定,expire_value 接受 number|string 的宽松性为既有 quirk(见下)。
+export type GenerateCodeData = anonContract.GenerateCodeData
 
-export interface RetrieveData {
-  file_name: string
-  file_size: number
-  content_type: string
-  download_url: string
-  remaining_count: number
-  expire_at: number // Unix timestamp
-  require_password: boolean
-}
+export type RetrieveData = anonContract.RetrieveData
 
-export interface SearchByCodeData {
-  file_name: string
-  file_size: number
-  created_at: string
-  expire_at: string
-  pickup_count: number
-  max_pickup_count: number
-  require_password: boolean
-}
+export type SearchByCodeData = anonContract.SearchByCodeData
 
 export const anonymousApi = {
   // 生成取件码（先上传文件，再调这个拿 6 位码）

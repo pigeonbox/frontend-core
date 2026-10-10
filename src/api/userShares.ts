@@ -1,48 +1,16 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
+import type { share as shareContract } from '@pigeonbox/contracts'
 
-// 后端 /api/v1/user/shares 单项
-export interface UserShareItem {
-  id: number
-  code: string
-  prefix: string
-  suffix: string
-  file_name: string
-  file_path: string
-  size: number
-  text: string
-  expired_at: string | null
-  expired_count: number
-  used_count: number
-  require_auth: boolean
-  upload_type: string
-  created_at: string
-  updated_at: string
-  deleted_at: string | null
-  viewer_ip: string
-  viewer_at: string | null
-  viewer_count: number
-  /** P0 多文件：子文件数（0 = 旧单文件无子表行） */
-  file_count?: number
-  is_expired: boolean
-  is_text_share: boolean
-}
+// 契约镜像退休(P1):wire 类型直取 @pigeonbox/contracts——P2 IDL 化列车后服务层
+// 直返契约模型 UserShareItemData,字段与 wire 1:1(含 pickup_code/status/file_count,
+// 比旧手抄副本更全)。批次操作结果信封保持手抄:UserShareOpResp.data 为可选,
+// 与消费侧非空假设不合,随 P3 一并处理。
+export type UserShareItem = shareContract.UserShareItemData
 
-export interface UserShareListData {
-  items: UserShareItem[]
-  total: number
-  page: number
-  page_size: number
-  total_pages: number
-  has_next: boolean
-  has_prev: boolean
-}
+export type UserShareListData = shareContract.UserSharesListData
 
-export interface UserShareListResp {
-  code: number
-  message: string
-  data: UserShareListData
-}
+export type UserShareListResp = ApiResponse<UserShareListData>
 
 export interface BatchResultResp {
   code: number

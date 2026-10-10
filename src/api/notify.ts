@@ -1,22 +1,12 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
+import type { notify as notifyContract } from '@pigeonbox/contracts'
 
-export interface NotifyItem {
-  id: number
-  title: string
-  content: string
-  type: string // system / feature / maintenance
-  level: string // info / warning / error / success
-  status: number
-  start_at?: string
-  end_at?: string
-  created_at: string
-  updated_at: string
-}
+// 契约镜像退休(P1):admin 直出 model 的通知字段与契约 NotifyItem 一致
+// (start_at/end_at 为 optional 非 null;ListData 为超集含 total/page)。
+export type NotifyItem = notifyContract.NotifyItem
 
-export interface NotifyListData {
-  items: NotifyItem[]
-}
+export type NotifyListData = notifyContract.ListData
 
 export const notifyApi = {
   // 获取当前活跃通知（匿名公开端点；2026-10-07 前指向不存在的 /notifies/active，

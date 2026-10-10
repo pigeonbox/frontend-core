@@ -1,25 +1,12 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
+import type { notify as notifyContract } from '@pigeonbox/contracts'
 
-export interface UserNotifyItem {
-  id: number
-  title: string
-  content: string
-  type: string
-  level: string
-  read_at: string | null
-  created_at: string
-  is_read: boolean
-}
+// 契约镜像退休(P1):IDL 化列车后 notify mine 直返契约模型
+// (read_at 为 optional 非 null——消费侧如有 `=== null` 比较需一并调整)。
+export type UserNotifyItem = notifyContract.UserNotifyItemData
 
-export interface UserNotifyListData {
-  items: UserNotifyItem[]
-  total: number
-  unread: number
-  page: number
-  page_size: number
-  total_pages: number
-}
+export type UserNotifyListData = notifyContract.MineData
 
 export const userNotifyApi = {
   // 我的通知列表

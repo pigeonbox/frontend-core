@@ -4,28 +4,17 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
+import type { request as requestContract } from '@pigeonbox/contracts'
 
-/** 字段与 core model.FileRequest 的 json tag（snake_case）对齐；gorm.Model 内嵌字段前端未用 */
-export interface FileRequestItem {
-  token: string
-  title: string
-  max_files: number
-  max_bytes: number
-  expired_at: string | null
-  used_count: number
-  recv_bytes: number
-}
+// 契约镜像退休(P1):IDL 化列车后服务层直返契约模型 FileRequestData/PublicViewData
+// (含 id/created_at/updated_at,较旧手抄子集更全;expired_at 为 optional 而非 null——
+// 消费侧如有 `=== null` 比较需一并调整)。
+export type FileRequestItem = requestContract.FileRequestData
 
-export interface RequestPublicView {
-  token: string
-  title: string
-  max_files: number
-  max_bytes: number
-  expired_at: string | null
-}
+export type RequestPublicView = requestContract.PublicViewData
 
 export const requestApi = {
-  create: (data: { title: string; max_files: number; max_bytes: number; expire_value: number; expire_style: string }) =>
+  create: (data: requestContract.CreateReq) =>
     request<ApiResponse<FileRequestItem>>({ url: '/api/v1/user/requests', method: 'POST', data }),
 
   listMine: () => request<ApiResponse<FileRequestItem[]>>({ url: '/api/v1/user/requests', method: 'GET' }),
