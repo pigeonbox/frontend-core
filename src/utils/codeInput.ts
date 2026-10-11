@@ -1,15 +1,16 @@
 /**
- * 取件码/分享码统一输入的分派与分格纯逻辑（2026-10-08 双模式合并）。
+ * 取件码/分享码统一输入的分派与分格纯逻辑（2026-10-08 双模式合并；
+ * 2026-10-12 输入收敛 6 格固定——「只保留 6 位码」决策收口输入面）。
  *
  * 码型（与后端约束对齐）：
  *   - 6 位取件码：匿名取件（字符表全大写无混淆字符；输入大小写不敏感），
  *     后端映射未命中自动回源 DB，兼容 6 位自定义口令；
- *   - 8 位分享码 / 3-64 位自定义口令：分享详情页（/share/select 查库）。
+ *   - 8 位分享码 / 3-64 位自定义口令：分享详情页（/share/select 查库）——
+ *     仅作旧数据/自定义口令/联邦码的静默兜底通道（粘贴/深链），输入框不再扩格。
  */
 
 export const PICKUP_LEN = 6
-export const MAX_BOXES = 8
-/** 填满后防抖自动提交的等待（续输即取消，防手输 8 位码在第 6 位误触发） */
+/** 填满后防抖自动提交的等待（续输即取消） */
 export const AUTO_SUBMIT_MS = 700
 
 export type DispatchKind = 'retrieve' | 'share'
@@ -65,27 +66,22 @@ export function splitTyping(
 }
 
 export interface PastePlan {
-  /** 分格内回显的串（≤MAX_BOXES） */
+  /** 分格内回显的串（≤PICKUP_LEN；超长码回显前 6 位） */
   display: string
-  /** 分格数是否需要扩到 MAX_BOXES */
-  expand: boolean
   /** 非空 = 立即分派；null = 留在格子等按钮/续输 */
   target: DispatchTarget | null
 }
 
 /**
- * 粘贴整段码的分派计划：恰 6 位 → 立即匿名取件；7 位 → 扩格回显但不提交
- * （罕见长度，等按钮）；≥8 位 → 扩格回显前 8 位、按整串立即走分享详情。
+ * 粘贴整段码的分派计划：恰 6 位 → 立即匿名取件；≤6 位散串 → 回显等按钮；
+ * >6 位（旧 8 位码/自定义口令/联邦码）→ 回显前 6 位、按整串立即走分享详情兜底。
  */
 export function planPaste(text: string): PastePlan {
   const code = text.trim()
+  if (!code) return { display: '', target: null }
   if (isPickupCode(code)) {
-    return { display: code, expand: false, target: { kind: 'retrieve', auto: true, code } }
+    return { display: code, target: { kind: 'retrieve', auto: true, code } }
   }
-  if (!code) return { display: '', expand: false, target: null }
-  const expand = code.length > PICKUP_LEN
-  if (code.length >= MAX_BOXES) {
-    return { display: code.slice(0, MAX_BOXES), expand, target: { kind: 'share', auto: false, code } }
-  }
-  return { display: code, expand, target: null }
+  if (code.length <= PICKUP_LEN) return { display: code, target: null }
+  return { display: code.slice(0, PICKUP_LEN), target: { kind: 'share', auto: false, code } }
 }

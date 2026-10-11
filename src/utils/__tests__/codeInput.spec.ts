@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  MAX_BOXES,
   PICKUP_LEN,
   isPickupCode,
   planPaste,
@@ -56,8 +55,8 @@ describe('splitTyping（分格顺延与溢出）', () => {
   it('快速连续输入跨格顺延', () => {
     expect(splitTyping('', 0, 'ABCDEF', PICKUP_LEN)).toEqual({ value: 'ABCDEF', overflow: '' })
   })
-  it('超出 MAX_BOXES 的长序列整段计为溢出', () => {
-    expect(splitTyping('ABC12345', 7, '59XYZ', MAX_BOXES)).toEqual({
+  it('超出格数的长序列整段计为溢出', () => {
+    expect(splitTyping('ABC12345', 7, '59XYZ', 8)).toEqual({
       value: 'ABC12345',
       overflow: '9XYZ',
     })
@@ -71,29 +70,32 @@ describe('planPaste（粘贴整段分派）', () => {
   it('6 位 → 立即匿名取件', () => {
     expect(planPaste('ABC123')).toEqual({
       display: 'ABC123',
-      expand: false,
       target: { kind: 'retrieve', auto: true, code: 'ABC123' },
     })
   })
-  it('7 位 → 扩格回显但不提交（等按钮）', () => {
-    expect(planPaste('ABC1234')).toEqual({ display: 'ABC1234', expand: true, target: null })
+  it('≤6 位散串 → 回显等按钮', () => {
+    expect(planPaste('ABC12')).toEqual({ display: 'ABC12', target: null })
   })
-  it('8 位 → 扩格并立即走分享详情', () => {
+  it('7 位 → 回显前 6 位、整串立即走分享详情兜底', () => {
+    expect(planPaste('ABC1234')).toEqual({
+      display: 'ABC123',
+      target: { kind: 'share', auto: false, code: 'ABC1234' },
+    })
+  })
+  it('8 位分享码 → 回显前 6 位、整串走分享详情', () => {
     expect(planPaste('aB3xK9mQ')).toEqual({
-      display: 'aB3xK9mQ',
-      expand: true,
+      display: 'aB3xK9',
       target: { kind: 'share', auto: false, code: 'aB3xK9mQ' },
     })
   })
-  it('>8 位口令：回显前 8 位、按整串分派', () => {
+  it('>8 位口令：回显前 6 位、按整串分派', () => {
     const long = 'fede2e-Zzk2C6ZfSmVrTXOs'
     expect(planPaste(long)).toEqual({
-      display: long.slice(0, MAX_BOXES),
-      expand: true,
+      display: long.slice(0, PICKUP_LEN),
       target: { kind: 'share', auto: false, code: long },
     })
   })
   it('空白输入无动作', () => {
-    expect(planPaste('   ')).toEqual({ display: '', expand: false, target: null })
+    expect(planPaste('   ')).toEqual({ display: '', target: null })
   })
 })

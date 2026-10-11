@@ -27,7 +27,7 @@ import { splitTyping } from '@/utils/codeInput'
  * 逐格输入自动推进、退格回退、方向键导航、整段粘贴分发；
  * 填满 emit `complete`（不抢焦点，调用方可防抖分派或继续输入）；
  * 粘贴超长文本整段 emit `paste-code`、末格续输溢出 emit `expand`，
- * 均交由调用方分派（扩格 6→8 或按整串跳转）。
+ * 均交由调用方分派（现役调用方锁 6 格：溢出丢弃，超长粘贴按整串跳转）。
  * 取件码区分大小写：不做任何大小写归一（回归 2026-10-03 教训）。
  */
 const props = withDefaults(
@@ -66,11 +66,15 @@ const onInput = (i: number, e: InputEvent) => {
   if (!typed) {
     // 内容被清空（含输入法清除）
     updateAt(i, '')
+    el.value = ''
     return
   }
   // 单格只收最后一个字符；多余字符顺延到后续格（快速连续输入）
   const { value, overflow } = splitTyping(props.modelValue, i, typed, props.length)
   emit('update:modelValue', value)
+  // 溢出被截断时模型不变 → Vue 不重渲染，原始键入会残留在单格 DOM 里
+  // （一格显示 "aaa"）——必须就地把 DOM 值钉回模型字符
+  el.value = value[i] ?? ''
   // 顺延超出 length 的溢出上抛（末格续输第 7 位等），由调用方决定扩格
   if (overflow) {
     emit('expand', value + overflow)

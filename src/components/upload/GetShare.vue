@@ -1,17 +1,17 @@
 <template>
   <div class="get-share-container">
     <!-- 统一取件入口（2026-10-09 融合 /retrieve 执行逻辑：就地 Peek 预检，
-         无密码一键取件，有密码就地展开密码框；8 位码仍跳分享详情页） -->
+         无密码一键取件，有密码就地展开密码框；2026-10-12 起输入锁 6 格，
+         旧 8 位码/自定义口令仅粘贴或深链静默兜底走分享详情页） -->
     <div class="pickup-section" @keydown.enter="onEnter">
       <CodeBoxes
         ref="codeBoxesRef"
         v-model="code"
-        :length="boxLength"
+        :length="PICKUP_LEN"
         :disabled="pickupPhase !== 'input'"
         :aria-label="t('home.getShare.pickupTitle')"
         @complete="onComplete"
         @paste-code="onPasteCode"
-        @expand="onExpand"
       />
       <p class="pickup-hint">{{ hintText }}</p>
 
@@ -65,7 +65,6 @@ import { useConfigStore } from '@/stores/config'
 import { usePickup } from '@/composables/usePickup'
 import {
   AUTO_SUBMIT_MS,
-  MAX_BOXES,
   PICKUP_LEN,
   planPaste,
   resolveDispatch,
@@ -90,7 +89,6 @@ const {
 } = usePickup()
 
 const code = ref('')
-const boxLength = ref(PICKUP_LEN)
 const codeBoxesRef = ref<InstanceType<typeof CodeBoxes>>()
 const passwordInputRef = ref<{ focus: () => void }>()
 const historyDialog = ref<InstanceType<typeof LocalHistoryDialog>>()
@@ -140,7 +138,7 @@ const onEnter = () => {
   if (code.value) dispatchCode(code.value)
 }
 
-// ---- 防抖自动提交：填满后短暂停顿才分派，续输即取消（防手输 8 位码在第 6 位误触发） ----
+// ---- 防抖自动提交：填满后短暂停顿才分派，续输即取消 ----
 let autoTimer: ReturnType<typeof setTimeout> | null = null
 const cancelAutoSubmit = () => {
   if (autoTimer) {
@@ -153,26 +151,16 @@ const scheduleAutoSubmit = (value: string) => {
   autoTimer = setTimeout(() => {
     autoTimer = null
     if (value.length === PICKUP_LEN) void submitPickup(value)
-    else if (value.length === MAX_BOXES) goShare(value)
   }, AUTO_SUBMIT_MS)
 }
 
 const onComplete = (value: string) => scheduleAutoSubmit(value)
 
-// 手输第 7 位：扩到 8 格，焦点跟进；满 8 位重新挂防抖
-const onExpand = (value: string) => {
-  cancelAutoSubmit()
-  boxLength.value = MAX_BOXES
-  code.value = value.slice(0, MAX_BOXES)
-  nextTick(() => codeBoxesRef.value?.focus(code.value.length))
-  if (code.value.length === MAX_BOXES) scheduleAutoSubmit(code.value)
-}
-
-// 粘贴整段：6 位 → 立即取件；7 位 → 扩格回显等按钮；≥8 位 → 显示前 8 位、整串走分享
+// 粘贴整段：恰 6 位 → 立即取件；>6 位（旧 8 位码/自定义口令/联邦码）
+// → 显示前 6 位、整串静默走分享详情页兜底
 const onPasteCode = (text: string) => {
   cancelAutoSubmit()
   const plan = planPaste(text)
-  if (plan.expand) boxLength.value = MAX_BOXES
   code.value = plan.display
   if (plan.target) {
     follow(plan.target)
@@ -183,7 +171,7 @@ const onPasteCode = (text: string) => {
 
 // 中途删改时撤掉待发的自动提交
 watch(code, (v) => {
-  if (v.length !== boxLength.value) cancelAutoSubmit()
+  if (v.length !== PICKUP_LEN) cancelAutoSubmit()
 })
 
 const onHistoryPickup = (c: string) => {
@@ -196,8 +184,7 @@ watch(() => props.deepCode, (c) => {
   const clean = (c || '').trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32)
   if (!clean) return
   cancelAutoSubmit()
-  if (clean.length > PICKUP_LEN) boxLength.value = MAX_BOXES
-  code.value = clean.slice(0, MAX_BOXES)
+  code.value = clean.slice(0, PICKUP_LEN)
   void submitPickup(clean)
 }, { immediate: true })
 

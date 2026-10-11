@@ -157,8 +157,12 @@ export function translateError(err: BizError | Error | unknown): {
   }
   if (err && typeof err === 'object' && 'message' in err) {
     const anyErr = err as { message?: string; code?: number; trace_id?: string }
+    // request.ts 拦截器包装的 {code, message, trace_id} 普通对象同样要吃错误码映射，
+    // 否则 toast 落英文原文（"pickup code not found" 事件，2026-10-12）
+    const i18nKey =
+      anyErr.code != null ? (ERRCODE_KEY_MAP[anyErr.code] ?? null) : null
     return {
-      i18nKey: null,
+      i18nKey,
       fallback: anyErr.message || 'Unknown error',
       code: anyErr.code ?? null,
       traceId: anyErr.trace_id ?? '',

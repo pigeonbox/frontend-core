@@ -58,4 +58,22 @@ describe('translateError', () => {
     expect(r.i18nKey).toBeNull()
     expect(r.fallback).toBe('boom')
   })
+
+  it('request.ts 包装的普通对象 {code,message,trace_id} 同样吃错误码映射（英文 toast 回归钉）', () => {
+    const r = translateError({
+      code: 20005,
+      message: 'pickup code not found',
+      trace_id: 't-9',
+    })
+    expect(r.i18nKey).toBe('errcode.20005')
+    expect(r.fallback).toBe('pickup code not found')
+    expect(r.code).toBe(20005)
+    expect(r.traceId).toBe('t-9')
+  })
+
+  it('普通对象无 code 时保持无映射', () => {
+    const r = translateError({ message: 'plain' })
+    expect(r.i18nKey).toBeNull()
+    expect(r.code).toBeNull()
+  })
 })
