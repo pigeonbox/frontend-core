@@ -679,7 +679,7 @@ export default {
       },
       apitoken: {
         enabled: '认证总开关',
-        enabledHint: '关闭后携带 fcb_sk_ Key 的请求一律 401（紧急停用）',
+        enabledHint: '关闭后携带 pb_sk_ Key 的请求一律 401（紧急停用）',
         perKeyQps: '单 Key QPS',
         perKeyBurst: '单 Key Burst',
         save: '保存',

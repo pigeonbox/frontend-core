@@ -679,7 +679,7 @@ export default {
       },
       apitoken: {
         enabled: 'Master Switch',
-        enabledHint: 'When off, all requests carrying fcb_sk_ keys return 401 (emergency shutoff)',
+        enabledHint: 'When off, all requests carrying pb_sk_ keys return 401 (emergency shutoff)',
         perKeyQps: 'Per-Key QPS',
         perKeyBurst: 'Per-Key Burst',
         save: 'Save',
