@@ -1,6 +1,9 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
 
+// 契约切换挂起(P1/B2 波):contracts main 已含 admin.LocalFileEntry/
+// AdminListLocalFilesData/AdminImportLocalFileReq|Data(local-files 三端点
+// 已 IDL 化),待 contracts v0.10.0 tag+列车钉版后切 import 并退休手抄。
 // 本地文件条目（Path 为相对所选根目录的路径，正斜杠）
 export interface LocalFileEntry {
   name: string
