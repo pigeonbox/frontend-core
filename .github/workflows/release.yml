@@ -3,6 +3,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # tagger 显式 dispatch 兜底(GITHUB_TOKEN 推 tag 不产生 push 事件);ref=目标 tag
+  workflow_dispatch: {}
 
 permissions:
   contents: write
