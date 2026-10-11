@@ -203,7 +203,10 @@ export function useUploadQueue(opts: {
         task.status = 'success'
         task.progress = 100
         task.statusText = t('common.success')
-        ElMessage.success(`${task.file.name}: ${t('upload.success')}`)
+        // 秒传去重命中（2026-10-12）：内容已存在未重复存储，提示区别于普通上传
+        ElMessage.success(
+          `${task.file.name}: ${res.deduped ? t('upload.dedupedSuccess') : t('upload.success')}`
+        )
         return {
           code: res.code,
           share_url: res.url,

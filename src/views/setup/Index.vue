@@ -103,6 +103,42 @@
           <span class="switch-hint">{{ t('setup.openUploadHint') }}</span>
         </el-form-item>
 
+        <!-- 政策段（2026-10-12 扩容：过期策略/文件白名单/注册开关，全部可选） -->
+        <el-form-item :label="t('setup.expireStylesLabel')">
+          <el-checkbox-group v-model="setupForm.expireStyles">
+            <el-checkbox v-for="s in expireStyleOptions" :key="s" :label="s" :value="s">
+              {{ expireStyleText(s) }}
+            </el-checkbox>
+          </el-checkbox-group>
+          <div class="field-hint">{{ t('setup.expireStylesHint') }}</div>
+        </el-form-item>
+
+        <el-form-item :label="t('setup.maxSaveDaysLabel')">
+          <el-input-number
+            v-model="setupForm.maxSaveDays"
+            :min="0"
+            :max="3650"
+            size="large"
+            style="width: 100%"
+          />
+          <div class="field-hint">{{ t('setup.maxSaveDaysHint') }}</div>
+        </el-form-item>
+
+        <el-form-item :label="t('setup.extensionsLabel')">
+          <el-input
+            v-model="setupForm.extensionsText"
+            :placeholder="t('setup.extensionsPlaceholder')"
+            size="large"
+            clearable
+          />
+          <div class="field-hint">{{ t('setup.extensionsHint') }}</div>
+        </el-form-item>
+
+        <el-form-item :label="t('setup.allowRegistrationLabel')">
+          <el-switch v-model="setupForm.allowRegistration" />
+          <span class="switch-hint">{{ t('setup.allowRegistrationHint') }}</span>
+        </el-form-item>
+
         <el-form-item>
           <el-button
             type="primary"
@@ -139,6 +175,19 @@ const setupFormRef = ref<FormInstance>()
 const loading = ref(false)
 const alreadyInitialized = ref(false)
 
+// 过期样式多选：默认全选（=不限）；取消勾选即裁剪用户可选项
+const expireStyleOptions = ['minute', 'hour', 'day', 'week', 'month', 'year', 'forever']
+const expireStyleKey: Record<string, string> = {
+  minute: 'common.minutes',
+  hour: 'common.hours',
+  day: 'common.days',
+  week: 'common.weeks',
+  month: 'common.months',
+  year: 'common.years',
+  forever: 'common.forever'
+}
+const expireStyleText = (s: string) => t(expireStyleKey[s] ?? 'common.forever')
+
 const setupForm = reactive({
   adminUsername: '',
   adminEmail: '',
@@ -147,7 +196,12 @@ const setupForm = reactive({
   // 站点预配置（可选段）
   siteName: '',
   uploadSizeMb: 100,
-  openUpload: true
+  openUpload: true,
+  // 政策段（2026-10-12）
+  expireStyles: [...expireStyleOptions] as string[],
+  maxSaveDays: 0,
+  extensionsText: '',
+  allowRegistration: true
 })
 
 const validateConfirmPassword = (_rule: unknown, value: string, callback: (err?: Error) => void) => {
@@ -199,6 +253,10 @@ const handleSetup = async () => {
     loading.value = true
 
     // 成功：HTTP 200 + {message, username}；失败：拦截器抛错（HTTP 400/403/500）
+    const exts = setupForm.extensionsText
+      .split(/[,，\s]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
     const res = await publicApi.initializeSystem({
       admin_username: setupForm.adminUsername,
       admin_password: setupForm.adminPassword,
@@ -210,7 +268,12 @@ const handleSetup = async () => {
         : {}),
       site_config: {
         upload_size_mb: setupForm.uploadSizeMb,
-        open_upload: setupForm.openUpload
+        open_upload: setupForm.openUpload,
+        // 政策段（可选；不传 = 保持默认）：全选过期=不限、0 天=不限、空扩展名=不限类型
+        allowed_expire_styles: setupForm.expireStyles,
+        ...(setupForm.maxSaveDays > 0 ? { max_save_days: setupForm.maxSaveDays } : {}),
+        ...(exts.length > 0 ? { allowed_extensions: exts } : {}),
+        allow_registration: setupForm.allowRegistration
       }
     })
     ElMessage.success(res.message || t('setup.success'))
@@ -297,6 +360,13 @@ const handleSetup = async () => {
   margin-left: 10px;
   font-size: 12px;
   color: var(--color-text-tertiary);
+}
+
+.field-hint {
+  width: 100%;
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  line-height: 1.5;
 }
 
 .setup-footer {

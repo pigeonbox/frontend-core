@@ -65,6 +65,8 @@ export interface UploadFileResult {
   code: string
   url: string
   pickup_code?: string
+  /** 秒传去重命中（2026-10-12 D1=A 同用户内）：未重复占用存储，引用既有对象 */
+  deduped?: boolean
 }
 
 export async function uploadFile(

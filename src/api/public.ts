@@ -41,7 +41,15 @@ export interface InitializeSystemReq {
   admin_email: string
   // 站点预配置（2026-10-07 首启向导；可选，缺省走 yaml 默认）
   base_config?: { name: string; description: string; port?: number; host?: string }
-  site_config?: { upload_size_mb: number; open_upload: boolean }
+  site_config?: {
+    upload_size_mb: number
+    open_upload: boolean
+    // 政策段（2026-10-12 扩容；全部可选，缺省保持默认）
+    allowed_expire_styles?: string[]
+    max_save_days?: number
+    allowed_extensions?: string[]
+    allow_registration?: boolean
+  }
 }
 
 export const publicApi = {

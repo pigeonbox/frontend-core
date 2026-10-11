@@ -100,6 +100,20 @@
         />
         <el-button type="primary" @click="applyFilters">查询</el-button>
         <el-button @click="resetFilters">重置</el-button>
+
+        <!-- 保存视图（2026-10-12 对标上游 view-presets）：筛选条件存为命名视图一键切换 -->
+        <el-divider direction="vertical" />
+        <el-select
+          v-model="activeView"
+          placeholder="保存的视图"
+          clearable
+          style="width: 140px"
+          @change="applyView"
+        >
+          <el-option v-for="v in savedViews" :key="v.name" :label="v.name" :value="v.name" />
+        </el-select>
+        <el-button @click="saveCurrentView">保存视图</el-button>
+        <el-button :disabled="!activeView" @click="removeActiveView">删除视图</el-button>
       </div>
 
       <el-table
@@ -305,6 +319,7 @@ import {
   VideoPlay, Headset, Reading
 } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
+import { loadViews, saveView, deleteView } from '@/utils/savedViews'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
@@ -445,6 +460,45 @@ const resetFilters = () => {
   filters.owner_ip = ''
   filters.user_id = ''
   reload()
+}
+
+// ==================== 保存视图（2026-10-12 对标上游 view-presets）====================
+// 筛选条件存为命名视图（localStorage 浏览器本地），保存（同名覆盖）/应用/删除。
+const FILE_VIEWS_KEY = 'pigeonbox.admin.file-views.v1'
+const savedViews = ref(loadViews<Record<string, string>>(FILE_VIEWS_KEY))
+const activeView = ref('')
+
+const saveCurrentView = async () => {
+  try {
+    const { value } = await ElMessageBox.prompt('当前筛选条件将保存为命名视图（同名覆盖）', '保存视图', {
+      inputValue: activeView.value || '',
+      inputPattern: /\S/,
+      inputErrorMessage: '视图名称不能为空'
+    })
+    savedViews.value = saveView(FILE_VIEWS_KEY, value, { ...filters })
+    activeView.value = value.trim()
+    ElMessage.success(`视图「${activeView.value}」已保存`)
+  } catch {
+    // 用户取消
+  }
+}
+
+const applyView = (name: string) => {
+  const v = savedViews.value.find((x) => x.name === name)
+  if (!v) return
+  // 先清空全部筛选键再套视图（防视图外残留条件漏过滤）
+  Object.assign(filters, {
+    keyword: '', health: '', status: '', upload_type: '',
+    expired: '', deleted: '', owner_ip: '', user_id: ''
+  }, v.filters)
+  reload()
+}
+
+const removeActiveView = () => {
+  if (!activeView.value) return
+  savedViews.value = deleteView(FILE_VIEWS_KEY, activeView.value)
+  ElMessage.success(`视图「${activeView.value}」已删除`)
+  activeView.value = ''
 }
 
 // ==================== 管控状态机 ====================

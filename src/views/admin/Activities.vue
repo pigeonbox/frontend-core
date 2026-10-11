@@ -3,17 +3,42 @@
     <el-card shadow="never" class="activities-card">
       <div class="card-header">
         <div class="header-title">
-          <h2>审计日志</h2>
-          <p>后台管理操作全程留痕（配置变更/用户管理/文件管理/维护操作）</p>
+          <h2>活动流</h2>
+          <p>统一时间线：传输记录 + 管理审计（上传/下载/删除与配置/用户/维护操作一屏回溯）</p>
         </div>
         <div class="header-actions">
-          <el-select v-model="filterAction" placeholder="操作类型" clearable style="width: 200px" @change="reload()">
+          <el-select v-model="filterSource" placeholder="来源" style="width: 120px" @change="resetAndLoad">
+            <el-option label="全部" value="" />
+            <el-option label="传输" value="transfer" />
+            <el-option label="审计" value="audit" />
+          </el-select>
+          <el-select
+            v-model="filterAction"
+            placeholder="审计操作"
+            clearable
+            style="width: 150px"
+            :disabled="filterSource === 'transfer'"
+            @change="resetAndLoad"
+          >
             <el-option label="配置变更" value="config.update" />
             <el-option label="用户操作" value="user." />
             <el-option label="文件操作" value="file." />
             <el-option label="维护操作" value="maintenance." />
           </el-select>
-          <el-button @click="load()" :loading="loading">
+          <el-select
+            v-model="filterOperation"
+            placeholder="传输操作"
+            clearable
+            style="width: 120px"
+            :disabled="filterSource === 'audit'"
+            @change="resetAndLoad"
+          >
+            <el-option label="上传" value="upload" />
+            <el-option label="下载" value="download" />
+            <el-option label="删除" value="delete" />
+            <el-option label="查看" value="view" />
+          </el-select>
+          <el-button @click="resetAndLoad" :loading="loading">
             <el-icon><Refresh /></el-icon>
             刷新
           </el-button>
@@ -22,26 +47,35 @@
 
       <el-divider />
 
-      <el-table :data="logs" v-loading="loading" class="activities-table">
-        <el-table-column prop="CreatedAt" label="时间" width="180">
+      <el-table :data="rows" v-loading="loading" class="activities-table">
+        <el-table-column label="时间" width="170">
           <template #default="{ row }">
-            {{ formatDate(row.CreatedAt || row.created_at) }}
+            {{ formatDate(row.time) }}
           </template>
         </el-table-column>
-        <el-table-column prop="actor_name" label="操作者" width="140">
+        <el-table-column label="来源" width="80" align="center">
           <template #default="{ row }">
-            <el-tag size="small" :type="row.actor_name === 'system' ? 'info' : 'primary'" effect="plain">
-              {{ row.actor_name || 'system' }}
+            <el-tag size="small" :type="row.source === 'transfer' ? 'primary' : 'info'" effect="plain">
+              {{ row.source === 'transfer' ? '传输' : '审计' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="action" label="操作" width="240">
+        <el-table-column label="操作者" width="140">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.actor === 'system' ? 'info' : 'primary'" effect="plain">
+              {{ row.actor || 'system' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200">
           <template #default="{ row }">
             <el-tag size="small" effect="plain">{{ row.action }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="target" label="对象" min-width="260" show-overflow-tooltip />
-        <el-table-column prop="ip" label="来源 IP" width="150" />
+        <el-table-column label="对象" min-width="240" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.target }}</template>
+        </el-table-column>
+        <el-table-column prop="ip" label="来源 IP" width="140" />
         <el-table-column label="结果" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.success ? 'success' : 'danger'" size="small">
@@ -51,17 +85,10 @@
         </el-table-column>
       </el-table>
 
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="pageSize"
-          :total="total"
-          :page-sizes="[20, 50, 100]"
-          layout="total, sizes, prev, pager, next"
-          @size-change="handleSizeChange"
-          @current-change="handlePageChange"
-          background
-        />
+      <div class="stream-footer">
+        <span class="stream-count">已加载 {{ rows.length }} 条{{ totalCountLabel }}</span>
+        <el-button v-if="hasMore" :loading="loading" @click="loadMore">加载更多</el-button>
+        <span v-else class="stream-end">— 已到末尾 —</span>
       </div>
     </el-card>
   </div>
@@ -69,49 +96,161 @@
 
 <script setup lang="ts">
 import { toLocaleDateTime as formatDate } from '@/utils/format'
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
-import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { handleError } = useErrorHandler()
 
-const logs = ref<any[]>([])
+// 活动聚合流（2026-10-12 对标上游 activities 单一活动流）：
+// 传输记录（/admin/logs/transfer）与管理审计（/admin/activities）合并为一张
+// 时间线。跨两源无服务端统一分页，采用"每源各取一页、归一合并、增量加载更多"
+// 的流式模型（高频回溯场景：先看最近，按需下翻）。
+interface ActivityRow {
+  time: string
+  source: 'transfer' | 'audit'
+  actor: string
+  action: string
+  target: string
+  ip: string
+  success: boolean
+}
+
+const PER_FETCH = 25
+
+const rows = ref<ActivityRow[]>([])
+const loading = ref(false)
+const filterSource = ref('') // ''=全部 / transfer / audit
 const filterAction = ref('')
+const filterOperation = ref('')
+const auditPage = ref(1)
+const transferPage = ref(1)
+const auditTotal = ref(0)
+const transferTotal = ref(0)
+const auditDone = ref(false)
+const transferDone = ref(false)
 
-const { total, page, pageSize, loading, load, reload, handleSizeChange, handlePageChange } =
-  useTableQuery<any>(async ({ page, page_size }) => {
-    try {
-      const res = await adminApi.getActivities({
-        page,
-        page_size,
-        action: filterAction.value || undefined,
-      })
-      if (res.code === 0 || res.code === 200) {
-        const data: any = res.data
-        const items = Array.isArray(data) ? data : data?.list || []
-        return { items, total: Array.isArray(data) ? data.length : data?.total ?? 0 }
-      }
-      handleError(new Error(res.message || '获取审计日志失败'))
-      return { items: [], total: 0 }
-    } catch (e: any) {
-      handleError(e)
-      return { items: [], total: 0 }
+const hasMore = computed(() => {
+  if (filterSource.value === 'transfer') return !transferDone.value
+  if (filterSource.value === 'audit') return !auditDone.value
+  return !auditDone.value || !transferDone.value
+})
+
+const totalCountLabel = computed(() => {
+  const total = (filterSource.value === 'transfer' ? 0 : auditTotal.value) +
+    (filterSource.value === 'audit' ? 0 : transferTotal.value)
+  return total > 0 ? ` / 共约 ${total} 条` : ''
+})
+
+const timeMs = (t: string) => {
+  const ms = Date.parse((t || '').replace(' ', 'T'))
+  return Number.isFinite(ms) ? ms : 0
+}
+
+const auditRow = (r: any): ActivityRow => ({
+  time: r.CreatedAt || r.created_at || '',
+  source: 'audit',
+  actor: r.actor_name || 'system',
+  action: r.action || '',
+  target: r.target || '',
+  ip: r.ip || '',
+  success: r.success !== false
+})
+
+const transferRow = (r: any): ActivityRow => ({
+  time: r.created_at || r.CreatedAt || '',
+  source: 'transfer',
+  actor: r.username || '匿名',
+  action: r.operation || '',
+  target: [r.file_name, r.file_code ? `#${r.file_code}` : ''].filter(Boolean).join(' ') || '-',
+  ip: r.ip || '',
+  success: true // 传输日志只记录成功落账的传输
+})
+
+const fetchAudit = async () => {
+  try {
+    const res = await adminApi.getActivities({
+      page: auditPage.value,
+      page_size: PER_FETCH,
+      action: filterAction.value || undefined
+    })
+    if (res.code === 0 || res.code === 200) {
+      const data: any = res.data
+      const items: any[] = Array.isArray(data) ? data : data?.list || []
+      auditTotal.value = Array.isArray(data) ? data.length : data?.total ?? 0
+      rows.value.push(...items.map(auditRow))
+      if (items.length < PER_FETCH) auditDone.value = true
+      else auditPage.value++
     }
-  })
+  } catch (e) {
+    handleError(e)
+    auditDone.value = true
+  }
+}
 
-onMounted(reload)
+const fetchTransfer = async () => {
+  try {
+    const res = await adminApi.getTransferLogsList({
+      page: transferPage.value,
+      page_size: PER_FETCH,
+      operation: filterOperation.value || undefined
+    })
+    if (res.code === 0 || res.code === 200) {
+      const data: any = res.data
+      const items: any[] = data?.items || (Array.isArray(data) ? data : [])
+      transferTotal.value = data?.total ?? items.length
+      rows.value.push(...items.map(transferRow))
+      if (items.length < PER_FETCH) transferDone.value = true
+      else transferPage.value++
+    }
+  } catch (e) {
+    handleError(e)
+    transferDone.value = true
+  }
+}
+
+const sortRows = () => {
+  rows.value.sort((a, b) => timeMs(b.time) - timeMs(a.time))
+}
+
+const loadMore = async () => {
+  loading.value = true
+  try {
+    const jobs: Promise<void>[] = []
+    if (filterSource.value !== 'transfer' && !auditDone.value) jobs.push(fetchAudit())
+    if (filterSource.value !== 'audit' && !transferDone.value) jobs.push(fetchTransfer())
+    await Promise.all(jobs)
+    sortRows()
+  } finally {
+    loading.value = false
+  }
+}
+
+const resetAndLoad = () => {
+  rows.value = []
+  auditPage.value = 1
+  transferPage.value = 1
+  auditDone.value = false
+  transferDone.value = false
+  auditTotal.value = 0
+  transferTotal.value = 0
+  loadMore()
+}
+
+onMounted(resetAndLoad)
 </script>
 
 <style scoped>
 .activities-container { animation: fadeIn 0.5s ease-in; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 .activities-card { border-radius: var(--radius-xl); border: none; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
+.card-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
 .header-title h2 { margin: 0 0 4px; font-size: 24px; font-weight: 600; color: var(--color-text-primary); }
 .header-title p { margin: 0; font-size: 14px; color: var(--color-text-secondary); }
-.header-actions { display: flex; gap: 8px; align-items: center; }
-.pagination-wrapper { margin-top: 24px; display: flex; justify-content: center; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.stream-footer { margin-top: 20px; display: flex; justify-content: center; align-items: center; gap: 16px; }
+.stream-count { font-size: 13px; color: var(--color-text-tertiary); }
+.stream-end { font-size: 13px; color: var(--color-text-tertiary); }
 :deep(.el-table th) { background: var(--color-muted) !important; font-weight: 600; }
 </style>

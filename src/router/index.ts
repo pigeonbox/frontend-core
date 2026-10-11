@@ -186,7 +186,7 @@ const routes: RouteRecordRaw[] = [
         path: 'activities',
         name: 'AdminActivities',
         component: () => import('@/views/admin/Activities.vue'),
-        meta: { title: '审计日志' },
+        meta: { title: '活动流' },
       },
       {
         path: 'maintenance',
