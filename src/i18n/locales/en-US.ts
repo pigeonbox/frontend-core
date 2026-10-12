@@ -244,6 +244,8 @@ export default {
     scan_qr: 'Share via QR',
     customCode: 'Custom Pickup Code',
     customCodePlaceholder: '3-32 letters, digits, - or _ (leave empty for random)',
+    note: 'File Note',
+    notePlaceholder: 'A message shown to the recipient together with the file (optional)',
     textPlaceholder: 'Enter the text to share...',
     textRequired: 'Please enter some text',
     textShareBtn: 'Secure Send',
@@ -290,6 +292,7 @@ export default {
     fileShare: 'File Share',
     downloadFile: 'Download File',
     textContent: 'Text Content',
+    noteLabel: 'Note',
     copyText: 'Copy Text',
     codeLabel: 'Share Code',
     typeLabel: 'Share Type',
@@ -529,6 +532,22 @@ export default {
     announcements: 'Announcements',
     users: 'User Management',
     config: 'System Settings',
+    adminLogin: {
+      title: 'Admin Sign-In',
+      username: 'Username',
+      usernamePlaceholder: 'Enter your username',
+      usernameRule: 'Username is required',
+      password: 'Password',
+      passwordPlaceholder: 'Enter your password',
+      passwordRule: 'Password is required',
+      submit: 'Sign In',
+      submitting: 'Signing in…',
+      success: 'Signed in',
+      notAdmin: 'This account is not an administrator',
+      backHome: 'Back to Home',
+      demoTitle: 'Demo account',
+      demoBody: 'Defaults to admin / admin123; if PB_ADMIN_PASSWORD was set at startup, use that password instead',
+    },
     configPage: {
     themes: {
       label: 'Theme Presets',
@@ -545,18 +564,36 @@ export default {
       saved: 'Settings saved',
       saveFailed: 'Save failed',
       fetchFailed: 'Failed to load settings',
-      tabs: {
-        basic: 'Basic',
-        upload: 'Upload',
-        transfer: 'Transfer',
-        user: 'User',
-        ratelimit: 'Security & Rate Limiting',
-        appearance: 'Appearance',
-        download: 'Download',
-        notify: 'Notifications & Email',
-        oidc: 'Login Integration (OIDC)',
-        localimport: 'Local Import',
-        apitoken: 'API Token'
+      nav: {
+        site: 'Site & Appearance',
+        share: 'Upload & Sharing',
+        download: 'Download & Direct Upload',
+        account: 'Users & Login',
+        security: 'Security & Rate Limiting',
+        notify: 'Notifications & Email'
+      },
+      navDesc: {
+        site: 'Site identity and public appearance',
+        share: 'Who can upload, and how shares are created by default',
+        download: 'How downloads and object-storage direct transfers behave',
+        account: 'Registration policy, per-user defaults and sign-in methods',
+        security: 'Rate limiting rules and API key admission',
+        notify: 'Off-site notifications for share events and email'
+      },
+      sections: {
+        site: 'Site Info',
+        appearance: 'Appearance & Branding',
+        uploadGate: 'Upload Access',
+        shareDefault: 'Share Defaults',
+        localImport: 'Local Import',
+        download: 'Download Behavior',
+        direct: 'Direct Upload (Object Storage)',
+        user: 'Users & Registration',
+        oidc: 'Single Sign-On (OIDC)',
+        ratelimit: 'Rate Limiting',
+        apitoken: 'API Token',
+        webhook: 'Webhook',
+        smtp: 'SMTP Email'
       },
       basic: {
         siteName: 'Site Name',
@@ -572,9 +609,6 @@ export default {
         uploadGatesHint: 'Visitor upload toggle, upload size, login requirement and chunking are managed by deployment config (config.yaml transfer section / PB_* env vars) and cannot be edited here'
       },
       user: {
-        save: 'Save User Settings',
-        saved: 'User settings saved and applied immediately',
-        saveHint: 'Takes effect immediately after saving (registration toggle / session duration; quotas and upload limits default to system values, with per-user overrides taking precedence)',
         allowRegistration: 'Allow User Registration',
         uploadLimit: 'Per-User Upload Limit',
         bytesDefault: 'bytes (default 50MB)',
@@ -593,8 +627,6 @@ export default {
         blockSeconds: 'Block Duration (Seconds)',
         redisShared: 'Redis Shared Counters',
         redisHint: 'Determined by deployment config (rate_limit.use_redis / PB_RATE_LIMIT_USE_REDIS); cannot be changed here',
-        save: 'Save Rate Limit Settings',
-        saved: 'Rate limit settings saved and hot-reloaded',
         viewStatus: 'View Runtime Status',
         status: 'Runtime Status',
         fetchStatusFailed: 'Failed to load runtime status'
@@ -608,8 +640,6 @@ export default {
         showAdminEntryHint: 'Turning off only hides the footer link; /admin stays reachable, and signed-in admins keep their top-bar menu entry',
     robots: 'Robots.txt',
     robotsHint: 'Crawler rules for search engines; takes effect at /robots.txt immediately after saving. Leave empty for the default Disallow-all',
-        save: 'Save Appearance',
-        saved: 'Appearance saved and applied sitewide'
       },
       upload: {
         openUpload: 'Allow Guest Uploads',
@@ -620,9 +650,6 @@ export default {
         anonymousDailyCountHint: 'Uploads allowed per IP per day (0 = unlimited)',
         anonymousDailyBytes: 'Guest Daily Quota (MB/IP)',
         anonymousDailyBytesHint: 'Upload traffic per IP per day in MB (0 = unlimited)',
-        directSection: 'Direct Upload (Object Storage)',
-        save: 'Save Upload Settings',
-        saved: 'Upload settings saved',
       },
       download: {
         s3Direct: 'S3 Direct Download (302)',
@@ -636,14 +663,11 @@ export default {
         presignThreshold: 'Direct Upload Threshold (MB)',
         presignThresholdHint: 'Files larger than this use presigned direct upload to COS so traffic bypasses the server',
         presignTTL: 'Presigned URL TTL (Seconds)',
-        presignTTLHint: 'How long presigned URLs stay valid (60-3600 seconds); expired ones require a new pickup',
-        save: 'Save Download Settings',
-        saved: 'Download settings saved'
+        presignTTLHint: 'How long presigned URLs stay valid (60-3600 seconds); expired ones require a new pickup'
       },
       notify: {
         webhook: 'Webhook URL',
         webhookPlaceholder: 'POST endpoint for notify.created events; leave empty to disable',
-        smtpSection: 'SMTP Email',
         smtpHost: 'SMTP Host',
         username: 'Username',
         password: 'Password',
@@ -653,8 +677,6 @@ export default {
         testToPlaceholder: 'Recipient email',
         testSend: 'Send Test Email',
         testHint: 'Save before testing; the test uses the currently active settings',
-        save: 'Save Notification Settings',
-        saved: 'Notification settings saved and applied live',
         testSent: 'Test email sent',
         fillTo: 'Please enter a recipient email',
         sendFailed: 'Send failed'
@@ -666,25 +688,19 @@ export default {
         test: 'Test Connection',
         testButton: 'Validate Discovery',
         testOk: 'Discovery validated',
-        testFailed: 'Validation failed',
-        save: 'Save OIDC',
-        saved: 'OIDC settings saved and applied live'
+        testFailed: 'Validation failed'
       },
       localimport: {
         enabled: 'Enable Local Import',
         enabledHint: 'Generate pickup codes for files in local server/NAS directories without uploading them',
         roots: 'Allowed Directories',
-        rootsPlaceholder: 'Absolute paths, comma-separated; must be reachable inside the container (e.g. /app/data/import)',
-        save: 'Save Local Import',
-        saved: 'Local import settings saved and applied live'
+        rootsPlaceholder: 'Absolute paths, comma-separated; must be reachable inside the container (e.g. /app/data/import)'
       },
       apitoken: {
         enabled: 'Master Switch',
         enabledHint: 'When off, all requests carrying pb_sk_ keys return 401 (emergency shutoff)',
         perKeyQps: 'Per-Key QPS',
-        perKeyBurst: 'Per-Key Burst',
-        save: 'Save',
-        saved: 'API token settings saved and applied live'
+        perKeyBurst: 'Per-Key Burst'
       }
     },
     storage: 'Storage Management',
@@ -946,6 +962,8 @@ export default {
       abort: 'Upload cancelled',
       failed: 'Upload failed',
       hashing: 'Computing instant-upload fingerprint...',
+      codeReady: 'Pickup code ready',
+      codeReadyHint: 'Share it with the recipient now; the file can be fetched once the upload completes',
     },
     quickUploadHit: 'Instant upload hit — the file already exists, share code issued',
   },

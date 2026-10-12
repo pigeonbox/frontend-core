@@ -116,6 +116,7 @@ export function useUploadQueue(opts: {
     encrypted: settings.e2e,
     // 统一为登录才发（原 multi 路径无条件发送，对齐 single 路径与后端 v0.11.1 语义）
     custom_code: opts.isLoggedIn?.() ?? true ? settings.custom_code || undefined : undefined,
+    note: settings.note || undefined,
   })
 
   const start = async (): Promise<ShareResult | null> => {
@@ -192,6 +193,7 @@ export function useUploadQueue(opts: {
             password: settings.password || undefined,
             encrypted: settings.e2e && task.payload !== task.file,
             custom_code: opts.isLoggedIn?.() ?? true ? settings.custom_code || undefined : undefined,
+            note: settings.note || undefined,
           },
           (loaded, total) => {
             task.progress = Math.round((loaded / Math.max(total, 1)) * 100)

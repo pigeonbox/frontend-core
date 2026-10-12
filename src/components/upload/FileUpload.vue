@@ -52,7 +52,7 @@
     </transition-group>
 
     <!-- 共享设置（对所有文件生效；常驻——恒定布局，未选文件时 CTA 禁用） -->
-    <ShareSettingsForm :settings="settings" />
+    <ShareSettingsForm :settings="settings" show-note />
 
     <!-- 上传按钮（对标上游"安全寄送"：纸飞机图标 + 寄送语义） -->
     <el-button
@@ -128,6 +128,8 @@ const queue = useUploadQueue({
       expire_style: s.expire_style,
       require_auth: s.require_auth,
       password: s.password || undefined,
+      note: s.note || undefined,
+      e2e: s.e2e,
     }),
 })
 const { tasks, isUploading, canStart, addFiles, remove, cancel, start, dispose } = queue

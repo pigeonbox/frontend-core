@@ -18,57 +18,57 @@
           class="admin-menu"
           router
         >
-          <el-menu-item index="/admin/dashboard">
+          <el-menu-item :index="adminBase + '/dashboard'">
             <el-icon><Monitor /></el-icon>
             <span>{{ t('admin.dashboard') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/files">
+          <el-menu-item :index="adminBase + '/files'">
             <el-icon><Folder /></el-icon>
             <span>{{ t('admin.files') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/local-files">
+          <el-menu-item :index="adminBase + '/local-files'">
             <el-icon><FolderOpened /></el-icon>
             <span>{{ t('admin.localFiles') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/users">
+          <el-menu-item :index="adminBase + '/users'">
             <el-icon><User /></el-icon>
             <span>{{ t('admin.users') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/storage">
+          <el-menu-item :index="adminBase + '/storage'">
             <el-icon><Box /></el-icon>
             <span>{{ t('admin.storage') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/logs">
+          <el-menu-item :index="adminBase + '/logs'">
             <el-icon><Document /></el-icon>
             <span>{{ t('admin.logs') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/moderation">
+          <el-menu-item :index="adminBase + '/moderation'">
             <el-icon><View /></el-icon>
             <span>{{ t('admin.moderationTitle') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/activities">
+          <el-menu-item :index="adminBase + '/activities'">
             <el-icon><List /></el-icon>
             <span>{{ t('admin.activities') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/config">
+          <el-menu-item :index="adminBase + '/config'">
             <el-icon><Setting /></el-icon>
             <span>{{ t('admin.config') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/maintenance">
+          <el-menu-item :index="adminBase + '/maintenance'">
             <el-icon><Tools /></el-icon>
             <span>{{ t('admin.maintenance') }}</span>
           </el-menu-item>
 
-          <el-menu-item index="/admin/announcements">
+          <el-menu-item :index="adminBase + '/announcements'">
             <el-icon><Bell /></el-icon>
             <span>{{ t('admin.announcements') }}</span>
           </el-menu-item>
@@ -132,6 +132,8 @@
 </template>
 
 <script setup lang="ts">
+import { getAdminBase } from '@/router'
+const adminBase = getAdminBase()
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -181,7 +183,7 @@ const handleCommand = async (command: string) => {
         })
         userStore.logout()
         ElMessage.success(t('admin.loggedOut'))
-        router.push('/admin/login')
+        router.push(adminBase + '/login')
       } catch (error: unknown) {
         if (error !== 'cancel') {
           console.error('退出登录失败:', error)

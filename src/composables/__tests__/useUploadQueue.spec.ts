@@ -40,6 +40,7 @@ const baseSettings = (): ShareSettings => ({
   password: '',
   e2e: false,
   custom_code: '',
+  note: '',
 })
 
 const mocked = {

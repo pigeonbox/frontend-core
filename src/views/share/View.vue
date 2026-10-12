@@ -82,6 +82,14 @@
           <!-- 文件分享（回归：select 响应恒带 url/download_url，不能作文件判据；
                文本分享 = 有 text 且无 file_name/files，否则文本被当文件渲染） -->
           <div v-if="hasFileContent" class="file-share-content">
+            <!-- 文件备注（发送者随文件投递的附言） -->
+            <div v-if="shareData.note" class="note-box">
+              <div class="note-label">
+                <el-icon><Memo /></el-icon>
+                <span>{{ t('share.noteLabel') }}</span>
+              </div>
+              <div class="note-text">{{ shareData.note }}</div>
+            </div>
             <!-- 多文件列表（P0 多文件）：逐文件下载 + 打包 zip -->
             <div v-if="shareFiles.length > 1" class="multi-file-section">
               <div class="multi-header">
@@ -181,7 +189,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import {
-  HomeFilled, Document, Folder, Download, CopyDocument, Loading
+  HomeFilled, Document, Folder, Download, CopyDocument, Loading, Memo
 } from '@element-plus/icons-vue'
 import { shareApi } from '@/api/share'
 import { decryptBytes, decryptText } from '@/utils/e2e'
@@ -640,5 +648,31 @@ onMounted(() => {
   .file-card {
     padding: 24px;
   }
+}
+/* 文件备注（发送者附言） */
+.note-box {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  background: var(--color-muted);
+}
+
+.note-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.note-text {
+  font-size: 14px;
+  color: var(--color-text-regular);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 </style>

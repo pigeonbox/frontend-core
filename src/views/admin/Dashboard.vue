@@ -6,15 +6,15 @@
         <h2 class="welcome-title">{{ greeting }}, {{ adminName }} 👋</h2>
         <p class="welcome-subtitle">{{ t('admin.welcomeSubtitle') }}</p>
         <div class="quick-actions">
-          <el-button type="primary" round @click="$router.push('/admin/files')">
+          <el-button type="primary" round @click="$router.push(adminBase + '/files')">
             <el-icon><Folder /></el-icon>
             {{ t('admin.files') }}
           </el-button>
-          <el-button round @click="$router.push('/admin/users')">
+          <el-button round @click="$router.push(adminBase + '/users')">
             <el-icon><User /></el-icon>
             {{ t('admin.users') }}
           </el-button>
-          <el-button round @click="$router.push('/admin/config')">
+          <el-button round @click="$router.push(adminBase + '/config')">
             <el-icon><Setting /></el-icon>
             {{ t('admin.config') }}
           </el-button>
@@ -162,7 +162,7 @@
                 <el-icon><User /></el-icon>
                 {{ t('admin.recentUsers') }}
               </h3>
-              <el-button text type="primary" @click="$router.push('/admin/users')">
+              <el-button text type="primary" @click="$router.push(adminBase + '/users')">
                 {{ t('common.viewAll') }}
                 <el-icon><ArrowRight /></el-icon>
               </el-button>
@@ -209,7 +209,7 @@
                 <el-icon><Folder /></el-icon>
                 {{ t('admin.recentFiles') }}
               </h3>
-              <el-button text type="primary" @click="$router.push('/admin/files')">
+              <el-button text type="primary" @click="$router.push(adminBase + '/files')">
                 {{ t('common.viewAll') }}
                 <el-icon><ArrowRight /></el-icon>
               </el-button>
@@ -254,6 +254,8 @@
 </template>
 
 <script setup lang="ts">
+import { getAdminBase } from '@/router'
+const adminBase = getAdminBase()
 import { formatFileSize, toLocaleDateTime } from '@/utils/format'
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -333,7 +335,7 @@ const healthCards = computed(() => [
 ])
 
 const goHealth = (key: string) => {
-  router.push({ path: '/admin/files', query: { health: key } })
+  router.push({ path: adminBase + '/files', query: { health: key } })
 }
 
 const animatedStats = reactive({

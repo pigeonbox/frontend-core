@@ -23,8 +23,8 @@ export const presignApi = {
       .join('')
   },
 
-  // 申请预签名上传 URL
-  init: (data: presignContract.InitReq) => {
+  // 申请预签名上传 URL（note 本地扩展字段，待 contracts d.ts 钉版升级后并入契约）
+  init: (data: presignContract.InitReq & { note?: string }) => {
     return request<ApiResponse<PresignInitData>>({
       url: '/api/v1/presign/upload',
       method: 'POST',

@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { host } from '@/host'
+import { adminBasePath } from '@/utils/adminPath'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -116,14 +117,21 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Docs.vue'),
     meta: { title: 'API 文档' },
   },
+]
+
+// adminRoutes 管理后台路由族（登录页+后台）：base 可替换实现管理入口路径混淆
+// （#502，ui.admin_path / PB_UI_ADMIN_PATH，缺省 /admin；自定义后 /admin 不再
+// 注册，落 404 兜底）。由守卫在首个导航时按公开配置 lazy 注册。
+function adminRoutes(base: string): RouteRecordRaw[] {
+  return [
   {
-    path: '/admin/login',
+    path: `${base}/login`,
     name: 'AdminLogin',
     component: () => import('@/views/admin/Login.vue'),
     meta: { title: '管理员登录' },
   },
   {
-    path: '/admin',
+    path: base,
     name: 'Admin',
     component: () => import('@/views/admin/index.vue'),
     meta: { title: '管理后台', requiresAuth: true, requiresAdmin: true },
@@ -202,7 +210,8 @@ const routes: RouteRecordRaw[] = [
       },
     ],
   },
-]
+  ]
+}
 
 const router = createRouter({
   history: createWebHashHistory(),  // 使用 hash 模式，避免与后端 API 路由冲突
@@ -212,6 +221,10 @@ const router = createRouter({
 // 未初始化状态缓存（对标上游未初始化全站拦截：唯一入口= /setup 向导）
 let initChecked = false
 let systemInitialized = true
+
+// 管理入口路由族的 lazy 注册状态（#502 路径混淆）
+let adminRoutesInstalled = false
+let adminBase = '/admin'
 
 // 路由守卫
 router.beforeEach(async (to, _from, next) => {
@@ -235,6 +248,26 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
+  // 管理入口路径混淆（#502）：首个导航按公开配置注册 admin 路由族。
+  // 自定义后 /admin 不注册（落 404 兜底），仅 `/<adminPath>` 可达。
+  if (!adminRoutesInstalled) {
+    adminRoutesInstalled = true
+    try {
+      const { useConfigStore } = await import('@/stores/config')
+      const cfg = useConfigStore()
+      if (!cfg.loaded) await cfg.fetchConfig().catch(() => null)
+      adminBase = adminBasePath(cfg.config?.adminPath)
+    } catch {
+      adminBase = '/admin'
+    }
+    for (const r of adminRoutes(adminBase)) router.addRoute(r)
+    if (to.path === adminBase || to.path.startsWith(adminBase + '/')) {
+      // 动态路由注册前本导航已按 404 兜底解析，重新解析以匹配新路由
+      next({ ...to, replace: true })
+      return
+    }
+  }
+
   // 设置页面标题
   const title = (to.meta.title as string) || 'PigeonBox'
   document.title = title
@@ -247,8 +280,8 @@ router.beforeEach(async (to, _from, next) => {
     const session = localStorage.getItem('fcb_session')
     if (!session) {
       // 如果是管理后台，跳转到管理员登录页面
-      if (to.path.startsWith('/admin')) {
-        next('/admin/login')
+      if (to.path === adminBase || to.path.startsWith(adminBase + '/')) {
+        next(adminBase + '/login')
       } else {
         next('/user/login')
       }
@@ -261,7 +294,7 @@ router.beforeEach(async (to, _from, next) => {
     if (to.meta.requiresAdmin) {
       const userRole = localStorage.getItem('userRole')
       if (userRole !== 'admin') {
-        next('/admin/login')
+        next(adminBase + '/login')
         return
       }
     }
@@ -271,3 +304,8 @@ router.beforeEach(async (to, _from, next) => {
 })
 
 export default router
+
+/** 管理后台路由基址（守卫按公开配置决定；供管理端内导航/入口链接复用） */
+export function getAdminBase(): string {
+  return adminBase
+}

@@ -244,6 +244,8 @@ export default {
     scan_qr: '扫码分享',
     customCode: '自定义取件码',
     customCodePlaceholder: '3-32 位字母、数字、- 或 _（留空随机）',
+    note: '文件备注',
+    notePlaceholder: '给取件人的附言，随文件一起展示（可空）',
     textPlaceholder: '请输入要分享的文本内容...',
     textRequired: '请输入文本内容',
     textShareBtn: '安全寄送',
@@ -290,6 +292,7 @@ export default {
     fileShare: '文件分享',
     downloadFile: '下载文件',
     textContent: '文本内容',
+    noteLabel: '备注',
     copyText: '复制文本',
     codeLabel: '分享码',
     typeLabel: '分享类型',
@@ -529,6 +532,22 @@ export default {
     announcements: '公告管理',
     users: '用户管理',
     config: '系统配置',
+    adminLogin: {
+      title: '管理后台登录',
+      username: '用户名',
+      usernamePlaceholder: '请输入用户名',
+      usernameRule: '请输入用户名',
+      password: '密码',
+      passwordPlaceholder: '请输入密码',
+      passwordRule: '请输入密码',
+      submit: '立即登录',
+      submitting: '登录中…',
+      success: '登录成功',
+      notAdmin: '该账号不是管理员',
+      backHome: '返回首页',
+      demoTitle: '演示账号',
+      demoBody: '默认 admin / admin123；若启动时设置了 PB_ADMIN_PASSWORD，以该口令为准',
+    },
     configPage: {
     themes: {
       label: '主题预设',
@@ -545,18 +564,36 @@ export default {
       saved: '配置保存成功',
       saveFailed: '保存失败',
       fetchFailed: '获取配置失败',
-      tabs: {
-        basic: '基础配置',
-        upload: '上传设置',
-        transfer: '传输配置',
-        user: '用户配置',
-        ratelimit: '安全与限流',
-        appearance: '外观主题',
-        download: '下载设置',
-        notify: '通知与邮件',
-        oidc: '登录集成 OIDC',
-        localimport: '本地导入',
-        apitoken: 'API Token'
+      nav: {
+        site: '站点与外观',
+        share: '上传与分享',
+        download: '下载与直传',
+        account: '用户与登录',
+        security: '安全与限流',
+        notify: '通知与邮件'
+      },
+      navDesc: {
+        site: '站点的基础信息与对外形象',
+        share: '决定谁可以上传、分享如何默认创建',
+        download: '决定下载与对象存储直传的运行方式',
+        account: '注册开放策略、用户默认配额与登录方式',
+        security: '接口限流规则与 API Key 准入',
+        notify: '分享创建等事件的站外通知与邮件'
+      },
+      sections: {
+        site: '站点信息',
+        appearance: '外观与品牌',
+        uploadGate: '上传准入',
+        shareDefault: '分享默认值',
+        localImport: '本地导入',
+        download: '下载行为',
+        direct: '直传（对象存储）',
+        user: '用户与注册',
+        oidc: '单点登录 OIDC',
+        ratelimit: '接口限流',
+        apitoken: 'API Token',
+        webhook: 'Webhook',
+        smtp: 'SMTP 邮件'
       },
       basic: {
         siteName: '站点名称',
@@ -572,9 +609,6 @@ export default {
         uploadGatesHint: '匿名上传开关/上传大小/需登录/分片开关由部署配置管理（config.yaml transfer 段 / PB_* 环境变量），不在线编辑'
       },
       user: {
-        save: '保存用户配置',
-        saved: '用户配置已保存并即时生效',
-        saveHint: '保存后即时生效（注册开关/会话时长；配额与上传限制为系统默认，用户级覆盖优先）',
         allowRegistration: '允许用户注册',
         uploadLimit: '用户上传限制',
         bytesDefault: '字节 (默认 50MB)',
@@ -593,8 +627,6 @@ export default {
         blockSeconds: '触发封禁时长（秒）',
         redisShared: 'Redis 共享计数',
         redisHint: '由部署配置决定（rate_limit.use_redis / PB_RATE_LIMIT_USE_REDIS），此处不可改',
-        save: '保存限流配置',
-        saved: '限流配置已保存并热更新',
         viewStatus: '查看运行状态',
         status: '运行状态',
         fetchStatusFailed: '获取运行状态失败'
@@ -608,8 +640,6 @@ export default {
         showAdminEntryHint: '关闭仅隐藏页脚入口，/admin 地址始终可直达；登录管理员的顶栏菜单不受影响',
     robots: 'Robots.txt',
     robotsHint: '搜索引擎抓取规则，保存后立即在 /robots.txt 生效；留空使用默认全站 Disallow',
-        save: '保存外观',
-        saved: '外观已保存并全站生效'
       },
       upload: {
         openUpload: '允许访客（未登录）上传',
@@ -620,9 +650,6 @@ export default {
         anonymousDailyCountHint: '单个 IP 每天可上传的次数，0 = 不限',
         anonymousDailyBytes: '访客日配额 (MB/IP)',
         anonymousDailyBytesHint: '单个 IP 每天可上传的流量上限（MB），0 = 不限',
-        directSection: '直传（对象存储）',
-        save: '保存上传设置',
-        saved: '上传设置已保存',
       },
       download: {
         s3Direct: 'S3 直下（302）',
@@ -636,14 +663,11 @@ export default {
         presignThreshold: '直传阈值 (MB)',
         presignThresholdHint: '超过该大小的文件走预签名直传 COS，流量不过服务器',
         presignTTL: '直传签名时效 (秒)',
-        presignTTLHint: '直传签名 URL 的有效期（60-3600 秒），过期需重新取件',
-        save: '保存下载设置',
-        saved: '下载设置已保存'
+        presignTTLHint: '直传签名 URL 的有效期（60-3600 秒），过期需重新取件'
       },
       notify: {
         webhook: 'Webhook URL',
         webhookPlaceholder: 'notify.created 事件 POST 地址，留空禁用',
-        smtpSection: 'SMTP 邮件',
         smtpHost: 'SMTP 主机',
         username: '用户名',
         password: '密码',
@@ -653,8 +677,6 @@ export default {
         testToPlaceholder: '收件邮箱',
         testSend: '发送测试邮件',
         testHint: '先保存再测试；测的是当前生效配置',
-        save: '保存通知设置',
-        saved: '通知设置已保存并热生效',
         testSent: '测试邮件已发送',
         fillTo: '请填收件邮箱',
         sendFailed: '发送失败'
@@ -666,25 +688,19 @@ export default {
         test: '测试连接',
         testButton: '验证 discovery',
         testOk: 'discovery 验证通过',
-        testFailed: '验证失败',
-        save: '保存 OIDC',
-        saved: 'OIDC 配置已保存并热生效'
+        testFailed: '验证失败'
       },
       localimport: {
         enabled: '启用本地导入',
         enabledHint: '服务器本地/NAS 目录内文件免上传生成提取码',
         roots: '白名单目录',
-        rootsPlaceholder: '绝对路径，逗号分隔；需容器内可达（如 /app/data/import）',
-        save: '保存本地导入',
-        saved: '本地导入设置已保存并热生效'
+        rootsPlaceholder: '绝对路径，逗号分隔；需容器内可达（如 /app/data/import）'
       },
       apitoken: {
         enabled: '认证总开关',
         enabledHint: '关闭后携带 pb_sk_ Key 的请求一律 401（紧急停用）',
         perKeyQps: '单 Key QPS',
-        perKeyBurst: '单 Key Burst',
-        save: '保存',
-        saved: 'API Token 设置已保存并热生效'
+        perKeyBurst: '单 Key Burst'
       }
     },
     storage: '存储管理',
@@ -946,6 +962,8 @@ export default {
       abort: '已取消上传',
       failed: '上传失败',
       hashing: '正在计算秒传指纹...',
+      codeReady: '取件码已生成',
+      codeReadyHint: '可先发给收件人，文件上传完成后即可取件',
     },
     quickUploadHit: '秒传成功：文件已存在，直接获取分享码',
   },

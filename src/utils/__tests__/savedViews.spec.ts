@@ -17,8 +17,8 @@ describe('savedViews', () => {
     saveView('k', '我的视图', { keyword: 'a' })
     const views = loadViews('k')
     expect(views).toHaveLength(1)
-    expect(views[0].name).toBe('我的视图')
-    expect(views[0].filters).toEqual({ keyword: 'a' })
+    expect(views[0]!.name).toBe('我的视图')
+    expect(views[0]!.filters).toEqual({ keyword: 'a' })
   })
 
   it('同名覆盖不重复', () => {
@@ -26,12 +26,12 @@ describe('savedViews', () => {
     saveView('k', 'v', { keyword: 'b' })
     const views = loadViews('k')
     expect(views).toHaveLength(1)
-    expect(views[0].filters).toEqual({ keyword: 'b' })
+    expect(views[0]!.filters).toEqual({ keyword: 'b' })
   })
 
   it('名称去空白', () => {
     saveView('k', '  x  ', {})
-    expect(loadViews('k')[0].name).toBe('x')
+    expect(loadViews('k')[0]!.name).toBe('x')
   })
 
   it('删除视图', () => {

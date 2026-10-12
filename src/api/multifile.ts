@@ -16,6 +16,8 @@ export interface MultiShareOptions {
   password?: string
   encrypted?: boolean
   custom_code?: string
+  /** 文件备注（可空）：随分享展示给取件人 */
+  note?: string
 }
 
 export interface MultiShareResult {
@@ -45,6 +47,7 @@ export async function multiDirect(
   if (opts.require_auth && opts.password) formData.append('password', opts.password)
   if (opts.encrypted) formData.append('encrypted', 'true')
   if (opts.custom_code) formData.append('custom_code', opts.custom_code)
+  if (opts.note) formData.append('note', opts.note)
 
   // 原内联 XHR 无超时（timeout=0=不限），钉现状
   const res = await xhrSend<MultiShareResult>({
@@ -156,6 +159,7 @@ export async function multiBind(
       password: opts.password || '',
       encrypted: opts.encrypted || false,
       custom_code: opts.custom_code || '',
+      note: opts.note || '',
     },
     timeout: 600000,
   })

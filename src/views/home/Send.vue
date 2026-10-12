@@ -66,7 +66,7 @@
           <!-- API 文档/管理入口按配置展示（/api-docs 与 /admin 路由始终可达,仅控制入口展示） -->
           <a v-if="configStore.config?.apiDocsEnabled !== false" @click="router.push('/api-docs')">{{ t('home.apiDocs') }}</a>
           <template v-if="configStore.config?.apiDocsEnabled !== false"><span class="meta-dot">·</span></template>
-          <a v-if="configStore.config?.showAdminAddr" href="#/admin/login">{{ t('admin.title') }}</a>
+          <a v-if="configStore.config?.showAdminAddr" :href="'#' + adminBasePath(configStore.config?.adminPath) + '/login'">{{ t('admin.title') }}</a>
           <template v-if="configStore.config?.showAdminAddr"><span class="meta-dot">·</span></template>
           <span>{{ t('home.versionLabel') }} v{{ appVersion }}</span>
           <span class="meta-dot">·</span>
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { adminBasePath } from '@/utils/adminPath'
 import { ref, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'

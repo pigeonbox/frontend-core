@@ -9,6 +9,8 @@ export interface ShareSettings {
   password: string
   e2e: boolean
   custom_code: string
+  /** 文件备注（可空）：随文件分享展示给取件人（文件+文本一并投递） */
+  note: string
 }
 
 export function defaultShareSettings(): ShareSettings {
@@ -19,6 +21,7 @@ export function defaultShareSettings(): ShareSettings {
     password: '',
     e2e: false,
     custom_code: '',
+    note: '',
   }
 }
 

@@ -10,6 +10,7 @@ describe('useShareSettings', () => {
       password: '',
       e2e: false,
       custom_code: '',
+      note: '',
     })
   })
 

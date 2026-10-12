@@ -15,6 +15,8 @@ export interface PublicConfig {
   oidcEnabled?: boolean
   /** 管理后台入口可见性（ui.show_admin_addr，缺省=展示；/admin 路由始终可达，仅控制页脚入口展示） */
   showAdminAddr?: boolean
+  /** 管理入口路径段（ui.admin_path/PB_UI_ADMIN_PATH，缺省 admin）：前端按此注册 hash 路由 */
+  adminPath?: string
   /** API 文档开关（ui.expose_openapi）：false 时后端 /openapi.json 404，前端隐藏入口并降级 /api-docs 页 */
   apiDocsEnabled?: boolean
   /** 背景图 URL（后端已白名单校验 http(s)） */

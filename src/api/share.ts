@@ -24,8 +24,8 @@ export const shareApi = {
     })
   },
 
-  // 分享文件(请求契约同上;password v0.6.1 起入契约)
-  shareFile: (data: shareContract.ShareFileReq & { file: File }) => {
+  // 分享文件(请求契约同上;password v0.6.1 起入契约;note 本地扩展类型,待 d.ts 钉版升级后并入契约)
+  shareFile: (data: shareContract.ShareFileReq & { file: File; note?: string }) => {
     const formData = new FormData()
     formData.append('file', data.file)
     formData.append('expire_value', String(data.expire_value))
@@ -33,6 +33,7 @@ export const shareApi = {
     // require_auth 为契约必填: false 也必须显式发送(条件 append 曾致公开分享 400)
     formData.append('require_auth', String(data.require_auth))
     if (data.require_auth && data.password) formData.append('password', data.password)
+    if (data.note) formData.append('note', data.note)
 
     // 响应契约 = ShareData{code,url}(幻影字段清理同上)
     return request<ApiResponse<shareContract.ShareData>>({
@@ -78,6 +79,7 @@ export async function uploadFile(
     password?: string
     encrypted: boolean
     custom_code?: string
+    note?: string
   },
   onProgress?: (loaded: number, total: number) => void,
   signal?: AbortSignal
@@ -91,6 +93,7 @@ export async function uploadFile(
   if (opts.require_auth && opts.password) formData.append('password', opts.password)
   if (opts.encrypted) formData.append('encrypted', 'true')
   if (opts.custom_code) formData.append('custom_code', opts.custom_code)
+  if (opts.note) formData.append('note', opts.note)
 
   // 原内联 XHR 无超时（timeout=0=不限），钉现状
   const res = await xhrSend<UploadFileResult>({

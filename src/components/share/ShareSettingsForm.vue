@@ -19,8 +19,22 @@
     </div>
 
     <!-- 更多设置（默认折叠，对标上游"主面只留有效期"的极简一卡） -->
-    <el-collapse v-if="showPassword || showCustom || showE2e" class="more-settings">
+    <el-collapse v-if="showPassword || showCustom || showE2e || showNote" class="more-settings">
       <el-collapse-item :title="t('upload.moreSettings')" name="more">
+        <div v-if="showNote" class="setting-group">
+          <label class="setting-label">
+            <el-icon><Memo /></el-icon>
+            {{ t('upload.note') }}
+          </label>
+          <el-input
+            v-model="settings.note"
+            type="textarea"
+            :rows="2"
+            :placeholder="t('upload.notePlaceholder')"
+            maxlength="500"
+            show-word-limit
+          />
+        </div>
         <div v-if="showPassword" class="setting-group">
           <label class="setting-label">
             <el-icon><Lock /></el-icon>
@@ -75,7 +89,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Clock, Lock, EditPen, Key } from '@element-plus/icons-vue'
+import { Clock, Lock, EditPen, Key, Memo } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import type { ShareSettings, ShareExpireStyle } from '@/composables/useShareSettings'
@@ -90,11 +104,14 @@ const props = withDefaults(defineProps<{
   /** 'auto' = 登录用户才显示自定义取件码（原有语义） */
   showCustomCode?: boolean | 'auto'
   showE2e?: boolean
+  /** 文件备注（随文件分享展示给取件人）；文本分享不适用不传 */
+  showNote?: boolean
   units?: ShareExpireStyle[]
 }>(), {
   showPassword: true,
   showCustomCode: 'auto',
   showE2e: true,
+  showNote: false,
   // 对标上游：管理台"允许的过期样式"白名单驱动前端可选集（/api/config.expireStyle）
   units: () => {
     const allowed = useConfigStore().config?.expireStyle

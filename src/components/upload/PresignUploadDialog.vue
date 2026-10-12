@@ -16,6 +16,13 @@
         </div>
       </div>
 
+      <!-- 先出码（#474）：上传前提前铸造取件码，长传期间即可告知收件人 -->
+      <div v-if="mintedCode" class="code-card">
+        <div class="code-label">{{ t('upload.presign.codeReady') }}</div>
+        <div class="code-value">{{ mintedCode }}</div>
+        <div class="code-hint">{{ t('upload.presign.codeReadyHint') }}</div>
+      </div>
+
       <el-progress
         :percentage="progress"
         :stroke-width="10"
@@ -62,6 +69,7 @@ import {
   Document, Loading, CircleCloseFilled
 } from '@element-plus/icons-vue'
 import { presignApi, type PresignCompleteData } from '@/api/presign'
+import { anonymousApi } from '@/api/anonymous'
 import { xhrRaw } from '@/api/_xhr'
 
 /**
@@ -77,6 +85,10 @@ export interface PresignOptions {
   expire_style: string
   require_auth: boolean
   password?: string
+  /** 文件备注（可空，随分享展示给取件人） */
+  note?: string
+  /** E2E 客户端加密分享（占位通道不带 encrypted 标记，先出码对其跳过） */
+  e2e?: boolean
 }
 
 const file = ref<File | null>(null)
@@ -86,6 +98,7 @@ const visible = ref(false)
 
 const progress = ref(0)
 const statusText = ref('')
+const mintedCode = ref('')
 const failed = ref(false)
 const errorMessage = ref('')
 const completed = ref(false)
@@ -103,6 +116,7 @@ let activeReject: ((e: unknown) => void) | null = null
 const open = (f: File, opts: PresignOptions): Promise<PresignCompleteData> => {
   file.value = f
   options.value = opts
+  mintedCode.value = ''
   failed.value = false
   completed.value = false
   errorMessage.value = ''
@@ -145,7 +159,28 @@ const doUpload = async (retryCount = 0) => {
     statusText.value = t('upload.presign.hashing')
     const fileHash = await presignApi.computeFileHash(f)
 
-    // 1. 申请预签名 URL
+    // 0.5 先出码（#474）：上传前提前铸造 6 位取件码占位，长传期间即可告知收件人，
+    // 完成后对象经 pickup_code 绑定回填该占位。铸造失败（如匿名上传被关）静默
+    // 降级普通流程——码在上传完成后随结果下发。E2E 分享跳过（占位记录不带
+    // encrypted 标记，绑定后详情页无从得知需前端解密）。
+    if (!options.value.e2e && !mintedCode.value) {
+      try {
+        const gen = await anonymousApi.generate({
+          file_name: f.name,
+          file_size: f.size,
+          expire_value: options.value.expire_value || 24,
+          expire_style: options.value.expire_style || 'hour',
+          password: options.value.password,
+        })
+        if (presignApi.isOk(gen.code) && gen.data?.code) {
+          mintedCode.value = gen.data.code
+        }
+      } catch {
+        // 降级普通流程
+      }
+    }
+
+    // 1. 申请预签名 URL（携带先出码时绑定占位；无则正常建分享）
     const initRes = await presignApi.init({
       file_name: f.name,
       file_size: f.size,
@@ -155,6 +190,8 @@ const doUpload = async (retryCount = 0) => {
       require_auth: options.value.require_auth,
       password: options.value.password,
       file_hash: fileHash || undefined,
+      note: options.value.note,
+      pickup_code: mintedCode.value || undefined,
     })
     if (!presignApi.isOk(initRes.code) || !initRes.data) {
       throw new Error(initRes.message || 'Init failed')
@@ -323,5 +360,33 @@ defineExpose({ open })
 
 .icon-primary {
   color: var(--primary-color);
+}
+/* 先出码卡片：上传前展示提前铸造的取件码 */
+.code-card {
+  margin: 12px 0 4px;
+  padding: 12px 16px;
+  border: 1px dashed var(--primary-color);
+  border-radius: var(--radius-md);
+  background: var(--color-muted);
+  text-align: center;
+}
+
+.code-label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.code-value {
+  margin: 4px 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  color: var(--primary-color);
+  font-family: var(--code-font, monospace);
+}
+
+.code-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
 }
 </style>
