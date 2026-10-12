@@ -4,16 +4,35 @@
       <template #header>
         <div class="card-header">
           <h3>{{ t('admin.configPage.title') }}</h3>
-          <el-button type="primary" @click="saveConfig" :loading="saving">
-            {{ t('admin.configPage.save') }}
-          </el-button>
         </div>
       </template>
 
-      <el-tabs v-model="activeTab">
-        <!-- 基础配置 -->
-        <el-tab-pane :label="t('admin.configPage.tabs.basic')" name="basic">
-          <el-form :model="configForm.base" label-width="140px" style="max-width: 600px">
+      <!-- 左侧分区导航 + 右侧表单：原 11 个横向 tab 收敛为 6 个分区，
+           分区与 URL ?section= 同步，支持深链/刷新不丢位置 -->
+      <div class="config-layout">
+        <nav class="config-nav">
+          <button
+            v-for="item in navItems"
+            :key="item.id"
+            type="button"
+            class="config-nav-item"
+            :class="{ active: activeSection === item.id }"
+            :title="t(item.labelKey)"
+            @click="activeSection = item.id"
+          >
+            <el-icon><component :is="item.icon" /></el-icon>
+            <span class="config-nav-label">{{ t(item.labelKey) }}</span>
+          </button>
+        </nav>
+
+        <div class="config-content">
+          <!-- 窄屏导航收为图标栏时，分区名在内容区顶部补显示（宽屏隐藏，导航自带文字） -->
+          <h4 class="section-title">{{ t(navLabelKey) }}</h4>
+          <p class="section-desc">{{ t(navDescKey) }}</p>
+
+          <!-- ============ 站点与外观（base + ui） ============ -->
+          <el-form v-if="activeSection === 'site'" label-width="180px" class="config-form">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.site') }}</el-divider>
             <el-form-item :label="t('admin.configPage.basic.siteName')">
               <el-input v-model="configForm.base.name" />
             </el-form-item>
@@ -25,139 +44,8 @@
             <el-form-item :label="t('admin.configPage.basic.port')">
               <el-input-number v-model="configForm.base.port" :min="1" :max="65535" />
             </el-form-item>
-          </el-form>
-        </el-tab-pane>
 
-        <!-- 传输配置（SystemConfig.Transfer 段；旧上传门禁字段属部署配置，不在线编辑） -->
-        <el-tab-pane :label="t('admin.configPage.tabs.upload')" name="upload">
-          <el-form label-width="150px">
-            <el-form-item :label="t('admin.configPage.upload.openUpload')">
-              <el-switch v-model="exForm.upload_ex.open_upload" />
-              <span class="field-hint">{{ t('admin.configPage.upload.openUploadHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.upload.requireLogin')">
-              <el-switch v-model="exForm.upload_ex.require_login" />
-              <span class="field-hint">{{ t('admin.configPage.upload.requireLoginHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.upload.anonymousDailyCount')">
-              <el-input-number v-model="exForm.upload_ex.anonymous_daily_count" :min="0" :max="100000" />
-              <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyCountHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.upload.anonymousDailyBytes')">
-              <el-input-number v-model="exForm.upload_ex.anonymous_daily_bytes" :min="0" :max="107374182400" />
-              <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyBytesHint') }}</span>
-            </el-form-item>
-            <el-divider content-position="left">{{ t('admin.configPage.upload.directSection') }}</el-divider>
-          </el-form>
-          <el-button
-            type="primary"
-            :loading="exSaving.upload || exSaving.download"
-            @click="saveUploadSettings"
-          >{{ t('admin.configPage.upload.save') }}</el-button>
-        </el-tab-pane>
-        <el-tab-pane :label="t('admin.configPage.tabs.transfer')" name="transfer">
-          <el-form :model="configForm.transfer" label-width="140px" style="max-width: 600px">
-            <el-form-item :label="t('admin.configPage.transfer.maxCount')">
-              <el-input-number v-model="configForm.transfer.max_count" :min="0" controls-position="right" />
-              <span style="margin-left: 10px; color: var(--color-text-secondary)">{{ t('admin.configPage.transfer.maxCountHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.transfer.expireDefault')">
-              <el-input-number v-model="configForm.transfer.expire_default" :min="1" controls-position="right" />
-              <span style="margin-left: 10px; color: var(--color-text-secondary)">{{ t('admin.configPage.transfer.days') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.transfer.uploadGates')">
-              <span class="form-hint" style="color: var(--color-text-secondary)">
-                {{ t('admin.configPage.transfer.uploadGatesHint') }}
-              </span>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <!-- 用户配置 -->
-        <el-tab-pane :label="t('admin.configPage.tabs.user')" name="user">
-          <div style="margin-bottom: 12px">
-            <el-button type="primary" :loading="userSaving" @click="saveUserSettings">{{ t('admin.configPage.user.save') }}</el-button>
-            <span style="margin-left: 10px; color: var(--color-text-secondary); font-size: 12px">{{ t('admin.configPage.user.saveHint') }}</span>
-          </div>
-          <el-form :model="configForm.user" label-width="140px" style="max-width: 600px">
-            <el-form-item :label="t('admin.configPage.user.allowRegistration')">
-              <el-switch v-model="configForm.user.allowuserregistration" :active-value="1" :inactive-value="0" />
-            </el-form-item>
-
-            <el-form-item :label="t('admin.configPage.user.uploadLimit')">
-              <el-input-number
-                v-model="configForm.user.useruploadsize"
-                :min="1048576"
-                :step="1048576"
-                controls-position="right"
-              />
-              <span style="margin-left: 10px; color: var(--color-text-secondary)">{{ t('admin.configPage.user.bytesDefault') }}</span>
-            </el-form-item>
-
-            <el-form-item :label="t('admin.configPage.user.storageQuota')">
-              <el-input-number
-                v-model="configForm.user.userstoragequota"
-                :min="1048576"
-                :step="1048576"
-                controls-position="right"
-              />
-              <span style="margin-left: 10px; color: var(--color-text-secondary)">{{ t('admin.configPage.user.quotaDefault') }}</span>
-            </el-form-item>
-
-            <el-form-item :label="t('admin.configPage.user.sessionExpiry')">
-              <el-input-number
-                v-model="configForm.user.sessionexpiryhours"
-                :min="1"
-                :max="720"
-                controls-position="right"
-              />
-              <span style="margin-left: 10px; color: var(--color-text-secondary)">{{ t('admin.configPage.user.hours') }}</span>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-        <!-- 安全与限流（读写 /admin/ratelimit/*，独立保存） -->
-        <el-tab-pane :label="t('admin.configPage.tabs.ratelimit')" name="ratelimit">
-          <el-form :model="rlForm" label-width="160px" style="max-width: 640px">
-            <el-form-item :label="t('admin.configPage.ratelimit.enabled')">
-              <el-switch v-model="rlForm.enabled" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.ratelimit.globalQps')">
-              <el-input-number v-model="rlForm.global_qps" :min="1" :max="100000" controls-position="right" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.ratelimit.uploadQps')">
-              <el-input-number v-model="rlForm.upload_qps" :min="1" :max="100000" controls-position="right" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.ratelimit.downloadQps')">
-              <el-input-number v-model="rlForm.download_qps" :min="1" :max="100000" controls-position="right" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.ratelimit.loginQps')">
-              <el-input-number v-model="rlForm.login_qps" :min="1" :max="10000" controls-position="right" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.ratelimit.burst')">
-              <el-input-number v-model="rlForm.burst" :min="1" :max="100000" controls-position="right" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.ratelimit.blockSeconds')">
-              <el-input-number v-model="rlForm.block_seconds" :min="0" :max="86400" controls-position="right" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.ratelimit.redisShared')">
-              <!-- 契约无 use_redis 字段（GET 不返回/PUT 不采纳），由部署配置
-                   rate_limit.use_redis / PB_RATE_LIMIT_USE_REDIS 决定 -->
-              <span class="form-hint" style="color: var(--color-text-secondary)">
-                {{ t('admin.configPage.ratelimit.redisHint') }}
-              </span>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="rlSaving" @click="saveRateLimit">{{ t('admin.configPage.ratelimit.save') }}</el-button>
-              <el-button :loading="rlStatusLoading" @click="fetchRateLimitStatus">{{ t('admin.configPage.ratelimit.viewStatus') }}</el-button>
-            </el-form-item>
-            <el-form-item v-if="rlStatus" :label="t('admin.configPage.ratelimit.status')">
-              <pre class="rl-status">{{ rlStatusText }}</pre>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <el-tab-pane :label="t('admin.configPage.tabs.appearance')" name="appearance">
-          <el-form label-width="150px">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.appearance') }}</el-divider>
             <el-form-item :label="t('admin.configPage.appearance.bgUrl')">
               <el-input v-model="exForm.ui.background" :placeholder="t('admin.configPage.appearance.bgUrlPlaceholder')" clearable />
             </el-form-item>
@@ -196,11 +84,60 @@
               <span class="field-hint">{{ t('admin.configPage.appearance.robotsHint') }}</span>
             </el-form-item>
           </el-form>
-          <el-button type="primary" :loading="exSaving.ui" @click="saveSection('ui', exForm.ui, t('admin.configPage.appearance.saved'))">{{ t('admin.configPage.appearance.save') }}</el-button>
-        </el-tab-pane>
 
-        <el-tab-pane :label="t('admin.configPage.tabs.download')" name="download">
-          <el-form label-width="150px">
+          <!-- ============ 上传与分享（upload_ex + transfer + local_import） ============ -->
+          <el-form v-else-if="activeSection === 'share'" label-width="180px" class="config-form">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.uploadGate') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.upload.openUpload')">
+              <el-switch v-model="exForm.upload_ex.open_upload" />
+              <span class="field-hint">{{ t('admin.configPage.upload.openUploadHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.upload.requireLogin')">
+              <el-switch v-model="exForm.upload_ex.require_login" />
+              <span class="field-hint">{{ t('admin.configPage.upload.requireLoginHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.upload.anonymousDailyCount')">
+              <el-input-number v-model="exForm.upload_ex.anonymous_daily_count" :min="0" :max="100000" />
+              <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyCountHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.upload.anonymousDailyBytes')">
+              <el-input-number v-model="exForm.upload_ex.anonymous_daily_bytes" :min="0" :max="107374182400" />
+              <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyBytesHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.transfer.uploadGates')">
+              <span class="field-hint">
+                {{ t('admin.configPage.transfer.uploadGatesHint') }}
+              </span>
+            </el-form-item>
+
+            <el-divider content-position="left">{{ t('admin.configPage.sections.shareDefault') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.transfer.maxCount')">
+              <el-input-number v-model="configForm.transfer.max_count" :min="0" controls-position="right" />
+              <span class="field-hint">{{ t('admin.configPage.transfer.maxCountHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.transfer.expireDefault')">
+              <el-input-number v-model="configForm.transfer.expire_default" :min="1" controls-position="right" />
+              <span class="field-hint">{{ t('admin.configPage.transfer.days') }}</span>
+            </el-form-item>
+
+            <el-divider content-position="left">{{ t('admin.configPage.sections.localImport') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.localimport.enabled')">
+              <el-switch v-model="exForm.local_import.enabled" />
+              <span class="field-hint">{{ t('admin.configPage.localimport.enabledHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.localimport.roots')">
+              <el-input
+                v-model="localImportRootsText"
+                type="textarea"
+                :rows="3"
+                :placeholder="t('admin.configPage.localimport.rootsPlaceholder')"
+              />
+            </el-form-item>
+          </el-form>
+
+          <!-- ============ 下载与直传（download） ============ -->
+          <el-form v-else-if="activeSection === 'download'" label-width="180px" class="config-form">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.download') }}</el-divider>
             <el-form-item :label="t('admin.configPage.download.s3Direct')">
               <el-switch v-model="exForm.download.s3_direct_download" />
               <span class="field-hint">{{ t('admin.configPage.download.s3DirectHint') }}</span>
@@ -215,6 +152,8 @@
               <el-switch v-model="exForm.download.code_case_insensitive" />
               <span class="field-hint">{{ t('admin.configPage.download.codeFoldHint') }}</span>
             </el-form-item>
+
+            <el-divider content-position="left">{{ t('admin.configPage.sections.direct') }}</el-divider>
             <el-form-item :label="t('admin.configPage.download.presignPolicy')">
               <el-select v-model="exForm.download.presign_policy" style="width: 280px">
                 <el-option label="所有人可直传" value="everyone" />
@@ -232,38 +171,45 @@
               <span class="field-hint">{{ t('admin.configPage.download.presignTTLHint') }}</span>
             </el-form-item>
           </el-form>
-          <el-button type="primary" :loading="exSaving.download" @click="saveSection('download', exForm.download, t('admin.configPage.download.saved'))">{{ t('admin.configPage.download.save') }}</el-button>
-        </el-tab-pane>
 
-        <el-tab-pane :label="t('admin.configPage.tabs.notify')" name="notify">
-          <el-form label-width="150px">
-            <el-form-item :label="t('admin.configPage.notify.webhook')">
-              <el-input v-model="exForm.notify.webhook_url" :placeholder="t('admin.configPage.notify.webhookPlaceholder')" clearable />
+          <!-- ============ 用户与登录（user + oidc） ============ -->
+          <el-form v-else-if="activeSection === 'account'" label-width="180px" class="config-form">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.user') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.user.allowRegistration')">
+              <el-switch v-model="configForm.user.allowuserregistration" :active-value="1" :inactive-value="0" />
             </el-form-item>
-            <el-divider content-position="left">{{ t('admin.configPage.notify.smtpSection') }}</el-divider>
-            <el-form-item :label="t('admin.configPage.notify.smtpHost')">
-              <el-input v-model="exForm.notify.smtp.host" placeholder="smtp.example.com:465" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.notify.username')">
-              <el-input v-model="exForm.notify.smtp.username" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.notify.password')">
-              <el-input v-model="exForm.notify.smtp.password" type="password" show-password />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.notify.sender')">
-              <el-input v-model="exForm.notify.smtp.from" :placeholder="t('admin.configPage.notify.senderPlaceholder')" />
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.notify.testTo')">
-              <el-input v-model="smtpTestTo" :placeholder="t('admin.configPage.notify.testToPlaceholder')" style="width: 260px" />
-              <el-button class="ml8" :loading="smtpTesting" @click="doSMTPTest">{{ t('admin.configPage.notify.testSend') }}</el-button>
-              <span class="field-hint">{{ t('admin.configPage.notify.testHint') }}</span>
-            </el-form-item>
-          </el-form>
-          <el-button type="primary" :loading="exSaving.notify" @click="saveNotify">{{ t('admin.configPage.notify.save') }}</el-button>
-        </el-tab-pane>
 
-        <el-tab-pane :label="t('admin.configPage.tabs.oidc')" name="oidc">
-          <el-form label-width="150px">
+            <el-form-item :label="t('admin.configPage.user.uploadLimit')">
+              <el-input-number
+                v-model="configForm.user.useruploadsize"
+                :min="1048576"
+                :step="1048576"
+                controls-position="right"
+              />
+              <span class="field-hint">{{ t('admin.configPage.user.bytesDefault') }}</span>
+            </el-form-item>
+
+            <el-form-item :label="t('admin.configPage.user.storageQuota')">
+              <el-input-number
+                v-model="configForm.user.userstoragequota"
+                :min="1048576"
+                :step="1048576"
+                controls-position="right"
+              />
+              <span class="field-hint">{{ t('admin.configPage.user.quotaDefault') }}</span>
+            </el-form-item>
+
+            <el-form-item :label="t('admin.configPage.user.sessionExpiry')">
+              <el-input-number
+                v-model="configForm.user.sessionexpiryhours"
+                :min="1"
+                :max="720"
+                controls-position="right"
+              />
+              <span class="field-hint">{{ t('admin.configPage.user.hours') }}</span>
+            </el-form-item>
+
+            <el-divider content-position="left">{{ t('admin.configPage.sections.oidc') }}</el-divider>
             <el-form-item :label="t('admin.configPage.oidc.enabled')">
               <el-switch v-model="exForm.oidc.enabled" />
             </el-form-item>
@@ -284,29 +230,46 @@
               <el-button :loading="oidcTesting" @click="doOIDCTest">{{ t('admin.configPage.oidc.testButton') }}</el-button>
             </el-form-item>
           </el-form>
-          <el-button type="primary" :loading="exSaving.oidc" @click="saveSection('oidc', exForm.oidc, t('admin.configPage.oidc.saved'))">{{ t('admin.configPage.oidc.save') }}</el-button>
-        </el-tab-pane>
 
-        <el-tab-pane :label="t('admin.configPage.tabs.localimport')" name="localimport">
-          <el-form label-width="150px">
-            <el-form-item :label="t('admin.configPage.localimport.enabled')">
-              <el-switch v-model="exForm.local_import.enabled" />
-              <span class="field-hint">{{ t('admin.configPage.localimport.enabledHint') }}</span>
+          <!-- ============ 安全与限流（ratelimit + api_token） ============ -->
+          <el-form v-else-if="activeSection === 'security'" label-width="180px" class="config-form">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.ratelimit') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.ratelimit.enabled')">
+              <el-switch v-model="rlForm.enabled" />
             </el-form-item>
-            <el-form-item :label="t('admin.configPage.localimport.roots')">
-              <el-input
-                v-model="localImportRootsText"
-                type="textarea"
-                :rows="3"
-                :placeholder="t('admin.configPage.localimport.rootsPlaceholder')"
-              />
+            <el-form-item :label="t('admin.configPage.ratelimit.globalQps')">
+              <el-input-number v-model="rlForm.global_qps" :min="1" :max="100000" controls-position="right" />
             </el-form-item>
-          </el-form>
-          <el-button type="primary" :loading="exSaving.local_import" @click="saveLocalImport">{{ t('admin.configPage.localimport.save') }}</el-button>
-        </el-tab-pane>
+            <el-form-item :label="t('admin.configPage.ratelimit.uploadQps')">
+              <el-input-number v-model="rlForm.upload_qps" :min="1" :max="100000" controls-position="right" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.ratelimit.downloadQps')">
+              <el-input-number v-model="rlForm.download_qps" :min="1" :max="100000" controls-position="right" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.ratelimit.loginQps')">
+              <el-input-number v-model="rlForm.login_qps" :min="1" :max="10000" controls-position="right" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.ratelimit.burst')">
+              <el-input-number v-model="rlForm.burst" :min="1" :max="100000" controls-position="right" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.ratelimit.blockSeconds')">
+              <el-input-number v-model="rlForm.block_seconds" :min="0" :max="86400" controls-position="right" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.ratelimit.redisShared')">
+              <!-- 契约无 use_redis 字段（GET 不返回/PUT 不采纳），由部署配置
+                   rate_limit.use_redis / PB_RATE_LIMIT_USE_REDIS 决定 -->
+              <span class="field-hint">
+                {{ t('admin.configPage.ratelimit.redisHint') }}
+              </span>
+            </el-form-item>
+            <el-form-item>
+              <el-button :loading="rlStatusLoading" @click="fetchRateLimitStatus">{{ t('admin.configPage.ratelimit.viewStatus') }}</el-button>
+            </el-form-item>
+            <el-form-item v-if="rlStatus" :label="t('admin.configPage.ratelimit.status')">
+              <pre class="rl-status">{{ rlStatusText }}</pre>
+            </el-form-item>
 
-        <el-tab-pane label="API Token" name="apitoken">
-          <el-form label-width="150px">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.apitoken') }}</el-divider>
             <el-form-item :label="t('admin.configPage.apitoken.enabled')">
               <el-switch v-model="exForm.api_token.enabled" />
               <span class="field-hint">{{ t('admin.configPage.apitoken.enabledHint') }}</span>
@@ -318,16 +281,50 @@
               <el-input-number v-model="exForm.api_token.per_key_burst" :min="1" :max="5000" />
             </el-form-item>
           </el-form>
-          <el-button type="primary" :loading="exSaving.api_token" @click="saveSection('api_token', exForm.api_token, t('admin.configPage.apitoken.saved'))">{{ t('admin.configPage.apitoken.save') }}</el-button>
-        </el-tab-pane>
-      </el-tabs>
+
+          <!-- ============ 通知与邮件（notify） ============ -->
+          <el-form v-else label-width="180px" class="config-form">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.webhook') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.notify.webhook')">
+              <el-input v-model="exForm.notify.webhook_url" :placeholder="t('admin.configPage.notify.webhookPlaceholder')" clearable />
+            </el-form-item>
+
+            <el-divider content-position="left">{{ t('admin.configPage.sections.smtp') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.notify.smtpHost')">
+              <el-input v-model="exForm.notify.smtp.host" placeholder="smtp.example.com:465" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.username')">
+              <el-input v-model="exForm.notify.smtp.username" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.password')">
+              <el-input v-model="exForm.notify.smtp.password" type="password" show-password />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.sender')">
+              <el-input v-model="exForm.notify.smtp.from" :placeholder="t('admin.configPage.notify.senderPlaceholder')" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.testTo')">
+              <el-input v-model="smtpTestTo" :placeholder="t('admin.configPage.notify.testToPlaceholder')" style="width: 260px" />
+              <el-button class="ml8" :loading="smtpTesting" @click="doSMTPTest">{{ t('admin.configPage.notify.testSend') }}</el-button>
+              <span class="field-hint">{{ t('admin.configPage.notify.testHint') }}</span>
+            </el-form-item>
+          </el-form>
+
+          <div class="config-save-bar">
+            <el-button type="primary" :loading="saving" @click="saveCurrent">
+              {{ t('admin.configPage.save') }}
+            </el-button>
+          </div>
+        </div>
+      </div>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, type Component } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Picture, Upload, Download, User, Lock, Message } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { THEMES, matchThemePreset, type ThemePreset } from '@/config/themes'
 import { adminApi } from '@/api/admin'
@@ -337,9 +334,47 @@ import { useErrorHandler } from '@/composables/useErrorHandler'
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
+// ==================== 分区导航（原 11 tab 收敛 6 分区，?section= 深链） ====================
+const SECTION_IDS = ['site', 'share', 'download', 'account', 'security', 'notify'] as const
+type SectionId = (typeof SECTION_IDS)[number]
+
+const navItems: { id: SectionId; labelKey: string; descKey: string; icon: Component }[] = [
+  { id: 'site', labelKey: 'admin.configPage.nav.site', descKey: 'admin.configPage.navDesc.site', icon: Picture },
+  { id: 'share', labelKey: 'admin.configPage.nav.share', descKey: 'admin.configPage.navDesc.share', icon: Upload },
+  { id: 'download', labelKey: 'admin.configPage.nav.download', descKey: 'admin.configPage.navDesc.download', icon: Download },
+  { id: 'account', labelKey: 'admin.configPage.nav.account', descKey: 'admin.configPage.navDesc.account', icon: User },
+  { id: 'security', labelKey: 'admin.configPage.nav.security', descKey: 'admin.configPage.navDesc.security', icon: Lock },
+  { id: 'notify', labelKey: 'admin.configPage.nav.notify', descKey: 'admin.configPage.navDesc.notify', icon: Message },
+]
+
+const route = useRoute()
+const router = useRouter()
+const sectionFromQuery = (() => {
+  const s = route.query.section
+  return typeof s === 'string' && (SECTION_IDS as readonly string[]).includes(s) ? (s as SectionId) : 'site'
+})()
+const activeSection = ref<SectionId>(sectionFromQuery)
+const navDescKey = computed(() => navItems.find((n) => n.id === activeSection.value)!.descKey)
+const navLabelKey = computed(() => navItems.find((n) => n.id === activeSection.value)!.labelKey)
+
+watch(activeSection, (v) => {
+  if (route.query.section !== v) router.replace({ query: { ...route.query, section: v } })
+})
+
+// URL → 视图反向同步：深链/前进后退改 ?section= 时页面要跟随（hash 导航不重载组件，
+// 只在挂载时读一次 query 会脱节——同 useSendTab 历史坑）
+watch(
+  () => route.query.section,
+  (s) => {
+    if (typeof s === 'string' && (SECTION_IDS as readonly string[]).includes(s)) {
+      const next = s as SectionId
+      if (next !== activeSection.value) activeSection.value = next
+    }
+  },
+)
+
 const loading = ref(false)
 const saving = ref(false)
-const activeTab = ref('basic')
 const configStore = useConfigStore()
 
 const configForm = reactive({
@@ -385,7 +420,7 @@ const fetchConfig = async () => {
   }
 }
 
-// ==================== 用户配置（/admin/config/user，独立保存） ====================
+// ==================== 用户配置（/admin/config/user，独立端点） ====================
 const fetchUserSettings = async () => {
   try {
     const res = await adminApi.getUserSettings()
@@ -398,52 +433,6 @@ const fetchUserSettings = async () => {
     }
   } catch (error) {
     console.error('fetch user settings failed:', error)
-  }
-}
-
-const userSaving = ref(false)
-const saveUserSettings = async () => {
-  userSaving.value = true
-  try {
-    const res = await adminApi.updateUserSettings({
-      allowuserregistration: Number(configForm.user.allowuserregistration) === 1,
-      useruploadsize: configForm.user.useruploadsize,
-      userstoragequota: configForm.user.userstoragequota,
-      sessionexpiryhours: configForm.user.sessionexpiryhours
-    })
-    if (res.code === 0 || res.code === 200) {
-      ElMessage.success(t('admin.configPage.user.saved'))
-      await configStore.refreshConfig()
-    } else {
-      handleError(new Error(res.message || t('admin.configPage.saveFailed')))
-    }
-  } catch (error) {
-    handleError(error)
-  } finally {
-    userSaving.value = false
-  }
-}
-
-const saveConfig = async () => {
-  saving.value = true
-  try {
-    // 只携带本页管辖的段（user 走 /admin/config/user 专属端点，避免双路径互踩）
-    const res = await adminApi.updateConfig({
-      base: configForm.base,
-      transfer: configForm.transfer
-    })
-    if (res.code === 200) {
-      ElMessage.success(t('admin.configPage.saved'))
-      // 刷新全局配置
-      await configStore.refreshConfig()
-      await fetchConfig()
-    } else {
-      handleError(new Error(res.message || t('admin.configPage.saveFailed')))
-    }
-  } catch (error) {
-    handleError(error)
-  } finally {
-    saving.value = false
   }
 }
 
@@ -477,8 +466,6 @@ const themePresetKey = computed(() => matchThemePreset(exForm.ui.accent_color))
 const applyThemePreset = (th: ThemePreset) => {
   exForm.ui.accent_color = th.accent
 }
-
-const exSaving = reactive<Record<string, boolean>>({})
 
 const origin = window.location.origin
 // 白名单目录 textarea ↔ roots 数组(逗号分隔,自动去空)
@@ -525,46 +512,135 @@ const fetchExSections = (data: Record<string, unknown>) => {
   if (sec.api_token) Object.assign(exForm.api_token, sec.api_token)
 }
 
-const saveSection = async (section: string, payload: Record<string, unknown>, msg: string) => {
-  exSaving[section] = true
+// ==================== 统一分区保存（一页一保存按钮，按分区聚合后端配置段） ====================
+// 写入辅助：非成功码抛错，供多段/多端点分区串联，失败即中断并统一走 handleError
+const putConfig = async (payload: Record<string, unknown>) => {
+  const res = await adminApi.updateConfig(payload)
+  if (!(res.code === 0 || res.code === 200)) {
+    throw new Error(res.message || t('admin.configPage.saveFailed'))
+  }
+}
+
+const putUserSettings = async () => {
+  const res = await adminApi.updateUserSettings({
+    allowuserregistration: Number(configForm.user.allowuserregistration) === 1,
+    useruploadsize: configForm.user.useruploadsize,
+    userstoragequota: configForm.user.userstoragequota,
+    sessionexpiryhours: configForm.user.sessionexpiryhours
+  })
+  if (!(res.code === 0 || res.code === 200)) {
+    throw new Error(res.message || t('admin.configPage.saveFailed'))
+  }
+}
+
+// GET 快照：契约存在 required 字段（如 block_on_limit）且不在 rlForm 中，
+// 保存时合并快照，避免缺 required 被 400
+let rlSnapshot: Record<string, unknown> = {}
+const rlForm = reactive({
+  enabled: true,
+  global_qps: 100,
+  upload_qps: 10,
+  download_qps: 50,
+  login_qps: 5,
+  burst: 20,
+  block_seconds: 60
+})
+
+const putRateLimit = async () => {
+  // 后端绑定结构为 {config: RateLimitConfig}，扁平体会因 required 缺失被 400
+  const res = await adminApi.updateRateLimitConfig({
+    config: { ...rlSnapshot, ...rlForm }
+  })
+  if (!(res.code === 0 || res.code === 200)) {
+    throw new Error(res.message || t('admin.configPage.saveFailed'))
+  }
+}
+
+const saveCurrent = async () => {
+  saving.value = true
   try {
-    const res = await adminApi.updateConfig({ [section]: payload })
-    if (res.code === 0 || res.code === 200) {
-      ElMessage.success(msg)
-      await configStore.refreshConfig()
-      const res2 = await adminApi.getConfig()
-      if (res2.code === 200 && res2.data) fetchExSections(res2.data as Record<string, unknown>)
-    } else {
-      handleError(new Error(res.message || t('admin.configPage.saveFailed')))
+    switch (activeSection.value) {
+      case 'site':
+        await putConfig({ base: configForm.base, ui: { ...exForm.ui } })
+        break
+      case 'share':
+        await putConfig({
+          upload_ex: { ...exForm.upload_ex },
+          transfer: configForm.transfer,
+          local_import: { enabled: exForm.local_import.enabled, roots: exForm.local_import.roots },
+        })
+        break
+      case 'download':
+        await putConfig({ download: { ...exForm.download } })
+        break
+      case 'account':
+        // 用户配置走专属端点，OIDC 走通用配置段，两段串行提交
+        await putUserSettings()
+        await putConfig({ oidc: { ...exForm.oidc } })
+        break
+      case 'security':
+        // 限流走专属端点（{config: …} 包裹），API Token 走通用配置段
+        await putRateLimit()
+        await putConfig({ api_token: { ...exForm.api_token } })
+        break
+      case 'notify':
+        await putConfig({
+          notify: { webhook_url: exForm.notify.webhook_url, smtp: { ...exForm.notify.smtp } },
+        })
+        break
     }
+    ElMessage.success(t('admin.configPage.saved'))
+    await configStore.refreshConfig()
+    // 回读服务端（含旧库 null 归一逻辑），避免本地表单与持久化值漂移
+    await fetchConfig()
+    await fetchRateLimit()
   } catch (e) {
     handleError(e)
   } finally {
-    exSaving[section] = false
+    saving.value = false
   }
 }
 
-// 上传设置整段保存（upload_ex 准入 + download 直传策略两段串行提交）
-const saveUploadSettings = async () => {
-  await saveSection('upload_ex', exForm.upload_ex, t('admin.configPage.upload.saved'))
-  await saveSection('download', exForm.download, t('admin.configPage.download.saved'))
-}
+// ==================== 安全与限流（/admin/ratelimit/*，独立于通用配置保存） ====================
+const rlStatusLoading = ref(false)
+const rlStatus = ref<Record<string, unknown> | null>(null)
 
-const saveNotify = async () => {
-  const payload: Record<string, unknown> = {
-    webhook_url: exForm.notify.webhook_url,
-    smtp: { ...exForm.notify.smtp },
+const fetchRateLimit = async () => {
+  try {
+    const res = await adminApi.getRateLimitConfig()
+    if (res.code === 0 || res.code === 200) {
+      const data = (res.data || {}) as Record<string, unknown>
+      rlSnapshot = { ...data }
+      for (const k of Object.keys(rlForm) as (keyof typeof rlForm)[]) {
+        if (typeof data[k] === 'boolean' || typeof data[k] === 'number') {
+          ;(rlForm as Record<string, unknown>)[k] = data[k]
+        }
+      }
+    }
+  } catch (error) {
+    console.error('fetch ratelimit config failed:', error)
   }
-  await saveSection('notify', payload, t('admin.configPage.notify.saved'))
 }
 
-const saveLocalImport = async () => {
-  await saveSection('local_import', {
-    enabled: exForm.local_import.enabled,
-    roots: exForm.local_import.roots,
-  }, t('admin.configPage.localimport.saved'))
+const rlStatusText = computed(() => JSON.stringify(rlStatus.value, null, 2))
+
+const fetchRateLimitStatus = async () => {
+  rlStatusLoading.value = true
+  try {
+    const res = await adminApi.getRateLimitStatus()
+    if (res.code === 0 || res.code === 200) {
+      rlStatus.value = res.data || null
+    } else {
+      handleError(new Error(res.message || t('admin.configPage.ratelimit.fetchStatusFailed')))
+    }
+  } catch (e: any) {
+    handleError(e)
+  } finally {
+    rlStatusLoading.value = false
+  }
 }
 
+// ==================== 通知与 OIDC 连通性测试 ====================
 const smtpTestTo = ref('')
 const smtpTesting = ref(false)
 const doSMTPTest = async () => {
@@ -598,77 +674,6 @@ const doOIDCTest = async () => {
   }
 }
 
-// ==================== 安全与限流（/admin/ratelimit/*，独立于通用配置保存） ====================
-const rlSaving = ref(false)
-const rlStatusLoading = ref(false)
-const rlStatus = ref<Record<string, unknown> | null>(null)
-// GET 快照：契约存在 required 字段（如 block_on_limit）且不在 rlForm 中，
-// 保存时合并快照，避免缺 required 被 400
-let rlSnapshot: Record<string, unknown> = {}
-const rlForm = reactive({
-  enabled: true,
-  global_qps: 100,
-  upload_qps: 10,
-  download_qps: 50,
-  login_qps: 5,
-  burst: 20,
-  block_seconds: 60
-})
-
-const fetchRateLimit = async () => {
-  try {
-    const res = await adminApi.getRateLimitConfig()
-    if (res.code === 0 || res.code === 200) {
-      const data = (res.data || {}) as Record<string, unknown>
-      rlSnapshot = { ...data }
-      for (const k of Object.keys(rlForm) as (keyof typeof rlForm)[]) {
-        if (typeof data[k] === 'boolean' || typeof data[k] === 'number') {
-          ;(rlForm as Record<string, unknown>)[k] = data[k]
-        }
-      }
-    }
-  } catch (error) {
-    console.error('fetch ratelimit config failed:', error)
-  }
-}
-
-const saveRateLimit = async () => {
-  rlSaving.value = true
-  try {
-    // 后端绑定结构为 {config: RateLimitConfig}，扁平体会因 required 缺失被 400
-    const res = await adminApi.updateRateLimitConfig({
-      config: { ...rlSnapshot, ...rlForm }
-    })
-    if (res.code === 0 || res.code === 200) {
-      ElMessage.success(t('admin.configPage.ratelimit.saved'))
-    } else {
-      handleError(new Error(res.message || t('admin.configPage.saveFailed')))
-    }
-  } catch (e: any) {
-    handleError(e)
-  } finally {
-    rlSaving.value = false
-  }
-}
-
-const rlStatusText = computed(() => JSON.stringify(rlStatus.value, null, 2))
-
-const fetchRateLimitStatus = async () => {
-  rlStatusLoading.value = true
-  try {
-    const res = await adminApi.getRateLimitStatus()
-    if (res.code === 0 || res.code === 200) {
-      rlStatus.value = res.data || null
-    } else {
-      handleError(new Error(res.message || t('admin.configPage.ratelimit.fetchStatusFailed')))
-    }
-  } catch (e: any) {
-    handleError(e)
-  } finally {
-    rlStatusLoading.value = false
-  }
-}
-
 onMounted(() => {
   fetchConfig()
   fetchRateLimit()
@@ -676,6 +681,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 表单标签防折行（#488 后台可读性）：固定 label-width 下长标签（如"允许访客
+   （未登录）上传"）被折成两行错位；标签列统一 180px 按最长标签放宽，这里再兜底禁换行 */
+.system-config :deep(.el-form-item__label) {
+  white-space: nowrap;
+}
 .field-hint {
   margin-left: 10px;
   color: var(--el-text-color-secondary);
@@ -699,6 +709,143 @@ onMounted(() => {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
+}
+
+/* ===== 布局：左侧分区导航 + 右侧表单 ===== */
+.config-layout {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.config-nav {
+  width: 188px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+}
+
+/* 导航项与 admin 侧栏菜单同视觉语言（Linear 风：hover 灰底、激活 primary 浅底） */
+.config-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-align: left;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.config-nav-item:hover {
+  background: var(--color-muted);
+  color: var(--color-text-primary);
+}
+
+.config-nav-item.active {
+  background: var(--primary-bg);
+  color: var(--primary-color);
+}
+
+.config-nav-item :deep(.el-icon) {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.config-nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.section-title {
+  display: none;
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.section-desc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.config-form {
+  max-width: 780px;
+}
+
+.config-form :deep(.el-divider__text) {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* 小节标题与描述行/标签列左缘对齐（is-left 文本自带 left:20px+padding 20px，
+   标题会浮在半空；is-left 类在 .el-divider__text 上而非分隔线容器上） */
+.config-form :deep(.el-divider__text.is-left) {
+  left: 0;
+  margin-left: 0;
+  padding-left: 0;
+}
+
+.config-form :deep(.el-divider) {
+  margin: 24px 0 18px;
+}
+
+.config-form :deep(.el-divider:first-child) {
+  margin-top: 0;
+}
+
+.config-save-bar {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+/* 窄屏：导航收为左侧图标栏——「在左侧」的形态全宽度保持（横排降级会让
+   窄窗/侧边面板用户以为左导航没了）；悬停 title 提示分区名，内容区顶部补显示 */
+@media (max-width: 900px) {
+  .config-layout {
+    gap: 16px;
+  }
+
+  .config-nav {
+    width: 52px;
+    gap: 4px;
+  }
+
+  .config-nav-item {
+    justify-content: center;
+    padding: 10px 0;
+  }
+
+  .config-nav-label {
+    display: none;
+  }
+
+  .section-title {
+    display: block;
+  }
+
+  .config-form {
+    max-width: none;
+  }
 }
 
 .rl-status {

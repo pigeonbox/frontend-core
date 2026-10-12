@@ -31,11 +31,15 @@
         </span>
       </div>
 
-      <!-- 功能未启用的引导态:不再发注定失败请求弹全局错误,直接说明配置路径 -->
-      <el-empty v-if="featureDisabled" description="本地文件功能未启用">
+      <!-- 功能不可用的引导态:不再发注定失败请求弹全局错误,直接说明配置路径。
+           两种情形分级:未启用 vs 已启用但白名单目录为空(后端报错文案不同) -->
+      <el-empty v-if="featureDisabled" :description="noRootsGuide ? '未配置白名单目录' : '本地文件功能未启用'">
         <div class="disabled-guide">
-          <p>该功能需在服务端配置 <code>upload.local_import.enabled</code> 与白名单 <code>roots</code> 后可用。</p>
-          <el-button type="primary" @click="$router.push('/admin/config')">前往系统配置</el-button>
+          <p v-if="noRootsGuide">
+            本地导入已启用，但白名单目录为空。请在系统配置「上传与分享 → 本地导入」中添加绝对路径目录后重试。
+          </p>
+          <p v-else>该功能需在服务端配置 <code>upload.local_import.enabled</code> 与白名单 <code>roots</code> 后可用。</p>
+          <el-button type="primary" @click="$router.push(adminBase + '/config')">前往系统配置</el-button>
         </div>
       </el-empty>
       <el-table v-else v-loading="loading" :data="entries" style="width: 100%">
@@ -111,6 +115,8 @@
 </template>
 
 <script setup lang="ts">
+import { getAdminBase } from '@/router'
+const adminBase = getAdminBase()
 import { formatFileSize } from '@/utils/format'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -128,10 +134,18 @@ const entries = ref<LocalFileEntry[]>([])
 const loading = ref(false)
 // 功能未启用(服务端 upload.local_import.enabled=false):展示配置引导而非报错
 const featureDisabled = ref(false)
+// 已启用但白名单目录为空:引导文案换成补 roots 的指向(与未启用分级)
+const noRootsGuide = ref(false)
 // 宿主文件动作可用性(适配器能力声明;default 恒 false → 按钮不渲染)
 const hostAvailable = computed(() => host.capabilities.fileActions)
 
-const isDisabledMessage = (msg?: string) => !!msg && msg.includes('本地文件功能未启用')
+const isDisabledMessage = (msg?: string) =>
+  !!msg && (msg.includes('本地文件功能未启用') || msg.includes('白名单目录'))
+
+const applyDisabledState = (msg?: string) => {
+  featureDisabled.value = true
+  noRootsGuide.value = !!msg && msg.includes('白名单目录')
+}
 
 const dirSegments = computed(() => {
   const parts = dir.value.split('/').filter(Boolean)
@@ -151,14 +165,15 @@ const load = async () => {
       roots.value = resp.data.roots || []
       entries.value = resp.data.entries || []
     } else if (isDisabledMessage(resp.message)) {
-      featureDisabled.value = true
+      applyDisabledState(resp.message)
     } else {
       ElMessage.error(resp.message || '加载本地文件失败')
     }
   } catch (e) {
     const msg = (e as { message?: string })?.message
-    if (isDisabledMessage(msg) || isDisabledMessage((e as { response?: { data?: { message?: string } } })?.response?.data?.message)) {
-      featureDisabled.value = true
+    const respMsg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+    if (isDisabledMessage(msg) || isDisabledMessage(respMsg)) {
+      applyDisabledState(msg || respMsg)
     } else {
       handleError(e)
     }
