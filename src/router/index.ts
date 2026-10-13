@@ -191,6 +191,12 @@ function adminRoutes(base: string): RouteRecordRaw[] {
         meta: { title: '内容审核' },
       },
       {
+        path: 'p2p',
+        name: 'AdminP2pTransfer',
+        component: () => import('@/views/admin/P2pTransfer.vue'),
+        meta: { title: '设备直传' },
+      },
+      {
         path: 'activities',
         name: 'AdminActivities',
         component: () => import('@/views/admin/Activities.vue'),

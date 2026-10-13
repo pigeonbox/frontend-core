@@ -53,6 +53,11 @@
             <span>{{ t('admin.moderationTitle') }}</span>
           </el-menu-item>
 
+          <el-menu-item :index="adminBase + '/p2p'">
+            <el-icon><Connection /></el-icon>
+            <span>{{ t('admin.p2pTitle') }}</span>
+          </el-menu-item>
+
           <el-menu-item :index="adminBase + '/activities'">
             <el-icon><List /></el-icon>
             <span>{{ t('admin.activities') }}</span>
@@ -140,7 +145,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
   Monitor, Folder, FolderOpened, User, Setting, ArrowDown, Bell,
-  Box, Document, Tools, Promotion, SwitchButton, List, View } from '@element-plus/icons-vue'
+  Box, Document, Tools, Promotion, SwitchButton, List, View, Connection } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { withBase } from '@/utils/base'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'

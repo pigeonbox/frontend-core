@@ -344,6 +344,48 @@
               />
               <span class="field-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
             </el-form-item>
+
+            <el-divider content-position="left">{{ t('admin.configPage.sections.directTransfer') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.p2p.dtEnabled')">
+              <el-switch v-model="exForm.p2p.direct.enabled" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.dtEnabledHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.dtRegistry')">
+              <el-input
+                v-model="exForm.p2p.direct.registry_url"
+                :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                style="width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.p2p.dtRegistryHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.sendRoots')">
+              <el-input
+                v-model="p2pSendRootsText"
+                type="textarea"
+                :rows="3"
+                :placeholder="t('admin.configPage.p2p.sendRootsPlaceholder')"
+              />
+              <span class="field-hint">{{ t('admin.configPage.p2p.sendRootsHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.recvDir')">
+              <el-input v-model="exForm.p2p.direct.recv_dir" :placeholder="t('admin.configPage.p2p.recvDirPlaceholder')" style="width: 360px" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.recvDirHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.maxTaskMB')">
+              <el-input-number v-model="p2pMaxTaskMB" :min="0" :max="1048576" controls-position="right" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.maxTaskMBHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.inboxQuotaGB')">
+              <el-input-number v-model="p2pInboxQuotaGB" :min="0" :max="10240" controls-position="right" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.inboxQuotaGBHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.binaryPath')">
+              <el-input v-model="exForm.p2p.direct.binary_path" :placeholder="t('admin.configPage.p2p.binaryPathPlaceholder')" style="width: 360px" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.binaryPathHint') }}</span>
+            </el-form-item>
+            <el-form-item>
+              <el-link type="primary" @click="goP2pOps">{{ t('admin.configPage.p2p.openOpsPage') }}</el-link>
+            </el-form-item>
           </el-form>
 
           <div class="config-save-bar">
@@ -499,6 +541,7 @@ const exForm = reactive({
   api_token: { enabled: true, per_key_qps: 20, per_key_burst: 40 },
   p2p: {
     federation: { enabled: false, registry_url: '', public_url: '', node_key_path: '', announce_min_entropy_bits: 40 },
+    direct: { enabled: false, registry_url: '', relay_addr: '', send_roots: [] as string[], recv_dir: '', max_task_bytes: 0, inbox_quota_bytes: 0, binary_path: '' },
   },
 })
 
@@ -516,6 +559,27 @@ const localImportRootsText = computed({
     exForm.local_import.roots = v.split(',').map((x) => x.trim()).filter(Boolean)
   },
 })
+
+// P2P 直传:send_roots 每行一个绝对路径(textarea ↔ 数组)
+const p2pSendRootsText = computed({
+  get: () => exForm.p2p.direct.send_roots.join('\n'),
+  set: (v: string) => {
+    exForm.p2p.direct.send_roots = v.split('\n').map((x) => x.trim()).filter(Boolean)
+  },
+})
+// 配额以友好单位展示(后端存字节;0 = 后端缺省)
+const p2pMaxTaskMB = computed({
+  get: () => Math.round(exForm.p2p.direct.max_task_bytes / 1024 / 1024),
+  set: (v: number) => { exForm.p2p.direct.max_task_bytes = v * 1024 * 1024 },
+})
+const p2pInboxQuotaGB = computed({
+  get: () => Math.round(exForm.p2p.direct.inbox_quota_bytes / 1024 / 1024 / 1024),
+  set: (v: number) => { exForm.p2p.direct.inbox_quota_bytes = v * 1024 * 1024 * 1024 },
+})
+const goP2pOps = () => {
+  const m = router.currentRoute.value.path.match(/^(.*?\/admin)/)
+  router.push(`${m ? m[1] : '/admin'}/p2p`)
+}
 
 const fetchExSections = (data: Record<string, unknown>) => {
   const sec = data as Record<string, any>
@@ -557,6 +621,11 @@ const fetchExSections = (data: Record<string, unknown>) => {
     if (exForm.p2p.federation.enabled == null) exForm.p2p.federation.enabled = false
     // 注意用 == null 而非 !x：合法 0（禁用熵门槛）不能被显示成默认 40
     if (exForm.p2p.federation.announce_min_entropy_bits == null) exForm.p2p.federation.announce_min_entropy_bits = 40
+  }
+  if (sec.p2p?.direct) {
+    Object.assign(exForm.p2p.direct, sec.p2p.direct)
+    if (exForm.p2p.direct.enabled == null) exForm.p2p.direct.enabled = false
+    if (exForm.p2p.direct.send_roots == null) exForm.p2p.direct.send_roots = []
   }
 }
 
@@ -637,7 +706,7 @@ const saveCurrent = async () => {
         })
         break
       case 'p2p':
-        await putConfig({ p2p: { federation: { ...exForm.p2p.federation } } })
+        await putConfig({ p2p: { federation: { ...exForm.p2p.federation }, direct: { ...exForm.p2p.direct } } })
         break
     }
     ElMessage.success(t('admin.configPage.saved'))
