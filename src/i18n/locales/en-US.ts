@@ -570,7 +570,8 @@ export default {
         download: 'Download & Direct Upload',
         account: 'Users & Login',
         security: 'Security & Rate Limiting',
-        notify: 'Notifications & Email'
+        notify: 'Notifications & Email',
+        p2p: 'P2P & Federation'
       },
       navDesc: {
         site: 'Site identity and public appearance',
@@ -578,7 +579,8 @@ export default {
         download: 'How downloads and object-storage direct transfers behave',
         account: 'Registration policy, per-user defaults and sign-in methods',
         security: 'Rate limiting rules and API key admission',
-        notify: 'Off-site notifications for share events and email'
+        notify: 'Off-site notifications for share events and email',
+        p2p: 'Device direct transfer and cross-site federation (code-based, traffic bypasses the server)'
       },
       sections: {
         site: 'Site Info',
@@ -593,7 +595,23 @@ export default {
         ratelimit: 'Rate Limiting',
         apitoken: 'API Token',
         webhook: 'Webhook',
-        smtp: 'SMTP Email'
+        smtp: 'SMTP Email',
+        federation: 'Federation Registry'
+      },
+      p2p: {
+        fedEnabled: 'Enable Federation',
+        fedEnabledHint: 'Register this instance into a federation registry so code shares resolve cross-site; takes effect on save (auto-disabled in multi-replica mode)',
+        registryUrl: 'Registry URL',
+        registryUrlPlaceholder: 'https://p2p.example.com:56788',
+        registryUrlHint: 'Leave empty for the official public registry; comma-separated for multi-registry failover; signaling port 56788, relay port auto-discovered via /health',
+        publicUrl: 'Public URL',
+        publicUrlPlaceholder: 'https://share.example.com',
+        publicUrlHint: 'Announced to receivers for direct download; must be publicly reachable; usually same as the site URL',
+        minEntropy: 'Announce entropy threshold (bits)',
+        minEntropyHint: 'Codes below this entropy stay local (6-digit pickup codes are site-local by default); 0 = default 40',
+        nodeKeyPath: 'Node key path',
+        nodeKeyPathPlaceholder: 'data/federation.key',
+        nodeKeyPathHint: 'Ed25519 node identity, auto-generated on first start; changing it changes the federation identity'
       },
       basic: {
         siteName: 'Site Name',

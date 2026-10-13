@@ -283,7 +283,7 @@
           </el-form>
 
           <!-- ============ 通知与邮件（notify） ============ -->
-          <el-form v-else label-width="180px" class="config-form">
+          <el-form v-else-if="activeSection === 'notify'" label-width="180px" class="config-form">
             <el-divider content-position="left">{{ t('admin.configPage.sections.webhook') }}</el-divider>
             <el-form-item :label="t('admin.configPage.notify.webhook')">
               <el-input v-model="exForm.notify.webhook_url" :placeholder="t('admin.configPage.notify.webhookPlaceholder')" clearable />
@@ -309,6 +309,43 @@
             </el-form-item>
           </el-form>
 
+          <el-form v-else-if="activeSection === 'p2p'" label-width="180px" class="config-form">
+            <!-- P2P 与联邦（p2p.federation；直传操作页随 P2a）——注释须在元素内，独立注释行会打断 v-if 链 -->
+            <el-divider content-position="left">{{ t('admin.configPage.sections.federation') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
+              <el-switch v-model="exForm.p2p.federation.enabled" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.fedEnabledHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.registryUrl')">
+              <el-input
+                v-model="exForm.p2p.federation.registry_url"
+                :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                style="width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.p2p.registryUrlHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.publicUrl')">
+              <el-input
+                v-model="exForm.p2p.federation.public_url"
+                :placeholder="t('admin.configPage.p2p.publicUrlPlaceholder')"
+                style="width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.p2p.publicUrlHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.minEntropy')">
+              <el-input-number v-model="exForm.p2p.federation.announce_min_entropy_bits" :min="0" :max="256" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.minEntropyHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.nodeKeyPath')">
+              <el-input
+                v-model="exForm.p2p.federation.node_key_path"
+                :placeholder="t('admin.configPage.p2p.nodeKeyPathPlaceholder')"
+                style="width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
+            </el-form-item>
+          </el-form>
+
           <div class="config-save-bar">
             <el-button type="primary" :loading="saving" @click="saveCurrent">
               {{ t('admin.configPage.save') }}
@@ -324,7 +361,7 @@
 import { ref, reactive, computed, watch, onMounted, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Picture, Upload, Download, User, Lock, Message } from '@element-plus/icons-vue'
+import { Picture, Upload, Download, User, Lock, Message, Connection } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { THEMES, matchThemePreset, type ThemePreset } from '@/config/themes'
 import { adminApi } from '@/api/admin'
@@ -335,7 +372,7 @@ const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 // ==================== 分区导航（原 11 tab 收敛 6 分区，?section= 深链） ====================
-const SECTION_IDS = ['site', 'share', 'download', 'account', 'security', 'notify'] as const
+const SECTION_IDS = ['site', 'share', 'download', 'account', 'security', 'notify', 'p2p'] as const
 type SectionId = (typeof SECTION_IDS)[number]
 
 const navItems: { id: SectionId; labelKey: string; descKey: string; icon: Component }[] = [
@@ -345,6 +382,7 @@ const navItems: { id: SectionId; labelKey: string; descKey: string; icon: Compon
   { id: 'account', labelKey: 'admin.configPage.nav.account', descKey: 'admin.configPage.navDesc.account', icon: User },
   { id: 'security', labelKey: 'admin.configPage.nav.security', descKey: 'admin.configPage.navDesc.security', icon: Lock },
   { id: 'notify', labelKey: 'admin.configPage.nav.notify', descKey: 'admin.configPage.navDesc.notify', icon: Message },
+  { id: 'p2p', labelKey: 'admin.configPage.nav.p2p', descKey: 'admin.configPage.navDesc.p2p', icon: Connection },
 ]
 
 const route = useRoute()
@@ -459,6 +497,9 @@ const exForm = reactive({
   oidc: { enabled: false, issuer: '', client_id: '', client_secret: '', scopes: 'openid profile email', frontend_callback: '' },
   local_import: { enabled: false, roots: [] as string[] },
   api_token: { enabled: true, per_key_qps: 20, per_key_burst: 40 },
+  p2p: {
+    federation: { enabled: false, registry_url: '', public_url: '', node_key_path: '', announce_min_entropy_bits: 40 },
+  },
 })
 
 // 主题预设（2026-10-07 轻量主题包）：选择=写 ui.accent_color 走既有持久化与热应用
@@ -510,6 +551,12 @@ const fetchExSections = (data: Record<string, unknown>) => {
   if (sec.oidc) Object.assign(exForm.oidc, sec.oidc)
   if (sec.local_import) Object.assign(exForm.local_import, sec.local_import)
   if (sec.api_token) Object.assign(exForm.api_token, sec.api_token)
+  if (sec.p2p?.federation) {
+    Object.assign(exForm.p2p.federation, sec.p2p.federation)
+    // 旧库无 p2p 段/缺键 null 归一（后端 env 种子回填见 ensureConfigLoaded）
+    if (exForm.p2p.federation.enabled == null) exForm.p2p.federation.enabled = false
+    if (!exForm.p2p.federation.announce_min_entropy_bits) exForm.p2p.federation.announce_min_entropy_bits = 40
+  }
 }
 
 // ==================== 统一分区保存（一页一保存按钮，按分区聚合后端配置段） ====================
@@ -587,6 +634,9 @@ const saveCurrent = async () => {
         await putConfig({
           notify: { webhook_url: exForm.notify.webhook_url, smtp: { ...exForm.notify.smtp } },
         })
+        break
+      case 'p2p':
+        await putConfig({ p2p: { federation: { ...exForm.p2p.federation } } })
         break
     }
     ElMessage.success(t('admin.configPage.saved'))

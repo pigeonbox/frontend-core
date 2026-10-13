@@ -570,7 +570,8 @@ export default {
         download: '下载与直传',
         account: '用户与登录',
         security: '安全与限流',
-        notify: '通知与邮件'
+        notify: '通知与邮件',
+        p2p: 'P2P 与联邦'
       },
       navDesc: {
         site: '站点的基础信息与对外形象',
@@ -578,7 +579,8 @@ export default {
         download: '决定下载与对象存储直传的运行方式',
         account: '注册开放策略、用户默认配额与登录方式',
         security: '接口限流规则与 API Key 准入',
-        notify: '分享创建等事件的站外通知与邮件'
+        notify: '分享创建等事件的站外通知与邮件',
+        p2p: '设备直传与跨站联邦（口令直达，流量不过服务器）'
       },
       sections: {
         site: '站点信息',
@@ -593,7 +595,23 @@ export default {
         ratelimit: '接口限流',
         apitoken: 'API Token',
         webhook: 'Webhook',
-        smtp: 'SMTP 邮件'
+        smtp: 'SMTP 邮件',
+        federation: '联邦注册'
+      },
+      p2p: {
+        fedEnabled: '启用联邦',
+        fedEnabledHint: '本站注册进联邦注册中心，口令分享跨站可达；保存即热生效（多副本部署下自动禁用）',
+        registryUrl: '注册中心地址',
+        registryUrlPlaceholder: 'https://p2p.example.com:56788',
+        registryUrlHint: '留空使用官方公共注册中心；逗号分隔多主备；信令端口 56788，中继端口经 /health 自发现',
+        publicUrl: '本站对外地址',
+        publicUrlPlaceholder: 'https://share.example.com',
+        publicUrlHint: '公告给取件方直连下载用，须公网/局域网可达；一般与站点地址一致',
+        minEntropy: '口令公告熵门槛（位）',
+        minEntropyHint: '低于此熵的口令不出站（6 位取件码默认仅本站有效，防注册中心侧枚举）；0 = 默认 40',
+        nodeKeyPath: '节点密钥路径',
+        nodeKeyPathPlaceholder: 'data/federation.key',
+        nodeKeyPathHint: 'Ed25519 节点身份，首次启动生成；变更即联邦身份更换'
       },
       basic: {
         siteName: '站点名称',
