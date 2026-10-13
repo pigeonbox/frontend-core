@@ -555,7 +555,8 @@ const fetchExSections = (data: Record<string, unknown>) => {
     Object.assign(exForm.p2p.federation, sec.p2p.federation)
     // 旧库无 p2p 段/缺键 null 归一（后端 env 种子回填见 ensureConfigLoaded）
     if (exForm.p2p.federation.enabled == null) exForm.p2p.federation.enabled = false
-    if (!exForm.p2p.federation.announce_min_entropy_bits) exForm.p2p.federation.announce_min_entropy_bits = 40
+    // 注意用 == null 而非 !x：合法 0（禁用熵门槛）不能被显示成默认 40
+    if (exForm.p2p.federation.announce_min_entropy_bits == null) exForm.p2p.federation.announce_min_entropy_bits = 40
   }
 }
 
