@@ -66,6 +66,18 @@
         </el-col>
       </el-row>
 
+      <!-- 待收邀请(P3:实例间推送,免口令交接) -->
+      <el-card class="p2p-card" v-if="invites.length > 0">
+        <template #header>{{ t('admin.p2p.invitesTitle') }}</template>
+        <div v-for="iv in invites" :key="iv.id" class="invite-row">
+          <code class="task-code">{{ iv.code }}</code>
+          <span class="invite-from">{{ t('admin.p2p.inviteFrom') }}: {{ iv.from_name || t('admin.p2p.inviteUnknown') }}</span>
+          <span class="dim" v-if="iv.note">「{{ iv.note }}」</span>
+          <span class="dim">{{ t('admin.p2p.inviteExpires', { n: Math.max(0, Math.floor(iv.expires_in / 60)) }) }}</span>
+          <el-button size="small" type="primary" @click="acceptInvite(iv)">{{ t('admin.p2p.inviteAccept') }}</el-button>
+        </div>
+      </el-card>
+
       <!-- 任务列表 -->
       <el-card class="p2p-card">
         <template #header>
@@ -87,6 +99,9 @@
               <template v-if="row.code">
                 <code class="task-code">{{ row.code }}</code>
                 <el-button size="small" text @click="copyCode(row.code)">{{ t('common.copy') }}</el-button>
+                <el-button v-if="row.kind === 'send'" size="small" text type="primary" @click="openPush(row)">
+                  {{ t('admin.p2p.pushBtn') }}
+                </el-button>
               </template>
               <span v-else class="dim">…</span>
             </template>
@@ -148,6 +163,22 @@
         <el-button type="primary" :loading="publishing" @click="doPublish">{{ t('admin.p2p.publishConfirm') }}</el-button>
       </template>
     </el-dialog>
+    <!-- 推送口令到实例(P3) -->
+    <el-dialog v-model="pushVisible" :title="t('admin.p2p.pushTitle')" width="460px">
+      <el-form label-width="110px">
+        <el-form-item :label="t('admin.p2p.pushTarget')">
+          <el-input v-model="pushForm.target_url" :placeholder="t('admin.p2p.pushTargetPlaceholder')" style="width: 320px" />
+          <span class="field-hint">{{ t('admin.p2p.pushTargetHint') }}</span>
+        </el-form-item>
+        <el-form-item :label="t('admin.p2p.pushNote')">
+          <el-input v-model="pushForm.note" maxlength="200" :placeholder="t('admin.p2p.pushNotePlaceholder')" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="pushVisible = false">{{ t('common.cancel') }}</el-button>
+        <el-button type="primary" :loading="pushing" @click="doPush">{{ t('admin.p2p.pushConfirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -156,7 +187,7 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { p2pApi, type P2pTask, type P2pStatus } from '@/api/p2p'
+import { p2pApi, type P2pTask, type P2pStatus, type P2pInvite } from '@/api/p2p'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { t } = useI18n()
@@ -178,7 +209,17 @@ const publishing = ref(false)
 const publishTaskId = ref('')
 const publishForm = reactive({ expire_value: 7, expire_style: 'day', require_auth: false, password: '' })
 
+// P3 邀请
+const invites = ref<P2pInvite[]>([])
+const pushVisible = ref(false)
+const pushing = ref(false)
+const pushForm = reactive({ code: '', target_url: '', note: '' })
+
 let pollTimer: ReturnType<typeof setInterval> | null = null
+// P3 邀请轻轮询(5s;页面在场即轮,量小无负担)
+const inviteTimer = setInterval(() => {
+  if (status.value?.enabled && status.value.available) void fetchInvites()
+}, 5000)
 
 const goConfig = () => router.push(`${adminBasePath()}/config?section=p2p`)
 
@@ -212,6 +253,54 @@ const fetchTasks = async () => {
     handleError(e)
   } finally {
     tasksLoading.value = false
+  }
+}
+
+const fetchInvites = async () => {
+  try {
+    const res = await p2pApi.invites()
+    if (res.code === 200 || res.code === 0) invites.value = res.data.invites ?? []
+  } catch {
+    /* 轮询失败静默 */
+  }
+}
+
+const acceptInvite = async (iv: P2pInvite) => {
+  try {
+    const res = await p2pApi.acceptInvite(iv.id)
+    if (res.code === 200 || res.code === 0) {
+      ElMessage.success(t('admin.p2p.acceptStarted'))
+      await fetchTasks()
+      await fetchInvites()
+    }
+  } catch (e) {
+    handleError(e)
+  }
+}
+
+const openPush = (row: P2pTask) => {
+  pushForm.code = row.code
+  pushForm.target_url = ''
+  pushForm.note = ''
+  pushVisible.value = true
+}
+
+const doPush = async () => {
+  if (!pushForm.target_url.trim()) {
+    ElMessage.warning(t('admin.p2p.pushTargetRequired'))
+    return
+  }
+  pushing.value = true
+  try {
+    const res = await p2pApi.invitePush(pushForm.code, pushForm.target_url.trim(), '', pushForm.note)
+    if (res.code === 200 || res.code === 0) {
+      ElMessage.success(t('admin.p2p.pushSuccess'))
+      pushVisible.value = false
+    }
+  } catch (e) {
+    handleError(e)
+  } finally {
+    pushing.value = false
   }
 }
 
@@ -334,10 +423,14 @@ const adminBasePath = () => {
 
 onMounted(async () => {
   await fetchStatus()
-  if (status.value?.enabled && status.value.available) await fetchTasks()
+  if (status.value?.enabled && status.value.available) {
+    await fetchTasks()
+    await fetchInvites()
+  }
 })
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
+  clearInterval(inviteTimer)
 })
 </script>
 
@@ -352,4 +445,6 @@ onUnmounted(() => {
 .task-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; letter-spacing: 1px; }
 .tasks-header { display: flex; justify-content: space-between; align-items: center; }
 .error-text { color: var(--el-color-danger); font-size: 12px; word-break: break-all; }
+.invite-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; flex-wrap: wrap; }
+.invite-from { font-size: 13px; }
 </style>

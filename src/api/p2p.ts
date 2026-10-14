@@ -25,6 +25,15 @@ export interface P2pStatus {
   deploy_allowed: boolean
 }
 
+export interface P2pInvite {
+  id: string
+  code: string
+  from_name: string
+  note: string
+  received_at: string
+  expires_in: number
+}
+
 export interface PublishOpts {
   expire_value?: number
   expire_style?: string
@@ -48,4 +57,10 @@ export const p2pApi = {
     request<ApiResponse<{ task_id: string }>>({ url: '/admin/p2p/cancel', method: 'POST', data: { task_id: taskId } }),
   publish: (taskId: string, opts: PublishOpts) =>
     request<ApiResponse<{ share_codes: string[] }>>({ url: '/admin/p2p/publish', method: 'POST', data: { task_id: taskId, ...opts } }),
+  // P3 推送邀请
+  invites: () => request<ApiResponse<{ invites: P2pInvite[] }>>({ url: '/admin/p2p/invites', method: 'GET' }),
+  acceptInvite: (inviteId: string) =>
+    request<ApiResponse<{ task: P2pTask }>>({ url: '/admin/p2p/invites/accept', method: 'POST', data: { invite_id: inviteId } }),
+  invitePush: (code: string, targetUrl: string, fromName: string, note: string) =>
+    request<ApiResponse<{ target_url: string }>>({ url: '/admin/p2p/invite-push', method: 'POST', data: { code, target_url: targetUrl, from_name: fromName, note } }),
 }
