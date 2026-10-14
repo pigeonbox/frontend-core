@@ -7,7 +7,7 @@
         </div>
       </template>
 
-      <!-- 左侧分区导航 + 右侧表单：原 11 个横向 tab 收敛为 6 个分区，
+      <!-- 左侧分区导航 + 右侧表单：原 11 个横向 tab 收敛为 7 个分区，
            分区与 URL ?section= 同步，支持深链/刷新不丢位置 -->
       <div class="config-layout">
         <nav class="config-nav">
@@ -413,7 +413,7 @@ import { useErrorHandler } from '@/composables/useErrorHandler'
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
-// ==================== 分区导航（原 11 tab 收敛 6 分区，?section= 深链） ====================
+// ==================== 分区导航（原 11 tab 收敛 7 分区，?section= 深链） ====================
 const SECTION_IDS = ['site', 'share', 'download', 'account', 'security', 'notify', 'p2p'] as const
 type SectionId = (typeof SECTION_IDS)[number]
 
