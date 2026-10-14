@@ -9,7 +9,7 @@ PigeonBox 公共前端(core):平台无关的 Web 应用全量(视图/stores/API/
   `?section=` 深链);P2P 分区含 federation(联邦热启停,registry 留空=官方公共
   注册中心 home.enjoye.top:56788)与 direct(设备直传:recv_dir/binary_path/
   send_roots/max_task_bytes/inbox_quota_bytes)两子段,另有独立设备直传控制台
-  `src/views/admin/P2pTransfer.vue`
+  `src/views/admin/P2pTransfer.vue`(含联邦推送邀请面板:待收列表/认领/推送)
 
 ```bash
 npm ci && npm run typecheck && npm test && npm run build   # neutral 构建
