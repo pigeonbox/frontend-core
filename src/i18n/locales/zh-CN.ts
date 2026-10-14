@@ -630,6 +630,8 @@ export default {
         binaryPath: 'p2pc 组件路径',
         binaryPathPlaceholder: '留空 = 自动查找（随包 /app/p2pc 或 PB_P2PC_PATH）',
         binaryPathHint: '高级项，仅自定义部署需要',
+        dtDiscoverable: '可被发现（在线名录）',
+        dtDiscoverableHint: '开启后本站注册进 p2pd 在线名录，其他实例可向你推送密封邀请（接收方 NAT 后也可达）；名录只含站点名与公钥，绝无口令。缺省关闭',
         openOpsPage: '打开「设备直传」操作页 →'
       },
       basic: {
@@ -794,6 +796,13 @@ export default {
       pushConfirm: '推送',
       pushSuccess: '口令已送达对方收件箱',
       pushTargetRequired: '请填写目标实例地址',
+      peerLabel: '名录对端',
+      peerPlaceholder: '选择名录对端并附密封邀请（可选）',
+      peerEmpty: '名录暂无在线对端（对端须开启「可被发现」）',
+      peerRecent: '最近使用',
+      peerNotePlaceholder: '邀请附言（选填，如「季度备份第一批」）',
+      peerHint: '选择对端后，发送将经 p2pd 信箱向其投递密封邀请——对端一键接收，NAT 后也能收到；失败不影响正常发送',
+      peerInviteQueued: '已附密封邀请：{peer}',
       state: {
         waiting: '等待中',
         retrying: '重试中',

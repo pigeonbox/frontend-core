@@ -35,6 +35,15 @@ export interface P2pInvite {
   expires_in: number
 }
 
+// 在线名录对端（2026-10-14 邀请信箱配套；p2pd 名录透传，零敏感）
+export interface P2pDirectoryPeer {
+  node_id: string
+  name: string
+  url: string
+  box_pub: string
+  online_since: number
+}
+
 export interface PublishOpts {
   expire_value?: number
   expire_style?: string
@@ -52,7 +61,12 @@ interface ApiResponse<T> {
 export const p2pApi = {
   status: () => request<ApiResponse<P2pStatus>>({ url: '/admin/p2p/status', method: 'GET' }),
   tasks: () => request<ApiResponse<{ tasks: P2pTask[] }>>({ url: '/admin/p2p/tasks', method: 'GET' }),
-  send: (paths: string[]) => request<ApiResponse<{ task: P2pTask }>>({ url: '/admin/p2p/send', method: 'POST', data: { paths } }),
+  send: (paths: string[], inviteTo?: string, inviteNote?: string) =>
+    request<ApiResponse<{ task: P2pTask }>>({
+      url: '/admin/p2p/send',
+      method: 'POST',
+      data: { paths, invite_to: inviteTo || undefined, invite_note: inviteNote || undefined },
+    }),
   recv: (code: string) => request<ApiResponse<{ task: P2pTask }>>({ url: '/admin/p2p/recv', method: 'POST', data: { code } }),
   cancel: (taskId: string) =>
     request<ApiResponse<{ task_id: string }>>({ url: '/admin/p2p/cancel', method: 'POST', data: { task_id: taskId } }),
@@ -64,4 +78,6 @@ export const p2pApi = {
     request<ApiResponse<{ task: P2pTask }>>({ url: '/admin/p2p/invites/accept', method: 'POST', data: { invite_id: inviteId } }),
   invitePush: (code: string, targetUrl: string, fromName: string, note: string) =>
     request<ApiResponse<{ target_url: string }>>({ url: '/admin/p2p/invite-push', method: 'POST', data: { code, target_url: targetUrl, from_name: fromName, note } }),
+  // 在线名录（发送卡对端选择器）
+  directory: () => request<ApiResponse<{ peers: P2pDirectoryPeer[] }>>({ url: '/admin/p2p/directory', method: 'GET' }),
 }

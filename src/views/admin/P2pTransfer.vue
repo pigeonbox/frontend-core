@@ -42,9 +42,35 @@
               :rows="4"
               :placeholder="t('admin.p2p.sendPathsPlaceholder')"
             />
+            <div class="peer-row">
+              <el-select
+                v-model="inviteTo"
+                filterable
+                clearable
+                :placeholder="t('admin.p2p.peerPlaceholder')"
+                :loading="peersLoading"
+                class="peer-select"
+                @visible-change="(v: boolean) => v && fetchPeers()"
+              >
+                <el-option v-for="p in sortedPeers" :key="p.node_id" :value="p.node_id" :label="peerLabel(p)">
+                  <span class="peer-name">{{ p.name || t('admin.p2p.inviteUnknown') }}</span>
+                  <span class="dim peer-fp">{{ shortFp(p.node_id) }}</span>
+                </el-option>
+                <template #empty>
+                  <span class="dim">{{ t('admin.p2p.peerEmpty') }}</span>
+                </template>
+              </el-select>
+              <el-input
+                v-if="inviteTo"
+                v-model="inviteNote"
+                maxlength="200"
+                :placeholder="t('admin.p2p.peerNotePlaceholder')"
+                class="peer-note"
+              />
+            </div>
             <div class="card-actions">
               <el-button type="primary" :loading="sending" @click="doSend">{{ t('admin.p2p.sendBtn') }}</el-button>
-              <span class="field-hint">{{ t('admin.p2p.sendHint') }}</span>
+              <span class="field-hint">{{ inviteTo ? t('admin.p2p.peerHint') : t('admin.p2p.sendHint') }}</span>
             </div>
           </el-card>
         </el-col>
@@ -183,11 +209,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { p2pApi, type P2pTask, type P2pStatus, type P2pInvite } from '@/api/p2p'
+import { p2pApi, type P2pTask, type P2pStatus, type P2pInvite, type P2pDirectoryPeer } from '@/api/p2p'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { t } = useI18n()
@@ -203,6 +229,57 @@ const sendPathsText = ref('')
 const sending = ref(false)
 const recvCode = ref('')
 const recving = ref(false)
+
+// 在线名录对端选择(2026-10-14 邀请信箱:密封邀请免手抄口令,近用优先)
+const peers = ref<P2pDirectoryPeer[]>([])
+const peersLoading = ref(false)
+const inviteTo = ref('')
+const inviteNote = ref('')
+const RECENT_PEERS_KEY = 'pb.p2p.recentPeers'
+const recentPeerIds = ref<string[]>(loadRecentPeers())
+
+function loadRecentPeers(): string[] {
+  try {
+    const raw = localStorage.getItem(RECENT_PEERS_KEY)
+    const arr = raw ? JSON.parse(raw) : []
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string').slice(0, 5) : []
+  } catch {
+    return []
+  }
+}
+
+const sortedPeers = computed(() => {
+  const rank = (id: string) => {
+    const i = recentPeerIds.value.indexOf(id)
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i
+  }
+  return [...peers.value].sort((a, b) => rank(a.node_id) - rank(b.node_id))
+})
+
+const peerLabel = (p: P2pDirectoryPeer) => `${p.name || 'p2pc'} · ${shortFp(p.node_id)}`
+const shortFp = (id: string) => (id.length > 10 ? id.slice(0, 10) : id)
+
+const fetchPeers = async () => {
+  peersLoading.value = true
+  try {
+    const res = await p2pApi.directory()
+    if (res.code === 200 || res.code === 0) peers.value = res.data.peers ?? []
+  } catch {
+    /* 名录不可达静默(公共注册中心波动常见,不该打断发送卡) */
+  } finally {
+    peersLoading.value = false
+  }
+}
+
+const rememberPeer = (id: string) => {
+  const next = [id, ...recentPeerIds.value.filter((x) => x !== id)].slice(0, 5)
+  recentPeerIds.value = next
+  try {
+    localStorage.setItem(RECENT_PEERS_KEY, JSON.stringify(next))
+  } catch {
+    /* 隐私模式等存储不可用时静默 */
+  }
+}
 
 const publishVisible = ref(false)
 const publishing = ref(false)
@@ -312,10 +389,17 @@ const doSend = async () => {
   }
   sending.value = true
   try {
-    const res = await p2pApi.send(paths)
+    const res = await p2pApi.send(paths, inviteTo.value || undefined, inviteNote.value || undefined)
     if (res.code === 200 || res.code === 0) {
       ElMessage.success(t('admin.p2p.sendStarted'))
+      if (inviteTo.value) {
+        const peer = peers.value.find((p) => p.node_id === inviteTo.value)
+        ElMessage.info(t('admin.p2p.peerInviteQueued', { peer: peerLabel(peer ?? { node_id: inviteTo.value, name: '', url: '', box_pub: '', online_since: 0 }) }))
+        rememberPeer(inviteTo.value)
+      }
       sendPathsText.value = ''
+      inviteTo.value = ''
+      inviteNote.value = ''
       await fetchTasks()
       if (!pollTimer) pollTimer = setInterval(fetchTasks, 2000)
     }
@@ -426,6 +510,7 @@ onMounted(async () => {
   if (status.value?.enabled && status.value.available) {
     await fetchTasks()
     await fetchInvites()
+    void fetchPeers() // 名录对端背景加载(失败静默)
   }
 })
 onUnmounted(() => {
@@ -447,4 +532,9 @@ onUnmounted(() => {
 .error-text { color: var(--el-color-danger); font-size: 12px; word-break: break-all; }
 .invite-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; flex-wrap: wrap; }
 .invite-from { font-size: 13px; }
+.peer-row { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.peer-select { flex: 1 1 240px; min-width: 200px; }
+.peer-note { flex: 1 1 180px; min-width: 160px; }
+.peer-name { margin-right: 8px; }
+.peer-fp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 </style>

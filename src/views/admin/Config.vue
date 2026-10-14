@@ -383,6 +383,10 @@
               <el-input v-model="exForm.p2p.direct.binary_path" :placeholder="t('admin.configPage.p2p.binaryPathPlaceholder')" style="width: 360px" />
               <span class="field-hint">{{ t('admin.configPage.p2p.binaryPathHint') }}</span>
             </el-form-item>
+            <el-form-item :label="t('admin.configPage.p2p.dtDiscoverable')">
+              <el-switch v-model="exForm.p2p.direct.discoverable" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.dtDiscoverableHint') }}</span>
+            </el-form-item>
             <el-form-item>
               <el-link type="primary" @click="goP2pOps">{{ t('admin.configPage.p2p.openOpsPage') }}</el-link>
             </el-form-item>
@@ -541,7 +545,7 @@ const exForm = reactive({
   api_token: { enabled: true, per_key_qps: 20, per_key_burst: 40 },
   p2p: {
     federation: { enabled: false, registry_url: '', public_url: '', node_key_path: '', announce_min_entropy_bits: 40 },
-    direct: { enabled: false, registry_url: '', relay_addr: '', send_roots: [] as string[], recv_dir: '', max_task_bytes: 0, inbox_quota_bytes: 0, binary_path: '' },
+    direct: { enabled: false, registry_url: '', relay_addr: '', send_roots: [] as string[], recv_dir: '', max_task_bytes: 0, inbox_quota_bytes: 0, binary_path: '', discoverable: false },
   },
 })
 
@@ -626,6 +630,7 @@ const fetchExSections = (data: Record<string, unknown>) => {
     Object.assign(exForm.p2p.direct, sec.p2p.direct)
     if (exForm.p2p.direct.enabled == null) exForm.p2p.direct.enabled = false
     if (exForm.p2p.direct.send_roots == null) exForm.p2p.direct.send_roots = []
+    if (exForm.p2p.direct.discoverable == null) exForm.p2p.direct.discoverable = false
   }
 }
 

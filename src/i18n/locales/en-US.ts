@@ -630,6 +630,8 @@ export default {
         binaryPath: 'p2pc binary path',
         binaryPathPlaceholder: 'Empty = auto-detect (bundled /app/p2pc or PB_P2PC_PATH)',
         binaryPathHint: 'Advanced — only needed for custom deployments',
+        dtDiscoverable: 'Discoverable (online directory)',
+        dtDiscoverableHint: 'When on, this site registers into the p2pd online directory so other instances can push sealed invites to you (works behind NAT). The directory holds only site names and public keys, never passphrases. Off by default.',
         openOpsPage: 'Open Device Transfer page →'
       },
       basic: {
@@ -801,6 +803,13 @@ export default {
       pushConfirm: 'Push',
       pushSuccess: 'Code delivered to the peer inbox',
       pushTargetRequired: 'Enter the target instance URL',
+      peerLabel: 'Directory peer',
+      peerPlaceholder: 'Pick a directory peer to attach a sealed invite (optional)',
+      peerEmpty: 'No online peers in the directory (peers must enable "Discoverable")',
+      peerRecent: 'Recent',
+      peerNotePlaceholder: 'Invite note (optional, e.g. "quarterly backup batch 1")',
+      peerHint: 'With a peer selected, sending also delivers a sealed invite via the p2pd mailbox — the peer accepts with one click, even behind NAT. Failures never block the transfer itself.',
+      peerInviteQueued: 'Sealed invite attached: {peer}',
       state: {
         waiting: 'Waiting',
         retrying: 'Retrying',
