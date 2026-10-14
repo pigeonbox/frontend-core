@@ -604,7 +604,7 @@ export default {
         fedEnabledHint: 'Register this instance into a federation registry so code shares resolve cross-site; takes effect on save (rejected with an explicit error in multi-replica mode)',
         registryUrl: 'Registry URL',
         registryUrlPlaceholder: 'https://p2p.example.com:56788',
-        registryUrlHint: 'Leave empty for the official public registry; comma-separated for multi-registry failover; signaling port 56788, relay port auto-discovered via /health',
+        registryUrlHint: 'Leave empty for the official public registry (plain http://, no TLS); comma-separated for multi-registry failover; signaling port 56788, relay port auto-discovered via /health',
         publicUrl: 'Public URL',
         publicUrlPlaceholder: 'https://share.example.com',
         publicUrlHint: 'Announced to receivers for direct download; must be publicly reachable; usually same as the site URL. Leave empty to fall back to the site base URL (server.base_url); saving fails explicitly when that cannot be inferred',

@@ -604,7 +604,7 @@ export default {
         fedEnabledHint: '本站注册进联邦注册中心，口令分享跨站可达；保存即热生效（多副本部署下禁用，保存会明确报错）',
         registryUrl: '注册中心地址',
         registryUrlPlaceholder: 'https://p2p.example.com:56788',
-        registryUrlHint: '留空使用官方公共注册中心；逗号分隔多主备；信令端口 56788，中继端口经 /health 自发现',
+        registryUrlHint: '留空使用官方公共注册中心（http:// 协议，无 TLS）；逗号分隔多主备；信令端口 56788，中继端口经 /health 自发现',
         publicUrl: '本站对外地址',
         publicUrlPlaceholder: 'https://share.example.com',
         publicUrlHint: '公告给取件方直连下载用，须公网/局域网可达；一般与站点地址一致。留空默认取站点对外地址（server.base_url），推断不可用时保存会报错',
