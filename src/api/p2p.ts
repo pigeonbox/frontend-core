@@ -5,11 +5,12 @@ import { request } from '@/utils/request'
 export interface P2pTask {
   id: string
   kind: 'send' | 'recv'
-  state: 'waiting' | 'running' | 'done' | 'failed' | 'canceled' | 'expired'
+  state: 'waiting' | 'running' | 'retrying' | 'done' | 'failed' | 'canceled' | 'expired'
   code: string
   paths: string[]
   bytes_done: number
   error: string
+  attempts: number
   created_at: string
   finished_at: string
 }

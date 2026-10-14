@@ -803,6 +803,7 @@ export default {
       pushTargetRequired: 'Enter the target instance URL',
       state: {
         waiting: 'Waiting',
+        retrying: 'Retrying',
         running: 'Transferring',
         done: 'Done',
         failed: 'Failed',

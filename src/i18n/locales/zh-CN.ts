@@ -796,6 +796,7 @@ export default {
       pushTargetRequired: '请填写目标实例地址',
       state: {
         waiting: '等待中',
+        retrying: '重试中',
         running: '传输中',
         done: '已完成',
         failed: '失败',

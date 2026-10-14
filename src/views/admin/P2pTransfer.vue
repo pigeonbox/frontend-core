@@ -108,7 +108,7 @@
           </el-table-column>
           <el-table-column :label="t('admin.p2p.colState')" width="110">
             <template #default="{ row }">
-              <el-tag :type="stateTagType(row.state)" size="small">{{ stateLabel(row.state) }}</el-tag>
+              <el-tag :type="stateTagType(row.state)" size="small">{{ stateLabel(row.state) }}<template v-if="row.state === 'retrying' && row.attempts > 0">({{ row.attempts }})</template></el-tag>
             </template>
           </el-table-column>
           <el-table-column :label="t('admin.p2p.colBytes')" width="110">
@@ -241,7 +241,7 @@ const fetchTasks = async () => {
     if (res.code === 200 || res.code === 0) {
       tasks.value = (res.data.tasks ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
       // 有活跃任务才轮询（空闲不打扰）
-      const active = tasks.value.some((x) => x.state === 'waiting' || x.state === 'running')
+      const active = tasks.value.some((x) => x.state === 'waiting' || x.state === 'running' || x.state === 'retrying')
       if (active && !pollTimer) {
         pollTimer = setInterval(fetchTasks, 2000)
       } else if (!active && pollTimer) {
