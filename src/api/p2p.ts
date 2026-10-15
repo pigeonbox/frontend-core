@@ -71,6 +71,9 @@ interface ApiResponse<T> {
 export const p2pApi = {
   status: () => request<ApiResponse<P2pStatus>>({ url: '/admin/p2p/status', method: 'GET' }),
   tasks: () => request<ApiResponse<{ tasks: P2pTask[] }>>({ url: '/admin/p2p/tasks', method: 'GET' }),
+  // taskLog 任务日志（p2pc 行级环,时间正序;详情抽屉诊断用——失败免登服务器）
+  taskLog: (taskId: string) =>
+    request<ApiResponse<{ lines: string[] }>>({ url: `/admin/p2p/tasks/${encodeURIComponent(taskId)}/log`, method: 'GET' }),
   send: (paths: string[], inviteTo?: string, inviteNote?: string) =>
     request<ApiResponse<{ task: P2pTask }>>({
       url: '/admin/p2p/send',

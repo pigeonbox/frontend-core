@@ -154,8 +154,12 @@
               :placeholder="t('admin.p2p.recvCodePlaceholder')"
               maxlength="14"
               @input="recvCode = formatCode(recvCode)"
+              @keyup.enter="doRecv"
             >
               <template #prefix><el-icon><Key /></el-icon></template>
+              <template v-if="canClipboardRead" #append>
+                <el-button @click="pasteCode">{{ t('admin.p2p.pasteBtn') }}</el-button>
+              </template>
             </el-input>
             <div class="card-actions">
               <el-button type="primary" :loading="recving" @click="doRecv">{{ t('admin.p2p.recvBtn') }}</el-button>
@@ -211,12 +215,16 @@
               <span v-else class="dim">…</span>
             </template>
           </el-table-column>
-          <el-table-column :label="t('admin.p2p.colState')" width="110">
+          <el-table-column :label="t('admin.p2p.colState')" width="130">
             <template #default="{ row }">
               <el-tag :type="stateTagType(row.state)" size="small">{{ stateLabel(row.state) }}<template v-if="row.state === 'retrying' && row.attempts > 0">({{ row.attempts }})</template></el-tag>
+              <!-- 发送等待期取件倒计时（10 分钟配对窗口,2026-10-16 深度易用化） -->
+              <div v-if="pickupLeft(row) !== null" class="pickup-cd" :class="{ hot: pickupLeft(row)! < 120 }">
+                ⏳ {{ t('admin.p2p.pickupLeft', { t: fmtMMSS(pickupLeft(row)!) }) }}
+              </div>
             </template>
           </el-table-column>
-          <el-table-column :label="t('admin.p2p.colProgress')" min-width="150">
+          <el-table-column :label="t('admin.p2p.colProgress')" min-width="160">
             <template #default="{ row }">
               <template v-if="row.bytes_total > 0">
                 <el-progress
@@ -228,6 +236,8 @@
                 <div class="dim progress-bytes">{{ formatBytes(row.bytes_done) }} / {{ formatBytes(row.bytes_total) }}</div>
               </template>
               <span v-else>{{ formatBytes(row.bytes_done) }}</span>
+              <!-- 轮询间差分速度 + 预计剩余（2026-10-16 深度易用化） -->
+              <div v-if="speedText(row)" class="dim progress-speed">{{ speedText(row) }}</div>
             </template>
           </el-table-column>
           <el-table-column :label="t('admin.p2p.colError')" min-width="180">
@@ -238,8 +248,9 @@
           <el-table-column :label="t('admin.p2p.colCreated')" width="170">
             <template #default="{ row }">{{ formatTime(row.created_at) }}</template>
           </el-table-column>
-          <el-table-column :label="t('common.actions')" width="180" fixed="right">
+          <el-table-column :label="t('common.actions')" width="230" fixed="right">
             <template #default="{ row }">
+              <el-button size="small" text @click="openDetail(row)">{{ t('admin.p2p.detailBtn') }}</el-button>
               <el-button
                 v-if="row.state === 'waiting' || row.state === 'running'"
                 size="small"
@@ -254,11 +265,70 @@
                 text
                 @click="openPublish(row)"
               >{{ t('admin.p2p.publishBtn') }}</el-button>
+              <el-button
+                v-if="canResend(row)"
+                size="small"
+                type="primary"
+                text
+                @click="resend(row)"
+              >{{ t('admin.p2p.resendBtn') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
       </el-card>
     </template>
+
+    <!-- 任务详情抽屉：信息 + 文件清单 + p2pc 日志（失败诊断免登服务器） -->
+    <el-drawer v-model="detailVisible" :title="t('admin.p2p.detailTitle')" size="560px">
+      <template v-if="detailTask">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item :label="t('admin.p2p.colKind')">
+            <el-tag :type="detailTask.kind === 'send' ? 'warning' : 'primary'" size="small">
+              {{ detailTask.kind === 'send' ? t('admin.p2p.kindSend') : t('admin.p2p.kindRecv') }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('admin.p2p.colState')">
+            <el-tag :type="stateTagType(detailTask.state)" size="small">{{ stateLabel(detailTask.state) }}</el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('admin.p2p.colCode')" :span="2">
+            <code v-if="detailTask.code" class="task-code">{{ detailTask.code }}</code>
+            <span v-else class="dim">—</span>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('admin.p2p.colProgress')" :span="2">
+            <template v-if="detailTask.bytes_total > 0">
+              {{ formatBytes(detailTask.bytes_done) }} / {{ formatBytes(detailTask.bytes_total) }}
+              （{{ taskPct(detailTask) }}%）
+            </template>
+            <template v-else>{{ formatBytes(detailTask.bytes_done) }}</template>
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('admin.p2p.detailAttempts')">
+            {{ detailTask.attempts }}
+          </el-descriptions-item>
+          <el-descriptions-item :label="t('admin.p2p.colCreated')">
+            {{ formatTime(detailTask.created_at) }}
+          </el-descriptions-item>
+        </el-descriptions>
+
+        <div class="detail-sec">{{ t('admin.p2p.detailPaths') }}</div>
+        <div class="detail-paths">
+          <code v-for="p in detailTask.paths" :key="p" class="detail-path">{{ p }}</code>
+          <span v-if="!detailTask.paths?.length" class="dim">—</span>
+        </div>
+
+        <div v-if="detailTask.error" class="detail-sec">
+          <span class="error-text">{{ plainError(detailTask.error) }}</span>
+        </div>
+
+        <div class="detail-sec detail-log-head">
+          <span>{{ t('admin.p2p.detailLog') }}</span>
+          <span>
+            <el-button size="small" text :loading="detailLogLoading" @click="fetchDetailLog">{{ t('common.refresh') }}</el-button>
+            <el-button size="small" text :disabled="!detailLog" @click="copyDetailLog">{{ t('common.copy') }}</el-button>
+          </span>
+        </div>
+        <pre class="detail-log">{{ detailLog || t('admin.p2p.detailLogEmpty') }}</pre>
+      </template>
+    </el-drawer>
 
     <!-- 发布为分享对话框 -->
     <el-dialog v-model="publishVisible" :title="t('admin.p2p.publishTitle')" width="460px">
@@ -320,7 +390,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { UploadUserFile } from 'element-plus'
@@ -412,7 +482,7 @@ const doUploadSend = async () => {
       inviteTo.value = ''
       inviteNote.value = ''
       await fetchTasks()
-      if (!pollTimer) pollTimer = setInterval(fetchTasks, 2000)
+      if (!pollTimer) pollTimer = setInterval(fetchTasks, 1500)
     }
   } catch (e) {
     handleError(e)
@@ -533,7 +603,14 @@ const fetchTasks = async () => {
   try {
     const res = await p2pApi.tasks()
     if (res.code === 200 || res.code === 0) {
+      const prevById = new Map(tasks.value.map((x) => [x.id, x]))
       tasks.value = (res.data.tasks ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
+      updateSpeeds(tasks.value)
+      // 后台 tab 有任务刚到完成态 → 标题闪烁提醒（回焦即停）
+      if (document.hidden) {
+        const newlyDone = tasks.value.some((x) => x.state === 'done' && prevById.get(x.id)?.state !== 'done')
+        if (newlyDone) startTitleFlash()
+      }
       // 待弹口令的任务：轮询到 p2pc 生成口令后弹结果框（仅一次）
       if (pendingCodeTaskId.value) {
         const t = tasks.value.find((x) => x.id === pendingCodeTaskId.value)
@@ -543,13 +620,14 @@ const fetchTasks = async () => {
           pendingCodeTaskId.value = ''
         }
       }
-      // 有活跃任务才轮询（空闲不打扰）
+      // 有活跃任务才轮询（空闲不打扰）；活跃期 1.5s 让进度条更顺滑
       const active = tasks.value.some((x) => x.state === 'waiting' || x.state === 'running' || x.state === 'retrying')
       if (active && !pollTimer) {
-        pollTimer = setInterval(fetchTasks, 2000)
+        pollTimer = setInterval(fetchTasks, 1500)
       } else if (!active && pollTimer) {
         clearInterval(pollTimer)
         pollTimer = null
+        speedCache.value = new Map()
       }
     }
   } catch (e) {
@@ -636,7 +714,7 @@ const doSend = async () => {
       inviteTo.value = ''
       inviteNote.value = ''
       await fetchTasks()
-      if (!pollTimer) pollTimer = setInterval(fetchTasks, 2000)
+      if (!pollTimer) pollTimer = setInterval(fetchTasks, 1500)
     }
   } catch (e) {
     handleError(e)
@@ -657,7 +735,7 @@ const doRecv = async () => {
       ElMessage.success(t('admin.p2p.recvStarted'))
       recvCode.value = ''
       await fetchTasks()
-      if (!pollTimer) pollTimer = setInterval(fetchTasks, 2000)
+      if (!pollTimer) pollTimer = setInterval(fetchTasks, 1500)
     }
   } catch (e) {
     handleError(e)
@@ -720,6 +798,149 @@ const taskPct = (row: P2pTask) => {
   if (!row.bytes_total || row.bytes_total <= 0) return 0
   return Math.min(100, Math.round((row.bytes_done / row.bytes_total) * 100))
 }
+
+// ---- 深度易用化（2026-10-16）----
+
+// 秒级心跳:驱动取件倒计时等相对时间渲染
+const nowTick = ref(Date.now())
+const tickTimer = setInterval(() => { nowTick.value = Date.now() }, 1000)
+
+// 发送任务 10 分钟配对窗口的取件倒计时（秒）。
+// 判据=发送活跃且零字节:p2pc 公告就绪即打 running（waiting 窗口极短）,
+// 有字节流动说明已在传输,倒计时失去意义即隐藏。
+const PAIR_WINDOW_MS = 10 * 60 * 1000
+const pickupLeft = (row: P2pTask): number | null => {
+  if (row.kind !== 'send' || row.bytes_done > 0) return null
+  if (row.state !== 'waiting' && row.state !== 'running' && row.state !== 'retrying') return null
+  const deadline = new Date(row.created_at).getTime() + PAIR_WINDOW_MS
+  const left = Math.round((deadline - nowTick.value) / 1000)
+  return left > 0 ? left : 0
+}
+const fmtMMSS = (s: number) => {
+  const m = Math.floor(s / 60)
+  const ss = s % 60
+  return `${m}:${ss < 10 ? '0' + ss : ss}`
+}
+
+// 传输速度/ETA:每次任务轮询做一次差分采样,渲染层只读缓存
+// (采样与渲染分离,避免模板多次求值把样本推进搞乱)
+const speedCache = ref(new Map<string, { speed: number; t: number; bytes: number }>())
+const updateSpeeds = (list: P2pTask[]) => {
+  const now = Date.now()
+  const next = new Map<string, { speed: number; t: number; bytes: number }>()
+  for (const row of list) {
+    if (row.state !== 'running' && row.state !== 'retrying') continue
+    const old = speedCache.value.get(row.id)
+    if (!old) {
+      next.set(row.id, { speed: 0, t: now, bytes: row.bytes_done })
+    } else if (now - old.t >= 900 && row.bytes_done > old.bytes) {
+      next.set(row.id, { speed: (row.bytes_done - old.bytes) / ((now - old.t) / 1000), t: now, bytes: row.bytes_done })
+    } else {
+      next.set(row.id, old) // 采样窗口未到,沿用上次速度
+    }
+  }
+  speedCache.value = next
+}
+const speedText = (row: P2pTask): string => {
+  const sp = speedCache.value.get(row.id)
+  if (!sp || !sp.speed) return ''
+  let out = `≈ ${formatBytes(sp.speed)}/s`
+  if (row.bytes_total > row.bytes_done) {
+    out += ` · ${t('admin.p2p.etaLeft', { t: fmtMMSS(Math.ceil((row.bytes_total - row.bytes_done) / sp.speed)) })}`
+  }
+  return out
+}
+
+// 任务详情抽屉
+const detailVisible = ref(false)
+const detailTask = ref<P2pTask | null>(null)
+const detailLog = ref('')
+const detailLogLoading = ref(false)
+let detailLogTimer: ReturnType<typeof setInterval> | null = null
+
+const openDetail = (row: P2pTask) => {
+  detailTask.value = row
+  detailLog.value = ''
+  detailVisible.value = true
+  void fetchDetailLog()
+  if (detailLogTimer) clearInterval(detailLogTimer)
+  detailLogTimer = setInterval(() => {
+    if (detailTask.value && (detailTask.value.state === 'waiting' || detailTask.value.state === 'running' || detailTask.value.state === 'retrying')) {
+      void fetchDetailLog()
+    }
+  }, 2000)
+}
+const fetchDetailLog = async () => {
+  if (!detailTask.value) return
+  detailLogLoading.value = true
+  try {
+    const res = await p2pApi.taskLog(detailTask.value.id)
+    if (res.code === 200 || res.code === 0) {
+      detailLog.value = (res.data.lines ?? []).join('\n')
+    }
+  } catch {
+    /* 任务可能已过保留期被剪除——保留上次内容 */
+  } finally {
+    detailLogLoading.value = false
+  }
+}
+const copyDetailLog = async () => {
+  try {
+    await navigator.clipboard.writeText(detailLog.value)
+    ElMessage.success(t('common.copied'))
+  } catch {
+    /* 剪贴板不可用时静默 */
+  }
+}
+// 抽屉打开期间同步任务行最新状态(轮询数据自然流经 tasks,这里做引用对齐)
+watch(tasks, (list) => {
+  if (detailTask.value) {
+    detailTask.value = list.find((x) => x.id === detailTask.value?.id) ?? detailTask.value
+  }
+})
+
+// 剪贴板一键粘贴口令(需 https/localhost 安全上下文;能力探测决定显示)
+const canClipboardRead = !!navigator.clipboard?.readText
+const pasteCode = async () => {
+  try {
+    const raw = await navigator.clipboard.readText()
+    recvCode.value = formatCode(raw || '')
+  } catch {
+    ElMessage.warning(t('admin.p2p.pasteDenied'))
+  }
+}
+
+// 后台 tab 完成提醒:标签页不可见时有任务到终态,标题闪烁直至回焦
+const BASE_TITLE = document.title
+let flashTimer: ReturnType<typeof setInterval> | null = null
+const stopTitleFlash = () => {
+  if (flashTimer) { clearInterval(flashTimer); flashTimer = null }
+  document.title = BASE_TITLE
+}
+const startTitleFlash = () => {
+  if (flashTimer) return
+  let on = false
+  flashTimer = setInterval(() => {
+    on = !on
+    document.title = on ? t('admin.p2p.notifyDone') : BASE_TITLE
+  }, 900)
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) stopTitleFlash()
+})
+onUnmounted(stopTitleFlash)
+
+// 再次发送:send 任务已结束且源路径仍在白名单内 → 预填服务器路径模式
+const canResend = (row: P2pTask): boolean => {
+  if (row.kind !== 'send' || !['done', 'failed', 'canceled', 'expired'].includes(row.state)) return false
+  if (!row.paths?.length || !sendRoots.value.length) return false
+  return row.paths.every((p) => sendRoots.value.some((root) => p === root || p.startsWith(root.endsWith('/') ? root : root + '/')))
+}
+const resend = (row: P2pTask) => {
+  sendMode.value = 'path'
+  sendPathsText.value = row.paths.join('\n')
+  ElMessage.info(t('admin.p2p.resendPrefilled'))
+}
 const stateLabel = (s: string) => t(`admin.p2p.state.${s}`)
 const stateTagType = (s: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' => {
   switch (s) {
@@ -757,6 +978,8 @@ onMounted(async () => {
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   clearInterval(inviteTimer)
+  clearInterval(tickTimer)
+  if (detailLogTimer) clearInterval(detailLogTimer)
 })
 </script>
 
@@ -774,6 +997,21 @@ onUnmounted(() => {
 .upload-t { font-size: 14px; font-weight: 600; }
 .upload-progress { margin-top: 10px; }
 .progress-bytes { margin-top: 2px; }
+.progress-speed { margin-top: 1px; font-variant-numeric: tabular-nums; }
+.pickup-cd { margin-top: 4px; font-size: 11px; color: var(--el-color-warning); }
+.pickup-cd.hot { color: var(--el-color-danger); font-weight: 600; }
+.detail-sec { margin: 14px 0 8px; font-size: 13px; font-weight: 600; }
+.detail-log-head { display: flex; justify-content: space-between; align-items: center; }
+.detail-paths { display: flex; flex-direction: column; gap: 4px; }
+.detail-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  background: var(--el-fill-color); padding: 4px 8px; border-radius: 6px; word-break: break-all;
+}
+.detail-log {
+  margin: 0; padding: 10px 12px; background: var(--el-fill-color-light); border-radius: 8px;
+  font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 320px; overflow-y: auto;
+  white-space: pre-wrap; word-break: break-all;
+}
 .card-actions { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
 .field-hint { color: var(--el-text-color-secondary); font-size: 12px; }
 .whitelist-chips { margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
