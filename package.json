@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
-    "@pigeonbox/contracts": "https://github.com/pigeonbox/contracts/releases/download/v0.15.0/pigeonbox-contracts-0.15.0.tgz",
+    "@pigeonbox/contracts": "https://github.com/pigeonbox/contracts/releases/download/v0.15.1/pigeonbox-contracts-0.15.1.tgz",
     "axios": "1.13.6",
     "dompurify": "^3.4.12",
     "element-plus": "2.13.4",
