@@ -137,7 +137,7 @@ async function uploadChunkWithRetry(
       return
     } catch (e) {
       const code = (e as { code?: number })?.code
-      if (code === 422 && attempt < maxRetries) continue
+      if ((code === 422 || code === 20009) && attempt < maxRetries) continue
       throw e
     }
   }

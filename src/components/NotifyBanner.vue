@@ -132,7 +132,7 @@ const handleClose = (id: number) => {
 const fetchActive = async () => {
   try {
     const res = await notifyApi.active()
-    if (res.code === 200 && res.data?.items) {
+    if ((res.code === 0 || res.code === 200) && res.data?.items) {
       items.value = res.data.items
     }
   } catch (e) {

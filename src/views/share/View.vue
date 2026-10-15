@@ -222,7 +222,7 @@ const fetchShare = async (pwd?: string) => {
   try {
     const res = await shareApi.getShare(shareCode.value, pwd)
 
-    if (res.code === 200) {
+    if (res.code === 0 || res.code === 200) {
       shareData.value = res.data
       // E2E 文本解密（密文 base64 存于 text 字段）
       if (res.data?.encrypted && res.data?.text && e2eKey.value) {
@@ -233,9 +233,9 @@ const fetchShare = async (pwd?: string) => {
           e2eError.value = t('share.decryptFailed')
         }
       }
-    } else if (res.code === 403 || res.data?.has_password) {
+    } else if (res.code === 403 || res.code === 10003 || res.data?.has_password) {
       needPassword.value = true
-    } else if (res.code === 404) {
+    } else if (res.code === 404 || res.code === 10004) {
       error.value = res.message || t('share.not_found')
     } else {
       error.value = res.message || t('share.not_found')
