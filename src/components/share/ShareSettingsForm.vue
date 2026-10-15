@@ -38,15 +38,17 @@
           />
         </div>
         <div v-if="showPassword" class="setting-group">
-          <label class="setting-label">
-            <el-icon><Lock /></el-icon>
-            {{ t('upload.requirePassword') }}
-          </label>
-          <el-switch
-            v-model="settings.require_auth"
-            :active-text="t('upload.needPassword')"
-            :inactive-text="t('upload.publicAccess')"
-          />
+          <div class="setting-row">
+            <label class="setting-label">
+              <el-icon><Lock /></el-icon>
+              {{ t('upload.requirePassword') }}
+            </label>
+            <el-switch
+              v-model="settings.require_auth"
+              :active-text="t('upload.needPassword')"
+              :inactive-text="t('upload.publicAccess')"
+            />
+          </div>
           <el-input
             v-if="settings.require_auth"
             v-model="settings.password"
@@ -54,7 +56,7 @@
             :placeholder="t('upload.passwordPlaceholder')"
             show-password
             maxlength="64"
-            style="margin-top: 8px"
+            class="password-input"
           />
         </div>
 
@@ -72,15 +74,17 @@
         </div>
 
         <div v-if="showE2e" class="setting-group">
-          <label class="setting-label">
-            <el-icon><Key /></el-icon>
-            {{ t('upload.e2e.title') }}
-          </label>
-          <el-switch
-            v-model="settings.e2e"
-            :active-text="t('upload.e2e.on')"
-            :inactive-text="t('upload.e2e.off')"
-          />
+          <div class="setting-row">
+            <label class="setting-label">
+              <el-icon><Key /></el-icon>
+              {{ t('upload.e2e.title') }}
+            </label>
+            <el-switch
+              v-model="settings.e2e"
+              :active-text="t('upload.e2e.on')"
+              :inactive-text="t('upload.e2e.off')"
+            />
+          </div>
           <div class="e2e-hint">{{ t('upload.e2e.hint') }}</div>
         </div>
       </el-collapse-item>
@@ -208,7 +212,29 @@ const unitLabel = (u: ShareExpireStyle) => t(UNIT_KEYS[u])
 
 .more-settings :deep(.el-collapse-item__wrap) {
   border-bottom: none;
-  background: var(--color-muted);
+  background: var(--color-card-bg);
+}
+
+/* EP 默认只有 padding-bottom，内容会贴死左右边框（图标被裁切） */
+.more-settings :deep(.el-collapse-item__content) {
+  padding: 4px 16px 16px;
+}
+
+/* 开关型设置行：label 居左、开关居右（窄屏换行） */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.setting-row .setting-label {
+  margin-bottom: 0;
+}
+
+.password-input {
+  margin-top: 12px;
 }
 
 .e2e-hint {

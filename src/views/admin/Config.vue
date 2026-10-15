@@ -321,52 +321,31 @@
               style="margin-bottom: 16px"
               :title="t('admin.configPage.envPriorityHint')"
             />
-            <el-divider content-position="left">{{ t('admin.configPage.sections.federation') }}</el-divider>
-            <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
-              <el-switch v-model="exForm.p2p.federation.enabled" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.fedEnabledHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.registryUrl')">
-              <el-input
-                v-model="exForm.p2p.federation.registry_url"
-                :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
-                style="width: 360px"
-              />
-              <span class="field-hint">{{ t('admin.configPage.p2p.registryUrlHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.publicUrl')">
-              <el-input
-                v-model="exForm.p2p.federation.public_url"
-                :placeholder="t('admin.configPage.p2p.publicUrlPlaceholder')"
-                style="width: 360px"
-              />
-              <span class="field-hint">{{ t('admin.configPage.p2p.publicUrlHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.minEntropy')">
-              <el-input-number v-model="exForm.p2p.federation.announce_min_entropy_bits" :min="0" :max="256" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.minEntropyHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.nodeKeyPath')">
-              <el-input
-                v-model="exForm.p2p.federation.node_key_path"
-                :placeholder="t('admin.configPage.p2p.nodeKeyPathPlaceholder')"
-                style="width: 360px"
-              />
-              <span class="field-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
-            </el-form-item>
+            <!-- 两功能白话导航卡：设备直传（人人可用）/ 跨站联邦（进阶） -->
+            <div class="p2p-intro">
+              <div class="p2p-feature-card">
+                <div class="p2p-feature-head">
+                  <span class="p2p-feature-title">{{ t('admin.configPage.p2p.introDtTitle') }}</span>
+                  <el-tag size="small" type="success">{{ t('admin.configPage.p2p.introDtBadge') }}</el-tag>
+                </div>
+                <p class="p2p-feature-desc">{{ t('admin.configPage.p2p.introDtDesc') }}</p>
+                <p class="p2p-feature-steps">{{ t('admin.configPage.p2p.introDtSteps') }}</p>
+                <el-link type="primary" @click="goP2pOps">{{ t('admin.configPage.p2p.openOpsPage') }} →</el-link>
+              </div>
+              <div class="p2p-feature-card is-muted">
+                <div class="p2p-feature-head">
+                  <span class="p2p-feature-title">{{ t('admin.configPage.p2p.introFedTitle') }}</span>
+                  <el-tag size="small" type="info">{{ t('admin.configPage.p2p.introFedBadge') }}</el-tag>
+                </div>
+                <p class="p2p-feature-desc">{{ t('admin.configPage.p2p.introFedDesc') }}</p>
+              </div>
+            </div>
 
+            <!-- 区块一：设备直传（推荐先配）——字段绑定不变 -->
             <el-divider content-position="left">{{ t('admin.configPage.sections.directTransfer') }}</el-divider>
             <el-form-item :label="t('admin.configPage.p2p.dtEnabled')">
               <el-switch v-model="exForm.p2p.direct.enabled" />
               <span class="field-hint">{{ t('admin.configPage.p2p.dtEnabledHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.dtRegistry')">
-              <el-input
-                v-model="exForm.p2p.direct.registry_url"
-                :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
-                style="width: 360px"
-              />
-              <span class="field-hint">{{ t('admin.configPage.p2p.dtRegistryHint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.p2p.sendRoots')">
               <el-input
@@ -389,17 +368,68 @@
               <el-input-number v-model="p2pInboxQuotaGB" :min="0" :max="10240" controls-position="right" />
               <span class="field-hint">{{ t('admin.configPage.p2p.inboxQuotaGBHint') }}</span>
             </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.binaryPath')">
-              <el-input v-model="exForm.p2p.direct.binary_path" :placeholder="t('admin.configPage.p2p.binaryPathPlaceholder')" style="width: 360px" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.binaryPathHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.dtDiscoverable')">
-              <el-switch v-model="exForm.p2p.direct.discoverable" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.dtDiscoverableHint') }}</span>
-            </el-form-item>
-            <el-form-item>
-              <el-link type="primary" @click="goP2pOps">{{ t('admin.configPage.p2p.openOpsPage') }}</el-link>
-            </el-form-item>
+            <el-collapse class="p2p-advanced">
+              <el-collapse-item name="dt-advanced" :title="t('admin.configPage.p2p.dtAdvancedTitle')">
+                <el-form-item :label="t('admin.configPage.p2p.dtRegistry')">
+                  <el-input
+                    v-model="exForm.p2p.direct.registry_url"
+                    :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                    style="width: 360px"
+                  />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.dtRegistryHint') }}</span>
+                </el-form-item>
+                <el-form-item :label="t('admin.configPage.p2p.dtDiscoverable')">
+                  <el-switch v-model="exForm.p2p.direct.discoverable" />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.dtDiscoverableHint') }}</span>
+                </el-form-item>
+                <el-form-item :label="t('admin.configPage.p2p.binaryPath')">
+                  <el-input v-model="exForm.p2p.direct.binary_path" :placeholder="t('admin.configPage.p2p.binaryPathPlaceholder')" style="width: 360px" />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.binaryPathHint') }}</span>
+                </el-form-item>
+              </el-collapse-item>
+            </el-collapse>
+
+            <!-- 区块二：跨站联邦（进阶，默认折叠）——字段绑定不变 -->
+            <el-collapse class="p2p-advanced">
+              <el-collapse-item name="fed" :title="t('admin.configPage.p2p.fedCollapseTitle')">
+                <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
+                  <el-switch v-model="exForm.p2p.federation.enabled" />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.fedEnabledHint') }}</span>
+                </el-form-item>
+                <el-form-item :label="t('admin.configPage.p2p.registryUrl')">
+                  <el-input
+                    v-model="exForm.p2p.federation.registry_url"
+                    :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                    style="width: 360px"
+                  />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.registryUrlHint') }}</span>
+                </el-form-item>
+                <el-form-item :label="t('admin.configPage.p2p.publicUrl')">
+                  <el-input
+                    v-model="exForm.p2p.federation.public_url"
+                    :placeholder="t('admin.configPage.p2p.publicUrlPlaceholder')"
+                    style="width: 360px"
+                  />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.publicUrlHint') }}</span>
+                </el-form-item>
+                <el-collapse class="p2p-advanced">
+                  <el-collapse-item name="fed-advanced" :title="t('admin.configPage.p2p.fedAdvancedTitle')">
+                    <el-form-item :label="t('admin.configPage.p2p.minEntropy')">
+                      <el-input-number v-model="exForm.p2p.federation.announce_min_entropy_bits" :min="0" :max="256" />
+                      <span class="field-hint">{{ t('admin.configPage.p2p.minEntropyHint') }}</span>
+                    </el-form-item>
+                    <el-form-item :label="t('admin.configPage.p2p.nodeKeyPath')">
+                      <el-input
+                        v-model="exForm.p2p.federation.node_key_path"
+                        :placeholder="t('admin.configPage.p2p.nodeKeyPathPlaceholder')"
+                        style="width: 360px"
+                      />
+                      <span class="field-hint p2p-danger-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
+                    </el-form-item>
+                  </el-collapse-item>
+                </el-collapse>
+              </el-collapse-item>
+            </el-collapse>
           </el-form>
 
           <div class="config-save-bar">
@@ -816,6 +846,66 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* P2P 分区：两功能白话导航卡（设备直传=推荐 / 跨站联邦=进阶折叠），2026-10-15 重设计 */
+.p2p-intro {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+  .p2p-intro {
+    grid-template-columns: 1fr;
+  }
+}
+.p2p-feature-card {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--primary-color);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  background: var(--color-muted);
+}
+.p2p-feature-card.is-muted {
+  border-left-color: var(--color-text-tertiary);
+  opacity: 0.88;
+}
+.p2p-feature-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.p2p-feature-title {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.p2p-feature-desc {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+.p2p-feature-steps {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--color-text-primary);
+  line-height: 1.7;
+}
+.p2p-advanced {
+  margin: 4px 0 12px;
+  border: none;
+}
+.p2p-advanced :deep(.el-collapse-item__header) {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  border-bottom: 1px dashed var(--color-border);
+}
+.p2p-advanced :deep(.el-collapse-item__wrap) {
+  border-bottom: none;
+}
+.p2p-danger-hint {
+  color: var(--el-color-danger, #f56c6c);
+}
 /* 表单标签防折行（#488 后台可读性）：固定 label-width 下长标签（如"允许访客
    （未登录）上传"）被折成两行错位；标签列统一 180px 按最长标签放宽，这里再兜底禁换行 */
 .system-config :deep(.el-form-item__label) {
