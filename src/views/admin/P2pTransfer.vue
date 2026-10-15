@@ -21,6 +21,14 @@
     </el-card>
 
     <template v-else-if="status">
+      <!-- 这是什么/对端是谁：白话说明条（2026-10-15 易用性重设计） -->
+      <el-alert type="info" :closable="false" class="p2p-how">
+        <template #title>
+          {{ t('admin.p2p.howStrip') }}
+        </template>
+        {{ t('admin.p2p.howCounterpart') }}
+      </el-alert>
+
       <!-- 状态横幅 -->
       <el-card class="p2p-card">
         <div class="status-row">
@@ -42,6 +50,20 @@
               :rows="4"
               :placeholder="t('admin.p2p.sendPathsPlaceholder')"
             />
+            <div class="whitelist-chips" v-if="sendRoots.length">
+              <span class="dim">{{ t('admin.p2p.whitelistChipsLabel') }}</span>
+              <el-tag
+                v-for="root in sendRoots"
+                :key="root"
+                class="whitelist-chip"
+                @click="appendSendRoot(root)"
+              >{{ root }}</el-tag>
+            </div>
+            <div class="whitelist-chips" v-else>
+              <span class="dim">{{ t('admin.p2p.whitelistEmpty') }}
+                <el-link size="small" @click="goConfig">{{ t('admin.p2p.goConfig') }}</el-link>
+              </span>
+            </div>
             <div class="peer-row">
               <el-select
                 v-model="inviteTo"
@@ -78,12 +100,15 @@
         <el-col :xs="24" :md="12">
           <el-card class="p2p-card">
             <template #header>{{ t('admin.p2p.recvTitle') }}</template>
+            <p class="recv-intro">{{ t('admin.p2p.recvIntro') }}</p>
             <el-input
               v-model="recvCode"
               :placeholder="t('admin.p2p.recvCodePlaceholder')"
               maxlength="14"
               @input="recvCode = formatCode(recvCode)"
-            />
+            >
+              <template #prefix><el-icon><Key /></el-icon></template>
+            </el-input>
             <div class="card-actions">
               <el-button type="primary" :loading="recving" @click="doRecv">{{ t('admin.p2p.recvBtn') }}</el-button>
               <span class="field-hint">{{ t('admin.p2p.recvHint') }}</span>
@@ -113,6 +138,9 @@
           </div>
         </template>
         <el-table :data="tasks" size="small" v-loading="tasksLoading">
+          <template #empty>
+            <el-empty :description="t('admin.p2p.taskEmpty')" :image-size="72" />
+          </template>
           <el-table-column :label="t('admin.p2p.colKind')" width="90">
             <template #default="{ row }">
               <el-tag :type="row.kind === 'send' ? 'warning' : 'primary'" size="small">
@@ -189,6 +217,27 @@
         <el-button type="primary" :loading="publishing" @click="doPublish">{{ t('admin.p2p.publishConfirm') }}</el-button>
       </template>
     </el-dialog>
+    <!-- 发送成功：口令结果框（大口令+对端接收指引，2026-10-15 易用性重设计） -->
+    <el-dialog v-model="codeVisible" :title="t('admin.p2p.codeDialogTitle')" width="520px" :close-on-click-modal="false">
+      <div class="code-result">
+        <p class="code-result-tip">{{ t('admin.p2p.codeValidTip') }}</p>
+        <div class="code-result-box">
+          <code class="code-result-pass">{{ lastSentCode }}</code>
+          <el-button type="primary" @click="copyCode(lastSentCode)">
+            {{ t('common.copy') }}
+          </el-button>
+        </div>
+        <el-divider content-position="left">{{ t('admin.p2p.codeHowTitle') }}</el-divider>
+        <ol class="code-how">
+          <li>{{ t('admin.p2p.codeHowDesktop') }}</li>
+          <li>{{ t('admin.p2p.codeHowCli') }}<code class="code-how-cmd">p2pc recv {{ lastSentCode }}</code></li>
+        </ol>
+        <p class="code-result-warn">{{ t('admin.p2p.codeWarn') }}</p>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="codeVisible = false">{{ t('common.confirm') }}</el-button>
+      </template>
+    </el-dialog>
     <!-- 推送口令到实例(P3) -->
     <el-dialog v-model="pushVisible" :title="t('admin.p2p.pushTitle')" width="460px">
       <el-form label-width="110px">
@@ -212,8 +261,10 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Key } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { p2pApi, type P2pTask, type P2pStatus, type P2pInvite, type P2pDirectoryPeer } from '@/api/p2p'
+import { adminApi } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { t } = useI18n()
@@ -229,6 +280,32 @@ const sendPathsText = ref('')
 const sending = ref(false)
 const recvCode = ref('')
 const recving = ref(false)
+
+// 发送白名单（系统配置 p2p.direct.send_roots）点选快速填入（2026-10-15 易用性重设计：
+// 免得让用户手抄服务器内部路径）
+const sendRoots = ref<string[]>([])
+const appendSendRoot = (root: string) => {
+  const cur = sendPathsText.value.split('\n').map((s) => s.trim()).filter(Boolean)
+  if (cur.includes(root)) return
+  sendPathsText.value = [...cur, root].join('\n')
+}
+
+// 发送成功口令结果框
+const codeVisible = ref(false)
+const lastSentCode = ref('')
+// 口令由 p2pc 异步生成：创建时可能为空，记下任务 id，任务列表轮询到口令再弹结果框
+const pendingCodeTaskId = ref('')
+
+const fetchSendRoots = async () => {
+  try {
+    const res = await adminApi.getConfig()
+    if (res.code === 200 || res.code === 0) {
+      sendRoots.value = (res.data?.p2p?.direct?.send_roots ?? []).filter(Boolean)
+    }
+  } catch {
+    /* 白名单读取失败静默（仅影响点选快捷，手填不受影响） */
+  }
+}
 
 // 在线名录对端选择(2026-10-14 邀请信箱:密封邀请免手抄口令,近用优先)
 const peers = ref<P2pDirectoryPeer[]>([])
@@ -317,6 +394,15 @@ const fetchTasks = async () => {
     const res = await p2pApi.tasks()
     if (res.code === 200 || res.code === 0) {
       tasks.value = (res.data.tasks ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
+      // 待弹口令的任务：轮询到 p2pc 生成口令后弹结果框（仅一次）
+      if (pendingCodeTaskId.value) {
+        const t = tasks.value.find((x) => x.id === pendingCodeTaskId.value)
+        if (t?.code) {
+          lastSentCode.value = t.code
+          codeVisible.value = true
+          pendingCodeTaskId.value = ''
+        }
+      }
       // 有活跃任务才轮询（空闲不打扰）
       const active = tasks.value.some((x) => x.state === 'waiting' || x.state === 'running' || x.state === 'retrying')
       if (active && !pollTimer) {
@@ -392,7 +478,16 @@ const doSend = async () => {
     const res = await p2pApi.send(paths, inviteTo.value || undefined, inviteNote.value || undefined)
     if (res.code === 200 || res.code === 0) {
       ElMessage.success(t('admin.p2p.sendStarted'))
-      if (inviteTo.value) {
+      const invited = !!inviteTo.value
+      const tid = res.data?.task?.id ?? ''
+      const code = res.data?.task?.code ?? ''
+      if (code && !invited) {
+        lastSentCode.value = code
+        codeVisible.value = true
+      } else if (tid && !invited) {
+        pendingCodeTaskId.value = tid
+      }
+      if (invited) {
         const peer = peers.value.find((p) => p.node_id === inviteTo.value)
         ElMessage.info(t('admin.p2p.peerInviteQueued', { peer: peerLabel(peer ?? { node_id: inviteTo.value, name: '', url: '', box_pub: '', online_since: 0 }) }))
         rememberPeer(inviteTo.value)
@@ -507,6 +602,7 @@ const adminBasePath = () => {
 
 onMounted(async () => {
   await fetchStatus()
+  void fetchSendRoots()
   if (status.value?.enabled && status.value.available) {
     await fetchTasks()
     await fetchInvites()
@@ -522,11 +618,17 @@ onUnmounted(() => {
 <style scoped>
 .p2p-page { padding: 4px 0; }
 .p2p-card { margin-bottom: 16px; }
+.p2p-how { margin-bottom: 16px; }
+.p2p-how :deep(.el-alert__title) { font-weight: 600; }
 .status-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .status-item { font-size: 13px; }
 .dim { color: var(--el-text-color-secondary); font-size: 12px; }
 .card-actions { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
 .field-hint { color: var(--el-text-color-secondary); font-size: 12px; }
+.whitelist-chips { margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.whitelist-chip { cursor: pointer; font-family: ui-monospace, Menlo, monospace; }
+.whitelist-chip:hover { opacity: 0.8; }
+.recv-intro { margin: 0 0 10px; font-size: 13px; color: var(--el-text-color-secondary); line-height: 1.6; }
 .task-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; letter-spacing: 1px; }
 .tasks-header { display: flex; justify-content: space-between; align-items: center; }
 .error-text { color: var(--el-color-danger); font-size: 12px; word-break: break-all; }
@@ -537,4 +639,21 @@ onUnmounted(() => {
 .peer-note { flex: 1 1 180px; min-width: 160px; }
 .peer-name { margin-right: 8px; }
 .peer-fp { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+/* 口令结果框 */
+.code-result-tip { margin: 0 0 10px; color: var(--el-text-color-secondary); font-size: 13px; }
+.code-result-box {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px; border-radius: 10px;
+  background: #1b1c20; margin-bottom: 6px;
+}
+.code-result-pass {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 24px; font-weight: 700; letter-spacing: 3px; color: #fff;
+}
+.code-how { margin: 8px 0 0; padding-left: 20px; line-height: 1.9; font-size: 13px; color: var(--el-text-color-primary); }
+.code-how-cmd {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 6px;
+  background: var(--el-fill-color, #f0f1f5); font-family: ui-monospace, Menlo, monospace; font-size: 12px;
+}
+.code-result-warn { margin: 12px 0 0; font-size: 12px; color: var(--el-color-danger); }
 </style>
