@@ -7,11 +7,13 @@
       </label>
       <div class="expire-inputs">
         <el-input-number
+          v-if="settings.expire_style !== 'forever'"
           v-model="settings.expire_value"
           :min="1"
           :max="999"
           controls-position="right"
         />
+        <span v-else class="forever-hint">{{ t('common.forever') }}</span>
         <el-select v-model="settings.expire_style" class="expire-select">
           <el-option v-for="u in units" :key="u" :label="unitLabel(u)" :value="u" />
         </el-select>
@@ -140,6 +142,13 @@ const unitLabel = (u: ShareExpireStyle) => t(UNIT_KEYS[u])
 </script>
 
 <style scoped>
+.forever-hint {
+  display: inline-flex;
+  align-items: center;
+  min-width: 90px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
 .share-settings {
   margin-bottom: 12px;
 }

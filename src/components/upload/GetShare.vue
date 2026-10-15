@@ -12,6 +12,7 @@
         :aria-label="t('home.getShare.pickupTitle')"
         @complete="onComplete"
         @paste-code="onPasteCode"
+        @expand="onExpand"
       />
       <p class="pickup-hint">{{ hintText }}</p>
 
@@ -140,6 +141,9 @@ const onEnter = () => {
 
 // ---- 防抖自动提交：填满后短暂停顿才分派，续输即取消 ----
 let autoTimer: ReturnType<typeof setTimeout> | null = null
+// 程序化回显守卫：粘贴/溢出后把前 6 位写回分格会触发 code watch，
+// 此间不得再排自动提交（整串已按分享详情分派，截断串不许碰取件）
+let echoGuard = false
 const cancelAutoSubmit = () => {
   if (autoTimer) {
     clearTimeout(autoTimer)
@@ -148,6 +152,7 @@ const cancelAutoSubmit = () => {
 }
 const scheduleAutoSubmit = (value: string) => {
   cancelAutoSubmit()
+  if (echoGuard) return
   autoTimer = setTimeout(() => {
     autoTimer = null
     if (value.length === PICKUP_LEN) void submitPickup(value)
@@ -156,12 +161,30 @@ const scheduleAutoSubmit = (value: string) => {
 
 const onComplete = (value: string) => scheduleAutoSubmit(value)
 
+// 键入溢出（末格续输第 7 位等）：与超长粘贴同规整——整串走分享详情页，
+// 绝不拿被截断的前 6 位去碰运气取件
+const onExpand = (full: string) => {
+  cancelAutoSubmit()
+  const target = resolveDispatch(full)
+  if (!target) return
+  echoGuard = true
+  code.value = full.slice(0, PICKUP_LEN)
+  follow(target)
+  nextTick(() => {
+    echoGuard = false
+  })
+}
+
 // 粘贴整段：恰 6 位 → 立即取件；>6 位（旧 8 位码/自定义口令/联邦码）
 // → 显示前 6 位、整串静默走分享详情页兜底
 const onPasteCode = (text: string) => {
   cancelAutoSubmit()
   const plan = planPaste(text)
+  echoGuard = true
   code.value = plan.display
+  nextTick(() => {
+    echoGuard = false
+  })
   if (plan.target) {
     follow(plan.target)
     return
@@ -169,9 +192,11 @@ const onPasteCode = (text: string) => {
   nextTick(() => codeBoxesRef.value?.focus(plan.display.length))
 }
 
-// 中途删改时撤掉待发的自动提交
+// 任何内容变化都重置自动提交：填满后续输/改格（长度不变但字符变）也必须
+// 取消旧定时器，否则会把改格前的旧串（或截断串）拿去取件
 watch(code, (v) => {
-  if (v.length !== PICKUP_LEN) cancelAutoSubmit()
+  cancelAutoSubmit()
+  if (v.length === PICKUP_LEN) scheduleAutoSubmit(v)
 })
 
 const onHistoryPickup = (c: string) => {
@@ -184,7 +209,11 @@ watch(() => props.deepCode, (c) => {
   const clean = (c || '').trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 32)
   if (!clean) return
   cancelAutoSubmit()
+  echoGuard = true
   code.value = clean.slice(0, PICKUP_LEN)
+  nextTick(() => {
+    echoGuard = false
+  })
   void submitPickup(clean)
 }, { immediate: true })
 

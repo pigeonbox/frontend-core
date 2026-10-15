@@ -18,7 +18,7 @@
         <!-- 投递表单 -->
         <template v-else-if="view">
           <div class="header">
-            <img src="/favicon.svg" alt="" class="logo" />
+            <BrandLogo alt="" class="logo" />
             <div>
               <h1>{{ t('request.pickupTitle') }}</h1>
               <p v-if="view.title">{{ view.title }}</p>
@@ -31,6 +31,7 @@
           <el-upload
             :auto-upload="false"
             :on-change="handleChange"
+            :on-remove="handleRemove"
             :show-file-list="true"
             multiple
             drag
@@ -69,6 +70,7 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, type UploadFile } from 'element-plus'
 import { Loading, UploadFilled } from '@element-plus/icons-vue'
 import { requestApi, guestSubmit, type RequestPublicView } from '@/api/request'
+import { translateError } from '@/utils/api-interceptor'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -85,8 +87,28 @@ const handleChange = (f: UploadFile) => {
   if (f.raw) files.value.push(f.raw)
 }
 
+// 列表点 X 移除必须同步待传清单，否则"删掉的"文件仍会被上传
+const handleRemove = (f: UploadFile) => {
+  if (!f.raw) return
+  files.value = files.value.filter((x) => x !== f.raw)
+}
+
 const submit = async () => {
   if (files.value.length === 0) return
+  // 上限前置校验：别等服务器报错（还叠一层原始报错上屏）
+  if (view.value?.max_files && files.value.length > view.value.max_files) {
+    ElMessage.warning(t('request.maxFiles', { n: view.value.max_files }))
+    return
+  }
+  if (view.value?.max_bytes) {
+    const over = files.value.find((f) => f.size > view.value!.max_bytes)
+    if (over) {
+      ElMessage.warning(
+        t('request.fileTooLarge', { name: over.name, size: formatSize(view.value.max_bytes) }),
+      )
+      return
+    }
+  }
   uploading.value = true
   progress.value = 0
   try {
@@ -94,7 +116,8 @@ const submit = async () => {
     ElMessage.success(t('request.done'))
     files.value = []
   } catch (e: unknown) {
-    ElMessage.error(e instanceof Error ? e.message : t('request.failed'))
+    const tr = translateError(e)
+    ElMessage.error(tr.i18nKey ? t(tr.i18nKey) : tr.fallback || t('request.failed'))
   } finally {
     uploading.value = false
   }
@@ -106,8 +129,9 @@ onMounted(async () => {
     const res = await requestApi.getPublic(token.value)
     if (res.code === 200 || res.code === 0) view.value = res.data
     else error.value = res.message || t('request.invalid')
-  } catch (e: any) {
-    error.value = e?.message || t('request.invalid')
+  } catch (e: unknown) {
+    const tr = translateError(e)
+    error.value = tr.i18nKey ? t(tr.i18nKey) : tr.fallback || t('request.invalid')
   } finally {
     loading.value = false
   }

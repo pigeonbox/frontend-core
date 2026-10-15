@@ -5,6 +5,7 @@ import { uploadFile } from '@/api/share'
 import { multiDirect, chunkUploadFile, multiBind, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
 import type { PresignCompleteData } from '@/api/presign'
 import { generateKeyB64, encryptFile } from '@/utils/e2e'
+import { translateError } from '@/utils/api-interceptor'
 import type { ShareSettings } from '@/composables/useShareSettings'
 import type { ShareResult } from '@/types/share'
 
@@ -97,7 +98,7 @@ export function useUploadQueue(opts: {
       multiAbort.abort()
     }
     task.status = 'error'
-    task.error = t('upload.presign.abort')
+    task.error = t('upload_view.presign.abort')
     task.statusText = ''
   }
 
@@ -347,7 +348,12 @@ export function useUploadQueue(opts: {
         pickup_code: result.pickup_code || undefined,
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Failed'
+      // 错误统一走错误码翻译（errcode/网络/HTTP 兜底），不再裸抛英文原文
+      const tr = translateError(e)
+      let msg = tr.i18nKey ? t(tr.i18nKey) : tr.fallback
+      if (!tr.i18nKey && e instanceof Error && (e.message === 'Cancelled' || e.message === 'Aborted')) {
+        msg = t('upload_view.presign.abort')
+      }
       for (const task of pending) {
         if (task.status !== 'success') {
           task.status = 'error'

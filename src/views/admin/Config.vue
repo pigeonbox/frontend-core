@@ -41,10 +41,6 @@
               <el-input v-model="configForm.base.description" type="textarea" :rows="3" />
             </el-form-item>
 
-            <el-form-item :label="t('admin.configPage.basic.port')">
-              <el-input-number v-model="configForm.base.port" :min="1" :max="65535" />
-            </el-form-item>
-
             <el-divider content-position="left">{{ t('admin.configPage.sections.appearance') }}</el-divider>
             <el-form-item :label="t('admin.configPage.appearance.bgUrl')">
               <el-input v-model="exForm.ui.background" :placeholder="t('admin.configPage.appearance.bgUrlPlaceholder')" clearable />
@@ -156,9 +152,9 @@
             <el-divider content-position="left">{{ t('admin.configPage.sections.direct') }}</el-divider>
             <el-form-item :label="t('admin.configPage.download.presignPolicy')">
               <el-select v-model="exForm.download.presign_policy" style="width: 280px">
-                <el-option label="所有人可直传" value="everyone" />
-                <el-option label="仅登录用户可直传" value="authenticated" />
-                <el-option label="关闭直传（全部走服务器）" value="disabled" />
+                <el-option :label="t('admin.configPage.download.policyEveryone')" value="everyone" />
+                <el-option :label="t('admin.configPage.download.policyAuthenticated')" value="authenticated" />
+                <el-option :label="t('admin.configPage.download.policyDisabled')" value="disabled" />
               </el-select>
               <span class="field-hint">{{ t('admin.configPage.download.presignPolicyHint') }}</span>
             </el-form-item>
@@ -223,7 +219,9 @@
               <el-input v-model="exForm.oidc.client_secret" type="password" show-password />
             </el-form-item>
             <el-form-item :label="t('admin.configPage.oidc.callback')">
-              <el-input :model-value="`${origin}/#/oidc/callback`" readonly />
+              <!-- 后端发给 IdP 的 redirect_uri = base_url + /api/v1/user/oidc/callback（oidc/service.go RedirectURI）；
+                   前端 #/oidc/callback 只是后端 302 的落地页，无需注册 -->
+              <el-input :model-value="`${origin}/api/v1/user/oidc/callback`" readonly />
               <span class="field-hint">{{ t('admin.configPage.oidc.callbackHint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.oidc.test')">
@@ -233,6 +231,12 @@
 
           <!-- ============ 安全与限流（ratelimit + api_token） ============ -->
           <el-form v-else-if="activeSection === 'security'" label-width="180px" class="config-form">
+            <el-alert
+              type="info"
+              :closable="false"
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.yamlOnlyHint')"
+            />
             <el-divider content-position="left">{{ t('admin.configPage.sections.ratelimit') }}</el-divider>
             <el-form-item :label="t('admin.configPage.ratelimit.enabled')">
               <el-switch v-model="rlForm.enabled" />
@@ -311,6 +315,12 @@
 
           <el-form v-else-if="activeSection === 'p2p'" label-width="180px" class="config-form">
             <!-- P2P 与联邦（p2p.federation；直传操作页随 P2a）——注释须在元素内，独立注释行会打断 v-if 链 -->
+            <el-alert
+              type="info"
+              :closable="false"
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.envPriorityHint')"
+            />
             <el-divider content-position="left">{{ t('admin.configPage.sections.federation') }}</el-divider>
             <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
               <el-switch v-model="exForm.p2p.federation.enabled" />

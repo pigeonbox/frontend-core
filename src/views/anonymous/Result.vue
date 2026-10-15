@@ -5,7 +5,7 @@
       <header class="result-header">
         <div class="logo-section" @click="$router.push('/')">
           <div class="logo-icon">
-            <img src="/favicon.svg" alt="PigeonBox" class="logo-img" />
+            <BrandLogo class="logo-img" />
           </div>
           <span class="logo-text">PigeonBox</span>
         </div>
@@ -78,16 +78,6 @@
           </el-button>
 
           <el-button
-            v-if="userStore.isLoggedIn"
-            class="save-btn"
-            size="large"
-            @click="handleSave"
-          >
-            <el-icon><FolderAdd /></el-icon>
-            {{ t('anonymous.saveToMine') }}
-          </el-button>
-
-          <el-button
             link
             class="back-link"
             @click="$router.push('/')"
@@ -108,16 +98,14 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
   Document, Files, Timer, Histogram, Download,
-  CircleCheckFilled, WarningFilled, Back, FolderAdd
+  CircleCheckFilled, WarningFilled, Back
 } from '@element-plus/icons-vue'
 import { type RetrieveData } from '@/api/anonymous'
-import { useUserStore } from '@/stores/user'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 
 const route = useRoute()
 const { t } = useI18n()
-const userStore = useUserStore()
 
 const data = computed<RetrieveData | null>(() => {
   const raw = route.query.data as string | undefined
@@ -167,10 +155,6 @@ const handleDownload = () => {
   } else {
     ElMessage.error(t('anonymous.notFound'))
   }
-}
-
-const handleSave = () => {
-  ElMessage.info(t('anonymous.saveTodo'))
 }
 </script>
 
@@ -339,13 +323,6 @@ const handleSave = () => {
 
 .download-btn:hover:not(:disabled) {
   background: var(--primary-hover);
-}
-
-.save-btn {
-  width: 100%;
-  height: 44px;
-  border-radius: var(--radius-lg);
-  margin-bottom: 8px;
 }
 
 .back-link {

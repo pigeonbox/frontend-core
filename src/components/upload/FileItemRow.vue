@@ -25,7 +25,7 @@
           <el-icon><CircleCloseFilled /></el-icon> {{ task.error || t('common.failed') }}
         </span>
         <span v-else class="status pending">
-          {{ t('common.optional') }}
+          {{ t('upload.pendingStatus') }}
         </span>
       </div>
       <el-progress
@@ -75,16 +75,17 @@ const isBusy = computed(() =>
   props.task.status === 'uploading' || props.task.status === 'encrypting' || props.task.status === 'binding'
 )
 
+// 类型标签走 i18n（键名小写映射），不再硬编码英文
 const getFileType = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
   const typeMap: Record<string, string> = {
-    jpg: 'Image', jpeg: 'Image', png: 'Image', gif: 'Image',
-    pdf: 'PDF', doc: 'Word', docx: 'Word',
-    xls: 'Excel', xlsx: 'Excel',
-    zip: 'Zip', rar: 'Zip',
-    mp4: 'Video', mp3: 'Audio',
+    jpg: 'image', jpeg: 'image', png: 'image', gif: 'image',
+    pdf: 'pdf', doc: 'word', docx: 'word',
+    xls: 'excel', xlsx: 'excel',
+    zip: 'zip', rar: 'zip',
+    mp4: 'video', mp3: 'audio',
   }
-  return typeMap[ext] || 'File'
+  return t(`upload.fileType.${typeMap[ext] || 'file'}`)
 }
 </script>
 

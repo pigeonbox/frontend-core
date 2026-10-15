@@ -7,14 +7,22 @@
  *    成功码归一 0|200（与 utils/request.ts axios 拦截器同一 house rule）。
  *  - xhrRaw：裸请求通道（presign PUT 到预签名 URL，响应非 JSON、头部服务端签发）。
  *
- * 错误一律 reject Error(message)——调用方与 catch 块统一只消费 e.message；
- * {code,message} 归一对象是 axios 侧职责，不在此复制。
+ * 错误一律 reject Error(message)，并附带 code 属性（errcode 或 HTTP 状态；
+ * 网络类=0、取消=-1）——调用方经 translateError 统一翻译成 i18n 文案，
+ * 裸英文 message 不再直接上屏（2026-10-15 易用性修复）。
  */
 
 const DEFAULT_TIMEOUT = 300000
 
 /** 业务成功码：新版 resp.Success 返回 0，旧式 handler 返回 200 */
 const isOkCode = (code?: number) => code === 0 || code === 200
+
+/** 构造带错误码的 Error（translateError 据此映射 i18n key） */
+const fail = (message: string, code: number): Error => {
+  const err = new Error(message) as Error & { code: number }
+  err.code = code
+  return err
+}
 
 export interface XhrSendOptions {
   url: string
@@ -49,12 +57,12 @@ export function xhrSend<T>(opts: XhrSendOptions): Promise<{ code: number; messag
       if (xhr.status >= 200 && xhr.status < 300 && data && isOkCode(data.code)) {
         resolve(data)
       } else {
-        reject(new Error(data?.message || `HTTP ${xhr.status}`))
+        reject(fail(data?.message || `HTTP ${xhr.status}`, data?.code ?? xhr.status))
       }
     }
-    xhr.onerror = () => reject(new Error('Network error'))
-    xhr.onabort = () => reject(new Error('Cancelled'))
-    xhr.ontimeout = () => reject(new Error('Timeout'))
+    xhr.onerror = () => reject(fail('Network error', 0))
+    xhr.onabort = () => reject(fail('Cancelled', -1))
+    xhr.ontimeout = () => reject(fail('Timeout', 0))
     xhr.send(opts.form)
   })
 }
@@ -88,12 +96,12 @@ export function xhrRaw(opts: XhrRawOptions): Promise<void> {
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve()
       } else {
-        reject(new Error(`Upload failed: ${xhr.status}`))
+        reject(fail(`Upload failed: ${xhr.status}`, xhr.status))
       }
     }
-    xhr.onerror = () => reject(new Error('Network error'))
-    xhr.onabort = () => reject(new Error('Cancelled'))
-    xhr.ontimeout = () => reject(new Error('Timeout'))
+    xhr.onerror = () => reject(fail('Network error', 0))
+    xhr.onabort = () => reject(fail('Cancelled', -1))
+    xhr.ontimeout = () => reject(fail('Timeout', 0))
     xhr.send(opts.body)
   })
 }

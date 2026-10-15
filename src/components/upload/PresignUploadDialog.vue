@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="t('upload.presign.init')"
+    :title="t('upload_view.presign.init')"
     width="520px"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
@@ -18,9 +18,9 @@
 
       <!-- 先出码（#474）：上传前提前铸造取件码，长传期间即可告知收件人 -->
       <div v-if="mintedCode" class="code-card">
-        <div class="code-label">{{ t('upload.presign.codeReady') }}</div>
+        <div class="code-label">{{ t('upload_view.presign.codeReady') }}</div>
         <div class="code-value">{{ mintedCode }}</div>
-        <div class="code-hint">{{ t('upload.presign.codeReadyHint') }}</div>
+        <div class="code-hint">{{ t('upload_view.presign.codeReadyHint') }}</div>
       </div>
 
       <el-progress
@@ -152,11 +152,11 @@ const doUpload = async (retryCount = 0) => {
   failed.value = false
   completed.value = false
   progress.value = 0
-  statusText.value = t('upload.presign.init')
+  statusText.value = t('upload_view.presign.init')
 
   try {
     // 0. 计算秒传指纹（大文件跳过，避免整文件进内存）
-    statusText.value = t('upload.presign.hashing')
+    statusText.value = t('upload_view.presign.hashing')
     const fileHash = await presignApi.computeFileHash(f)
 
     // 0.5 先出码（#474）：上传前提前铸造 6 位取件码占位，长传期间即可告知收件人，
@@ -202,7 +202,7 @@ const doUpload = async (retryCount = 0) => {
     if (initData.existed && initData.share_code) {
       progress.value = 100
       completed.value = true
-      statusText.value = t('upload.quickUploadHit')
+      statusText.value = t('upload_view.quickUploadHit')
       finish({
         code: initData.share_code,
         url: initData.share_url || '',
@@ -217,7 +217,7 @@ const doUpload = async (retryCount = 0) => {
     currentToken = initData.token
 
     // 2. PUT 直传（xhrRaw：进度 + 中断 + 自定义签发头；进度封顶 95% 留给 complete）
-    statusText.value = t('upload.presign.upload')
+    statusText.value = t('upload_view.presign.upload')
     putAbort = new AbortController()
     await xhrRaw({
       url: initData.upload_url,
@@ -235,7 +235,7 @@ const doUpload = async (retryCount = 0) => {
     putAbort = null
 
     // 3. Complete
-    statusText.value = t('upload.presign.complete')
+    statusText.value = t('upload_view.presign.complete')
     progress.value = 97
     const completeRes = await presignApi.complete({
       upload_id: initData.upload_id,
@@ -264,7 +264,7 @@ const doUpload = async (retryCount = 0) => {
     }
     failed.value = true
     errorMessage.value = msg
-    statusText.value = t('upload.presign.failed')
+    statusText.value = t('upload_view.presign.failed')
     fail(e)
   }
 }
@@ -290,7 +290,7 @@ const handleCancel = async () => {
         // ignore abort failure
       }
     }
-    ElMessage.info(t('upload.presign.abort'))
+    ElMessage.info(t('upload_view.presign.abort'))
     fail(new Error('Cancelled'))
   } finally {
     cancelling.value = false

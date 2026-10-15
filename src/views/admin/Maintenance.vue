@@ -7,8 +7,8 @@
           <div class="status-item">
             <el-icon size="30" class="icon-success"><CircleCheckFilled /></el-icon>
             <div class="status-info">
-              <h4>系统状态</h4>
-              <p class="text-success">运行正常</p>
+              <h4>{{ t('admin.maintenancePage.statusTitle') }}</h4>
+              <p class="text-success">{{ t('admin.maintenancePage.statusOk') }}</p>
             </div>
           </div>
         </el-card>
@@ -19,7 +19,7 @@
           <div class="status-item">
             <el-icon size="30" class="icon-info"><Timer /></el-icon>
             <div class="status-info">
-              <h4>版本</h4>
+              <h4>{{ t('admin.maintenancePage.versionTitle') }}</h4>
               <p>{{ systemInfo.version }}</p>
             </div>
           </div>
@@ -31,7 +31,7 @@
           <div class="status-item">
             <el-icon size="30" class="icon-warning"><Files /></el-icon>
             <div class="status-info">
-              <h4>总文件数</h4>
+              <h4>{{ t('admin.totalFiles') }}</h4>
               <p>{{ systemInfo.totalFiles }}</p>
             </div>
           </div>
@@ -43,7 +43,7 @@
           <div class="status-item">
             <el-icon size="30" class="icon-danger"><Folder /></el-icon>
             <div class="status-info">
-              <h4>总大小</h4>
+              <h4>{{ t('admin.maintenancePage.totalSizeTitle') }}</h4>
               <p>{{ formatFileSize(systemInfo.totalSize) }}</p>
             </div>
           </div>
@@ -58,22 +58,22 @@
           <template #header>
             <div class="card-header">
               <el-icon><Delete /></el-icon>
-              <span>清理工具</span>
+              <span>{{ t('admin.maintenancePage.toolsTitle') }}</span>
             </div>
           </template>
 
           <div class="tool-list">
             <div class="tool-item">
               <div class="tool-info">
-                <h4>清理过期文件</h4>
-                <p>删除所有已过期的分享文件</p>
+                <h4>{{ t('admin.maintenancePage.cleanExpiredTitle') }}</h4>
+                <p>{{ t('admin.maintenancePage.cleanExpiredDesc') }}</p>
               </div>
               <el-button
                 type="danger"
                 @click="cleanExpiredFiles"
                 :loading="cleaningExpired"
               >
-                执行
+                {{ t('admin.maintenancePage.run') }}
               </el-button>
             </div>
 
@@ -81,15 +81,15 @@
 
             <div class="tool-item">
               <div class="tool-info">
-                <h4>优化数据库</h4>
-                <p>执行数据库优化操作</p>
+                <h4>{{ t('admin.maintenancePage.optimizeTitle') }}</h4>
+                <p>{{ t('admin.maintenancePage.optimizeDesc') }}</p>
               </div>
               <el-button
                 type="primary"
                 @click="optimizeDatabase"
                 :loading="optimizing"
               >
-                执行
+                {{ t('admin.maintenancePage.run') }}
               </el-button>
             </div>
           </div>
@@ -101,24 +101,24 @@
           <template #header>
             <div class="card-header">
               <el-icon><DocumentChecked /></el-icon>
-              <span>系统信息</span>
+              <span>{{ t('admin.maintenancePage.infoTitle') }}</span>
             </div>
           </template>
 
           <el-descriptions :column="1" border>
-            <el-descriptions-item label="Go 版本">
+            <el-descriptions-item :label="t('admin.maintenancePage.goVersion')">
               {{ systemInfo.goVersion }}
             </el-descriptions-item>
-            <el-descriptions-item label="构建时间">
+            <el-descriptions-item :label="t('admin.maintenancePage.buildTime')">
               {{ systemInfo.buildTime }}
             </el-descriptions-item>
             <el-descriptions-item label="Git Commit">
               {{ systemInfo.gitCommit }}
             </el-descriptions-item>
-            <el-descriptions-item label="系统信息">
+            <el-descriptions-item :label="t('admin.maintenancePage.osInfo')">
               {{ systemInfo.osInfo }}
             </el-descriptions-item>
-            <el-descriptions-item label="CPU 核心数">
+            <el-descriptions-item :label="t('admin.maintenancePage.cpuCores')">
               {{ systemInfo.cpuCores }}
             </el-descriptions-item>
           </el-descriptions>
@@ -132,6 +132,7 @@
 import { formatFileSize } from '@/utils/format'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import {
   CircleCheckFilled,
   Timer,
@@ -143,6 +144,7 @@ import {
 import { adminApi } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 const cleaningExpired = ref(false)
@@ -163,22 +165,22 @@ const systemInfo = reactive({
 const cleanExpiredFiles = async () => {
   try {
     await ElMessageBox.confirm(
-      '确定要清理所有过期文件吗？此操作不可恢复！',
-      '确认清理',
+      t('admin.maintenancePage.cleanConfirmBody'),
+      t('admin.maintenancePage.cleanConfirmTitle'),
       { type: 'warning' }
     )
 
     cleaningExpired.value = true
     const res = await adminApi.cleanExpiredFiles()
     if (res.code === 200) {
-      ElMessage.success(`已清理 ${res.data.deleted_count || 0} 个过期文件`)
+      ElMessage.success(t('admin.maintenancePage.cleaned', { n: res.data.deleted_count || 0 }))
       await fetchSystemInfo()
     } else {
-      handleError(new Error(res.message || '清理失败'))
+      handleError(new Error(res.message || t('admin.maintenancePage.cleanFailed')))
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('清理失败')
+      ElMessage.error(t('admin.maintenancePage.cleanFailed'))
     }
   } finally {
     cleaningExpired.value = false
@@ -188,20 +190,20 @@ const cleanExpiredFiles = async () => {
 const optimizeDatabase = async () => {
   try {
     await ElMessageBox.confirm(
-      '数据库优化可能需要较长时间，确定继续吗？',
-      '确认优化'
+      t('admin.maintenancePage.optimizeConfirmBody'),
+      t('admin.maintenancePage.optimizeConfirmTitle')
     )
 
     optimizing.value = true
     const res = await adminApi.optimizeDatabase()
     if (res.code === 200) {
-      ElMessage.success('数据库优化完成')
+      ElMessage.success(t('admin.maintenancePage.optimizeDone'))
     } else {
-      handleError(new Error(res.message || '优化失败'))
+      handleError(new Error(res.message || t('admin.maintenancePage.optimizeFailed')))
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('优化失败')
+      ElMessage.error(t('admin.maintenancePage.optimizeFailed'))
     }
   } finally {
     optimizing.value = false
@@ -228,7 +230,7 @@ const fetchSystemInfo = async () => {
       systemInfo.totalSize = statsRes.data.total_size || 0
     }
   } catch (error) {
-    console.error('获取系统信息失败:', error)
+    console.error(t('admin.maintenancePage.fetchInfoFailed'), error)
   }
 }
 

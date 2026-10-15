@@ -3,29 +3,29 @@
     <el-card shadow="never" class="users-card">
       <div class="card-header">
         <div class="header-title">
-          <h2>用户管理</h2>
-          <p>管理系统中的所有用户账户</p>
+          <h2>{{ t('admin.users') }}</h2>
+          <p>{{ t('admin.usersPage.subtitle') }}</p>
         </div>
         <div class="header-actions">
           <el-button type="primary" @click="openCreateDialog">
             <el-icon><Plus /></el-icon>
-            新建用户
+            {{ t('admin.usersPage.create') }}
           </el-button>
           <el-button @click="reload()" :loading="loading" class="refresh-btn">
             <el-icon><Refresh /></el-icon>
-            刷新数据
+            {{ t('admin.usersPage.refresh') }}
           </el-button>
         </div>
       </div>
 
       <el-divider />
 
-      <el-table 
-        :data="usersList" 
+      <el-table
+        :data="usersList"
         v-loading="loading"
         class="users-table"
       >
-        <el-table-column label="用户信息" min-width="200">
+        <el-table-column :label="t('admin.usersPage.colUserInfo')" min-width="200">
           <template #default="{ row }">
             <div class="user-info">
               <el-avatar :size="40" class="user-avatar">
@@ -34,41 +34,41 @@
               <div class="user-details">
                 <div class="user-name">
                   {{ row.username }}
-                  <el-tag 
-                    v-if="row.role === 'admin'" 
-                    type="danger" 
+                  <el-tag
+                    v-if="row.role === 'admin'"
+                    type="danger"
                     size="small"
                     effect="dark"
                   >
-                    管理员
+                    {{ t('admin.usersPage.roleAdmin') }}
                   </el-tag>
                 </div>
-                <div class="user-email">{{ row.email || '未绑定邮箱' }}</div>
+                <div class="user-email">{{ row.email || t('admin.usersPage.noEmail') }}</div>
               </div>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="昵称" width="120">
+        <el-table-column :label="t('admin.nickname')" width="120">
           <template #default="{ row }">
             {{ row.nickname || '—' }}
           </template>
         </el-table-column>
 
-        <el-table-column label="状态" width="100" align="center">
+        <el-table-column :label="t('admin.usersPage.colStatus')" width="100" align="center">
           <template #default="{ row }">
             <el-tag
               :type="row.status === 1 || row.status === 'active' ? 'success' : 'danger'"
               effect="light"
             >
-              {{ row.status === 1 || row.status === 'active' ? '正常' : '禁用' }}
+              {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
             </el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="存储使用" width="140" align="center">
+        <el-table-column :label="t('admin.usersPage.colStorage')" width="140" align="center">
           <template #default="{ row }">
-            <el-progress 
+            <el-progress
               :percentage="getStoragePercentage(row)"
               :stroke-width="8"
               :color="getStorageColor(row)"
@@ -79,13 +79,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="created_at" label="注册时间" width="180">
+        <el-table-column prop="created_at" :label="t('admin.registeredAt')" width="180">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="240" align="center">
+        <el-table-column :label="t('admin.usersPage.colActions')" width="240" align="center">
           <template #default="{ row }">
             <el-button
               @click="toggleUserStatus(row)"
@@ -93,10 +93,10 @@
               size="small"
               round
             >
-              {{ row.status === 1 || row.status === 'active' ? '禁用' : '启用' }}
+              {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
             </el-button>
-            <el-button @click="openResetPassword(row)" size="small" round>重置密码</el-button>
-            <el-button @click="removeUser(row)" type="danger" size="small" round plain>删除</el-button>
+            <el-button @click="openResetPassword(row)" size="small" round>{{ t('admin.usersPage.resetPassword') }}</el-button>
+            <el-button @click="removeUser(row)" type="danger" size="small" round plain>{{ t('admin.usersPage.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -116,29 +116,29 @@
     </el-card>
 
     <!-- 新建用户 -->
-    <el-dialog v-model="createVisible" title="新建用户" width="460px">
+    <el-dialog v-model="createVisible" :title="t('admin.usersPage.create')" width="460px">
       <el-form :model="createForm" label-width="90px">
-        <el-form-item label="用户名" required>
-          <el-input v-model="createForm.username" placeholder="登录用户名" />
+        <el-form-item :label="t('admin.usersPage.usernameLabel')" required>
+          <el-input v-model="createForm.username" :placeholder="t('admin.usersPage.usernamePlaceholder')" />
         </el-form-item>
-        <el-form-item label="邮箱">
-          <el-input v-model="createForm.email" placeholder="选填" />
+        <el-form-item :label="t('admin.usersPage.emailLabel')">
+          <el-input v-model="createForm.email" :placeholder="t('admin.usersPage.optional')" />
         </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="createForm.nickname" placeholder="选填" />
+        <el-form-item :label="t('admin.nickname')">
+          <el-input v-model="createForm.nickname" :placeholder="t('admin.usersPage.optional')" />
         </el-form-item>
-        <el-form-item label="初始密码" required>
-          <el-input v-model="createForm.password" type="password" show-password placeholder="至少 6 位" />
+        <el-form-item :label="t('admin.usersPage.passwordLabel')" required>
+          <el-input v-model="createForm.password" type="password" show-password :placeholder="t('admin.usersPage.passwordPlaceholder')" />
         </el-form-item>
-        <el-form-item label="角色">
+        <el-form-item :label="t('admin.usersPage.roleLabel')">
           <el-select v-model="createForm.role" style="width: 100%">
-            <el-option label="普通用户" value="user" />
-            <el-option label="管理员" value="admin" />
+            <el-option :label="t('admin.usersPage.roleUser')" value="user" />
+            <el-option :label="t('admin.usersPage.roleAdmin')" value="admin" />
           </el-select>
         </el-form-item>
-        <el-form-item label="存储配额">
+        <el-form-item :label="t('admin.usersPage.quotaLabel')">
           <el-select v-model="createForm.quotaUnit" style="width: 100%">
-            <el-option label="不限（用系统默认）" :value="0" />
+            <el-option :label="t('admin.usersPage.quotaUnlimited')" :value="0" />
             <el-option label="100 MB" :value="100" />
             <el-option label="1 GB" :value="1024" />
             <el-option label="10 GB" :value="10240" />
@@ -146,24 +146,24 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitCreate">创建</el-button>
+        <el-button @click="createVisible = false">{{ t('admin.usersPage.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="submitCreate">{{ t('admin.usersPage.createBtn') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 重置密码 -->
-    <el-dialog v-model="resetVisible" title="重置密码" width="420px">
+    <el-dialog v-model="resetVisible" :title="t('admin.usersPage.resetPassword')" width="420px">
       <el-form label-width="90px">
-        <el-form-item label="用户">
+        <el-form-item :label="t('admin.usersPage.userLabel')">
           <span>{{ resetTarget?.username }}</span>
         </el-form-item>
-        <el-form-item label="新密码" required>
-          <el-input v-model="resetPassword" type="password" show-password placeholder="至少 6 位" />
+        <el-form-item :label="t('admin.usersPage.newPasswordLabel')" required>
+          <el-input v-model="resetPassword" type="password" show-password :placeholder="t('admin.usersPage.passwordPlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="resetVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitReset">确认重置</el-button>
+        <el-button @click="resetVisible = false">{{ t('admin.usersPage.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="submitReset">{{ t('admin.usersPage.confirmReset') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -173,11 +173,13 @@
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 const saving = ref(false)
@@ -210,7 +212,7 @@ const openCreateDialog = () => {
 
 const submitCreate = async () => {
   if (!createForm.username || createForm.password.length < 6) {
-    ElMessage.warning('用户名与至少 6 位的密码必填')
+    ElMessage.warning(t('admin.usersPage.createRequired'))
     return
   }
   saving.value = true
@@ -224,11 +226,11 @@ const submitCreate = async () => {
       max_storage_quota: createForm.quotaUnit > 0 ? createForm.quotaUnit * 1024 * 1024 : 0
     })
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success('用户已创建')
+      ElMessage.success(t('admin.usersPage.created'))
       createVisible.value = false
       await fetchUsers()
     } else {
-      handleError(new Error(res.message || '创建失败'))
+      handleError(new Error(res.message || t('admin.usersPage.createFailed')))
     }
   } catch (e: any) {
     handleError(e)
@@ -245,17 +247,17 @@ const openResetPassword = (user: any) => {
 
 const submitReset = async () => {
   if (!resetTarget.value || resetPassword.value.length < 6) {
-    ElMessage.warning('密码至少 6 位')
+    ElMessage.warning(t('admin.usersPage.passwordTooShort'))
     return
   }
   saving.value = true
   try {
     const res = await adminApi.resetUserPassword(resetTarget.value.id, resetPassword.value)
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success('密码已重置')
+      ElMessage.success(t('admin.usersPage.passwordReset'))
       resetVisible.value = false
     } else {
-      handleError(new Error(res.message || '重置失败'))
+      handleError(new Error(res.message || t('admin.usersPage.resetFailed')))
     }
   } catch (e: any) {
     handleError(e)
@@ -267,8 +269,8 @@ const submitReset = async () => {
 const removeUser = async (user: any) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除用户 ${user.username} 吗？其分享记录将一并移入回收站。`,
-      '确认删除',
+      t('admin.usersPage.deleteConfirmBody', { name: user.username }),
+      t('admin.usersPage.deleteConfirmTitle'),
       { type: 'warning' }
     )
   } catch {
@@ -277,10 +279,10 @@ const removeUser = async (user: any) => {
   try {
     const res = await adminApi.deleteUser(user.id)
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success('已删除')
+      ElMessage.success(t('admin.usersPage.deleted'))
       await fetchUsers()
     } else {
-      handleError(new Error(res.message || '删除失败'))
+      handleError(new Error(res.message || t('admin.usersPage.deleteFailed')))
     }
   } catch (e: any) {
     handleError(e)
@@ -342,21 +344,23 @@ const toggleUserStatus = async (user: any) => {
     const isActive = user.status === 1 || user.status === 'active'
     const newStatus = isActive ? 0 : 1
     await ElMessageBox.confirm(
-      `确定要${isActive ? '禁用' : '启用'}用户 ${user.username} 吗？`,
-      '确认操作',
+      isActive
+        ? t('admin.usersPage.disableConfirmBody', { name: user.username })
+        : t('admin.usersPage.enableConfirmBody', { name: user.username }),
+      t('admin.usersPage.confirmTitle'),
       { type: 'warning' }
     )
 
     const res = await adminApi.updateUserStatus(user.id, newStatus)
     if (res.code === 200) {
-      ElMessage.success('操作成功')
+      ElMessage.success(t('admin.usersPage.actionSuccess'))
       await fetchUsers()
     } else {
-      handleError(new Error(res.message || '操作失败'))
+      handleError(new Error(res.message || t('admin.usersPage.actionFailed')))
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('操作失败')
+      ElMessage.error(t('admin.usersPage.actionFailed'))
     }
   }
 }

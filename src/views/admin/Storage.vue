@@ -2,56 +2,62 @@
   <div class="storage-management">
     <!-- 当前状态 -->
     <el-card v-loading="loading" class="mb">
-      <template #header><h3>存储状态</h3></template>
+      <template #header><h3>{{ t('admin.storagePage.statusTitle') }}</h3></template>
       <el-descriptions :column="3" border>
-        <el-descriptions-item label="配置类型">
+        <el-descriptions-item :label="t('admin.storagePage.labelConfigType')">
           <el-tag>{{ info.current || 'local' }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="实际生效">
+        <el-descriptions-item :label="t('admin.storagePage.labelEffective')">
           <el-tag :type="info.effective === info.current ? 'success' : 'warning'">
             {{ info.effective || info.current || 'local' }}
           </el-tag>
           <span v-if="info.effective && info.effective !== info.current" class="degraded">
-            （配置后端不可用，已降级）
+            {{ t('admin.storagePage.degradedHint') }}
           </span>
         </el-descriptions-item>
-        <el-descriptions-item label="数据路径">
+        <el-descriptions-item :label="t('admin.storagePage.labelDataPath')">
           {{ info.data_path || '-' }}
         </el-descriptions-item>
       </el-descriptions>
 
       <div class="chips">
-        <span class="chips-label">支持后端：</span>
-        <el-tag v-for="t in info.available || []" :key="t" size="small" class="chip">{{ t }}</el-tag>
+        <span class="chips-label">{{ t('admin.storagePage.availableBackends') }}</span>
+        <el-tag v-for="bt in info.available || []" :key="bt" size="small" class="chip">{{ bt }}</el-tag>
       </div>
     </el-card>
 
     <!-- 站点配额 -->
     <el-card class="mb">
-      <template #header><h3>站点存储配额</h3></template>
+      <template #header><h3>{{ t('admin.storagePage.quotaTitle') }}</h3></template>
       <template v-if="quota > 0">
         <el-progress :percentage="usagePercent" :status="usagePercent >= 95 ? 'exception' : 'success'" />
-        <p class="quota-text">{{ formatFileSize(used) }} / {{ formatFileSize(quota) }}（统计口径：存活分享合计，未完成分片会话不计入）</p>
+        <p class="quota-text">{{ formatFileSize(used) }} / {{ formatFileSize(quota) }}{{ t('admin.storagePage.quotaStatHint') }}</p>
       </template>
       <template v-else>
-        <p class="quota-text">未启用站点级配额（storage.quota / PB_STORAGE_QUOTA，0=不限）。</p>
+        <p class="quota-text">{{ t('admin.storagePage.quotaDisabledHint') }}</p>
       </template>
-      <p class="quota-used">当前已用：{{ formatFileSize(used) }}</p>
+      <p class="quota-used">{{ t('admin.storagePage.currentUsage') }}{{ formatFileSize(used) }}</p>
     </el-card>
 
     <!-- 切换后端 -->
     <el-card>
-      <template #header><h3>切换存储后端</h3></template>
+      <template #header><h3>{{ t('admin.storagePage.switchTitle') }}</h3></template>
       <el-alert
-        title="保存即执行：SSRF 校验 → 认证级 Probe → 热切换 → 持久化；任一失败不改动现有配置"
+        :title="t('admin.storagePage.switchAlert')"
         type="warning"
         :closable="false"
         class="mb"
       />
+      <el-alert
+        :title="t('admin.storagePage.envOverrideAlert')"
+        type="info"
+        :closable="false"
+        class="mb"
+      />
       <el-form label-width="120px">
-        <el-form-item label="目标类型">
+        <el-form-item :label="t('admin.storagePage.targetType')">
           <el-select v-model="form.type" @change="onTypeChange">
-            <el-option v-for="t in allTypes" :key="t.value" :label="t.label" :value="t.value" />
+            <el-option v-for="bt in allTypes" :key="bt.value" :label="bt.label" :value="bt.value" />
           </el-select>
         </el-form-item>
         <el-form-item v-for="f in fields" :key="f.key" :label="f.label">
@@ -60,8 +66,8 @@
         </el-form-item>
       </el-form>
       <div>
-        <el-button type="primary" :loading="switching" @click="doSwitch">校验并切换</el-button>
-        <el-button @click="resetForm">重置</el-button>
+        <el-button type="primary" :loading="switching" @click="doSwitch">{{ t('admin.storagePage.switchBtn') }}</el-button>
+        <el-button @click="resetForm">{{ t('admin.storagePage.reset') }}</el-button>
       </div>
     </el-card>
 
@@ -70,34 +76,34 @@
     <el-card v-if="hostDirs !== null">
       <template #header>
         <div class="host-dirs-header">
-          <h3>{{ host.name }}授权目录</h3>
+          <h3>{{ t('admin.storagePage.hostDirsTitle', { host: host.name }) }}</h3>
           <div>
-            <el-button size="small" :loading="picking" @click="pickAndAuthorize">选择并授权目录</el-button>
+            <el-button size="small" :loading="picking" @click="pickAndAuthorize">{{ t('admin.storagePage.pickBtn') }}</el-button>
             <el-button size="small" circle :icon="'Refresh'" @click="loadDirs" />
           </div>
         </div>
       </template>
       <el-alert
-        title="管理员授权后应用才可读写对应目录;选择器由宿主系统弹出,授权结果实时生效"
+        :title="t('admin.storagePage.hostDirsAlert')"
         type="info"
         :closable="false"
         class="mb"
       />
       <el-table v-if="hostDirs.length" :data="hostDirs" size="small">
-        <el-table-column label="展示路径" min-width="240">
+        <el-table-column :label="t('admin.storagePage.colSemantic')" min-width="240">
           <template #default="{ row }">{{ row.semantic || row.path }}</template>
         </el-table-column>
-        <el-table-column label="内部路径" min-width="240">
+        <el-table-column :label="t('admin.storagePage.colPath')" min-width="240">
           <template #default="{ row }"><span class="mono">{{ row.path }}</span></template>
         </el-table-column>
-        <el-table-column label="操作" width="220">
+        <el-table-column :label="t('admin.storagePage.colActions')" width="220">
           <template #default="{ row }">
-            <el-button size="small" type="primary" plain @click="applyAsDataPath(row)">用作数据路径</el-button>
-            <el-button size="small" @click="openDir(row)">打开目录</el-button>
+            <el-button size="small" type="primary" plain @click="applyAsDataPath(row)">{{ t('admin.storagePage.useAsDataPath') }}</el-button>
+            <el-button size="small" @click="openDir(row)">{{ t('admin.storagePage.openDir') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <el-empty v-else description="尚无授权目录:点击「选择并授权目录」由宿主弹出目录选择器" :image-size="80" />
+      <el-empty v-else :description="t('admin.storagePage.noHostDirs')" :image-size="80" />
     </el-card>
   </div>
 </template>
@@ -106,10 +112,12 @@
 import { formatFileSize } from '@/utils/format'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { host } from '@/host'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 interface FieldDef {
@@ -120,9 +128,10 @@ interface FieldDef {
   secret?: boolean
 }
 
-// 各后端的最小可用字段集（完整字段见 server/configs/config.example.yaml 注释段）
+// 各后端的最小可用字段集（完整字段见 server/configs/config.example.yaml 注释段）。
+// label/ph 为 i18n key（admin. 前缀），纯 ASCII 品牌词/术语保持字面量
 const TYPE_DEFS: Record<string, { label: string; fields: FieldDef[] }> = {
-  local: { label: '本地存储', fields: [{ key: 'storage_path', label: '数据路径', ph: './data' }] },
+  local: { label: 'admin.storagePage.type.local', fields: [{ key: 'storage_path', label: 'admin.storagePage.labelDataPath', ph: './data' }] },
   s3: {
     label: 'Amazon S3',
     fields: [
@@ -131,44 +140,44 @@ const TYPE_DEFS: Record<string, { label: string; fields: FieldDef[] }> = {
       { key: 'access_key', label: 'Access Key' },
       { key: 'secret_key', label: 'Secret Key', secret: true },
       { key: 'region', label: 'Region', ph: 'us-east-1' },
-      { key: 'use_ssl', label: '使用 TLS', kind: 'bool' },
+      { key: 'use_ssl', label: 'admin.storagePage.field.useTls', kind: 'bool' },
       { key: 'path_style', label: 'Path Style', kind: 'bool' },
     ],
   },
-  oss: { label: '阿里云 OSS', fields: cloudFields() },
-  cos: { label: '腾讯云 COS', fields: cloudFields() },
-  bos: { label: '百度云 BOS', fields: cloudFields() },
-  ks3: { label: '金山云 KS3', fields: cloudFields() },
-  obs: { label: '华为云 OBS', fields: cloudFields() },
+  oss: { label: 'admin.storagePage.type.oss', fields: cloudFields() },
+  cos: { label: 'admin.storagePage.type.cos', fields: cloudFields() },
+  bos: { label: 'admin.storagePage.type.bos', fields: cloudFields() },
+  ks3: { label: 'admin.storagePage.type.ks3', fields: cloudFields() },
+  obs: { label: 'admin.storagePage.type.obs', fields: cloudFields() },
   gcs: { label: 'Google Cloud Storage', fields: [...cloudFields(), { key: 'endpoint', label: 'Endpoint', ph: 'storage.googleapis.com' }] },
   webdav: {
     label: 'WebDAV',
     fields: [
       { key: 'webdav_url', label: 'URL', ph: 'https://dav.example.com/dav/' },
-      { key: 'webdav_username', label: '用户名' },
-      { key: 'webdav_password', label: '密码', secret: true },
-      { key: 'root', label: '远端子目录', ph: 'pigeonbox' },
+      { key: 'webdav_username', label: 'admin.storagePage.field.username' },
+      { key: 'webdav_password', label: 'admin.storagePage.field.password', secret: true },
+      { key: 'root', label: 'admin.storagePage.field.remoteRoot', ph: 'pigeonbox' },
     ],
   },
   ftp: {
     label: 'FTP / FTPS',
     fields: [
       { key: 'ftp_host', label: 'Host', ph: 'nas.local:21' },
-      { key: 'ftp_username', label: '用户名' },
-      { key: 'ftp_password', label: '密码', secret: true },
+      { key: 'ftp_username', label: 'admin.storagePage.field.username' },
+      { key: 'ftp_password', label: 'admin.storagePage.field.password', secret: true },
       { key: 'ftp_tls', label: 'FTPS(AUTH TLS)', kind: 'bool' },
-      { key: 'root', label: '远端子目录', ph: 'pigeonbox' },
+      { key: 'root', label: 'admin.storagePage.field.remoteRoot', ph: 'pigeonbox' },
     ],
   },
   sftp: {
     label: 'SFTP',
     fields: [
       { key: 'sftp_host', label: 'Host', ph: 'nas.local:22' },
-      { key: 'sftp_username', label: '用户名' },
-      { key: 'sftp_password', label: '密码', secret: true },
-      { key: 'sftp_private_key', label: 'PEM 私钥', secret: true, ph: '与密码二选一' },
-      { key: 'sftp_host_key', label: 'Host Key', ph: '可选，known_hosts 行' },
-      { key: 'root', label: '远端子目录', ph: 'pigeonbox' },
+      { key: 'sftp_username', label: 'admin.storagePage.field.username' },
+      { key: 'sftp_password', label: 'admin.storagePage.field.password', secret: true },
+      { key: 'sftp_private_key', label: 'admin.storagePage.field.pemKey', secret: true, ph: 'admin.storagePage.field.eitherPassword' },
+      { key: 'sftp_host_key', label: 'Host Key', ph: 'admin.storagePage.field.hostKeyPh' },
+      { key: 'root', label: 'admin.storagePage.field.remoteRoot', ph: 'pigeonbox' },
     ],
   },
   azureblob: {
@@ -176,18 +185,18 @@ const TYPE_DEFS: Record<string, { label: string; fields: FieldDef[] }> = {
     fields: [
       { key: 'azureblob_account', label: 'Account' },
       { key: 'azureblob_container', label: 'Container' },
-      { key: 'azureblob_key', label: '共享密钥', secret: true },
-      { key: 'azureblob_sas', label: 'SAS', secret: true, ph: '与密钥二选一' },
-      { key: 'azureblob_endpoint', label: 'Endpoint', ph: '可选，Azurite/主权云' },
-      { key: 'root', label: '容器内前缀', ph: 'pigeonbox' },
+      { key: 'azureblob_key', label: 'admin.storagePage.field.sharedKey', secret: true },
+      { key: 'azureblob_sas', label: 'SAS', secret: true, ph: 'admin.storagePage.field.eitherKey' },
+      { key: 'azureblob_endpoint', label: 'Endpoint', ph: 'admin.storagePage.field.endpointPhAzurite' },
+      { key: 'root', label: 'admin.storagePage.field.containerPrefix', ph: 'pigeonbox' },
     ],
   },
   hdfs: {
     label: 'HDFS (WebHDFS)',
     fields: [
-      { key: 'hdfs_endpoint', label: 'WebHDFS 地址', ph: 'http://namenode:9870' },
-      { key: 'hdfs_user', label: '代理用户' },
-      { key: 'root', label: '远端子目录', ph: 'pigeonbox' },
+      { key: 'hdfs_endpoint', label: 'admin.storagePage.field.webhdfsAddr', ph: 'http://namenode:9870' },
+      { key: 'hdfs_user', label: 'admin.storagePage.field.proxyUser' },
+      { key: 'root', label: 'admin.storagePage.field.remoteRoot', ph: 'pigeonbox' },
     ],
   },
   onedrive: {
@@ -197,23 +206,29 @@ const TYPE_DEFS: Record<string, { label: string; fields: FieldDef[] }> = {
       { key: 'onedrive_client_secret', label: 'Client Secret', secret: true },
       { key: 'onedrive_refresh_token', label: 'Refresh Token', secret: true },
       { key: 'onedrive_tenant', label: 'Tenant', ph: 'common' },
-      { key: 'onedrive_drive_id', label: 'Drive ID', ph: '可选，默认 me/drive' },
-      { key: 'root', label: '远端子目录', ph: 'pigeonbox' },
+      { key: 'onedrive_drive_id', label: 'Drive ID', ph: 'admin.storagePage.field.driveIdPh' },
+      { key: 'root', label: 'admin.storagePage.field.remoteRoot', ph: 'pigeonbox' },
     ],
   },
 }
 
 function cloudFields(): FieldDef[] {
   return [
-    { key: 'region', label: 'Region', ph: '如 cn-hangzhou / ap-guangzhou' },
+    { key: 'region', label: 'Region', ph: 'admin.storagePage.field.regionPh' },
     { key: 'bucket', label: 'Bucket' },
     { key: 'access_key', label: 'Access Key' },
     { key: 'secret_key', label: 'Secret Key', secret: true },
-    { key: 'endpoint', label: 'Endpoint', ph: '留空按 region 推导' },
+    { key: 'endpoint', label: 'Endpoint', ph: 'admin.storagePage.field.endpointPhRegion' },
   ]
 }
 
-const allTypes = Object.entries(TYPE_DEFS).map(([value, v]) => ({ value, label: v.label }))
+// i18n key（admin. 前缀）→ 翻译；纯 ASCII 品牌词/术语原样透出
+const labelOf = (x: { label: string }) => (x.label.startsWith('admin.') ? t(x.label) : x.label)
+const phOf = (x: { ph?: string }) => (x.ph && x.ph.startsWith('admin.') ? t(x.ph) : x.ph)
+
+const allTypes = computed(() =>
+  Object.entries(TYPE_DEFS).map(([value, v]) => ({ value, label: labelOf(v) }))
+)
 const FIB = 'pigeonbox'
 
 const loading = ref(false)
@@ -224,7 +239,9 @@ const quota = ref(0)
 const form = reactive({ type: 'local' })
 const values = reactive<Record<string, string | boolean>>({})
 
-const fields = computed(() => TYPE_DEFS[form.type]?.fields ?? [])
+const fields = computed(() =>
+  (TYPE_DEFS[form.type]?.fields ?? []).map((f) => ({ ...f, label: labelOf(f), ph: phOf(f) }))
+)
 const usagePercent = computed(() => (quota.value > 0 ? Math.min(100, Math.round((used.value / quota.value) * 100)) : 0))
 
 const onTypeChange = () => resetForm()
@@ -301,10 +318,10 @@ const doSwitch = async () => {
   try {
     const res = await adminApi.updateStorageConfig(buildPayload())
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success('已切换并持久化')
+      ElMessage.success(t('admin.storagePage.switched'))
       load()
     } else {
-      handleError(new Error(res.message || '切换失败'))
+      handleError(new Error(res.message || t('admin.storagePage.switchFailed')))
     }
   } catch (e) {
     handleError(e)
@@ -331,7 +348,7 @@ const pickAndAuthorize = async () => {
   picking.value = true
   try {
     const picked = await host.pickAuthorizedDir()
-    if (picked && picked.length) ElMessage.success('授权成功')
+    if (picked && picked.length) ElMessage.success(t('admin.storagePage.authorized'))
     await loadDirs()
   } finally {
     picking.value = false
@@ -343,12 +360,12 @@ const applyAsDataPath = (item: HostDirItem) => {
   form.type = 'local'
   onTypeChange()
   values.storage_path = item.path
-  ElMessage.success('已填入数据路径,确认无误后点「校验并切换」生效')
+  ElMessage.success(t('admin.storagePage.dataPathFilled'))
 }
 
 const openDir = async (item: HostDirItem) => {
   if (!(await host.openDir(item.path))) {
-    ElMessage.warning(`当前未运行在${host.name || '受支持的'}宿主中`)
+    ElMessage.warning(t('admin.storagePage.notInHost', { host: host.name || t('admin.storagePage.supportedHost') }))
   }
 }
 

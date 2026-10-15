@@ -3,43 +3,43 @@
     <el-card v-loading="loading">
       <template #header>
         <div class="card-header">
-          <h3>公告管理</h3>
-          <el-button type="primary" @click="openCreate">新建公告</el-button>
+          <h3>{{ t('admin.announcements') }}</h3>
+          <el-button type="primary" @click="openCreate">{{ t('admin.announcementsPage.create') }}</el-button>
         </div>
       </template>
 
       <el-table :data="items" style="width: 100%">
         <el-table-column prop="id" label="ID" width="70" />
-        <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-        <el-table-column label="类型" width="110">
+        <el-table-column prop="title" :label="t('admin.announcementsPage.colTitle')" min-width="200" show-overflow-tooltip />
+        <el-table-column :label="t('admin.announcementsPage.colType')" width="110">
           <template #default="{ row }">
             <el-tag size="small" :type="row.type === 'maintenance' ? 'warning' : 'info'">{{ typeLabel(row.type) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="级别" width="90">
+        <el-table-column :label="t('admin.announcementsPage.colLevel')" width="90">
           <template #default="{ row }">
             <el-tag size="small" :type="levelTagType(row.level)">{{ row.level }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90">
+        <el-table-column :label="t('admin.announcementsPage.colStatus')" width="90">
           <template #default="{ row }">
             <el-tag size="small" :type="row.status === 1 ? 'success' : row.status === 2 ? 'danger' : 'info'">
-              {{ row.status === 1 ? '已发布' : row.status === 2 ? '已下线' : '草稿' }}
+              {{ row.status === 1 ? t('admin.announcementsPage.statusPublished') : row.status === 2 ? t('admin.announcementsPage.statusOffline') : t('admin.announcementsPage.statusDraft') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="start_at" label="生效时间" width="170">
+        <el-table-column prop="start_at" :label="t('admin.announcementsPage.colStartAt')" width="170">
           <template #default="{ row }">{{ row.start_at || '—' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right" class-name="nowrap-actions">
+        <el-table-column :label="t('admin.announcementsPage.colActions')" width="220" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
-            <el-button size="small" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="row.status === 1" size="small" type="warning" plain @click="setStatus(row, 2)">下线</el-button>
-            <el-button v-else size="small" type="success" plain @click="setStatus(row, 1)">发布</el-button>
-            <el-button size="small" type="danger" plain @click="onDelete(row)">删除</el-button>
+            <el-button size="small" @click="openEdit(row)">{{ t('admin.announcementsPage.edit') }}</el-button>
+            <el-button v-if="row.status === 1" size="small" type="warning" plain @click="setStatus(row, 2)">{{ t('admin.announcementsPage.offline') }}</el-button>
+            <el-button v-else size="small" type="success" plain @click="setStatus(row, 1)">{{ t('admin.announcementsPage.publish') }}</el-button>
+            <el-button size="small" type="danger" plain @click="onDelete(row)">{{ t('admin.announcementsPage.delete') }}</el-button>
           </template>
         </el-table-column>
-        <template #empty>暂无公告</template>
+        <template #empty>{{ t('admin.announcementsPage.empty') }}</template>
       </el-table>
 
       <div class="pager">
@@ -53,22 +53,22 @@
       </div>
     </el-card>
 
-    <el-dialog v-model="dlg" :title="editId ? '编辑公告' : '新建公告'" width="560px">
+    <el-dialog v-model="dlg" :title="editId ? t('admin.announcementsPage.editTitle') : t('admin.announcementsPage.create')" width="560px">
       <el-form label-width="90px">
-        <el-form-item label="标题" required>
+        <el-form-item :label="t('admin.announcementsPage.colTitle')" required>
           <el-input v-model="form.title" maxlength="120" show-word-limit />
         </el-form-item>
-        <el-form-item label="内容" required>
+        <el-form-item :label="t('admin.announcementsPage.labelContent')" required>
           <el-input v-model="form.content" type="textarea" :rows="5" />
         </el-form-item>
-        <el-form-item label="类型">
+        <el-form-item :label="t('admin.announcementsPage.colType')">
           <el-select v-model="form.type">
-            <el-option label="系统" value="system" />
-            <el-option label="功能更新" value="feature" />
-            <el-option label="维护" value="maintenance" />
+            <el-option :label="t('admin.announcementsPage.typeSystem')" value="system" />
+            <el-option :label="t('admin.announcementsPage.typeFeature')" value="feature" />
+            <el-option :label="t('admin.announcementsPage.typeMaintenance')" value="maintenance" />
           </el-select>
         </el-form-item>
-        <el-form-item label="级别">
+        <el-form-item :label="t('admin.announcementsPage.colLevel')">
           <el-select v-model="form.level">
             <el-option label="info" value="info" />
             <el-option label="success" value="success" />
@@ -76,16 +76,16 @@
             <el-option label="error" value="error" />
           </el-select>
         </el-form-item>
-        <el-form-item label="生效时间">
-          <el-date-picker v-model="form.start_at" type="datetime" value-format="YYYY-MM-DDTHH:mm:ssZ" placeholder="留空=立即" />
+        <el-form-item :label="t('admin.announcementsPage.colStartAt')">
+          <el-date-picker v-model="form.start_at" type="datetime" value-format="YYYY-MM-DDTHH:mm:ssZ" :placeholder="t('admin.announcementsPage.startPlaceholder')" />
         </el-form-item>
-        <el-form-item label="失效时间">
-          <el-date-picker v-model="form.end_at" type="datetime" value-format="YYYY-MM-DDTHH:mm:ssZ" placeholder="留空=长期" />
+        <el-form-item :label="t('admin.announcementsPage.labelEndAt')">
+          <el-date-picker v-model="form.end_at" type="datetime" value-format="YYYY-MM-DDTHH:mm:ssZ" :placeholder="t('admin.announcementsPage.endPlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dlg = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="doSave">保存</el-button>
+        <el-button @click="dlg = false">{{ t('admin.announcementsPage.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="doSave">{{ t('admin.announcementsPage.save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -94,10 +94,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 interface NotifyRow {
@@ -116,7 +118,7 @@ const dlg = ref(false)
 const editId = ref<number | null>(null)
 const form = ref({ title: '', content: '', type: 'system', level: 'info', start_at: '', end_at: '' })
 
-const typeLabel = (t: string) => (t === 'maintenance' ? '维护' : t === 'feature' ? '功能' : '系统')
+const typeLabel = (v: string) => (v === 'maintenance' ? t('admin.announcementsPage.typeMaintenance') : v === 'feature' ? t('admin.announcementsPage.typeFeatureShort') : t('admin.announcementsPage.typeSystem'))
 const levelTagType = (l: string) => (l === 'error' ? 'danger' : l === 'warning' ? 'warning' : l === 'success' ? 'success' : 'info')
 
 const { list: items, total, page, loading, reload, handlePageChange } = useTableQuery<NotifyRow>(
@@ -162,7 +164,7 @@ const openEdit = (row: NotifyRow) => {
 
 const doSave = async () => {
   if (!form.value.title || !form.value.content) {
-    ElMessage.warning('标题与内容必填')
+    ElMessage.warning(t('admin.announcementsPage.titleContentRequired'))
     return
   }
   saving.value = true
@@ -174,11 +176,11 @@ const doSave = async () => {
       ? await adminApi.updateNotify(editId.value, payload)
       : await adminApi.createNotify(payload)
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success('已保存')
+      ElMessage.success(t('admin.announcementsPage.saved'))
       dlg.value = false
       load()
     } else {
-      handleError(new Error(res.message || '保存失败'))
+      handleError(new Error(res.message || t('admin.announcementsPage.saveFailed')))
     }
   } catch (e) {
     handleError(e)
@@ -193,10 +195,10 @@ const setStatus = async (row: NotifyRow, status: number) => {
       title: row.title, content: row.content, type: row.type, level: row.level, status,
     })
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success(status === 1 ? '已发布' : '已下线')
+      ElMessage.success(status === 1 ? t('admin.announcementsPage.publishedToast') : t('admin.announcementsPage.offlineToast'))
       load()
     } else {
-      handleError(new Error(res.message || '操作失败'))
+      handleError(new Error(res.message || t('admin.announcementsPage.actionFailed')))
     }
   } catch (e) {
     handleError(e)
@@ -205,16 +207,16 @@ const setStatus = async (row: NotifyRow, status: number) => {
 
 const onDelete = async (row: NotifyRow) => {
   try {
-    await ElMessageBox.confirm(`确定删除公告「${row.title}」？`, '删除确认', { type: 'warning' })
+    await ElMessageBox.confirm(t('admin.announcementsPage.deleteConfirmBody', { name: row.title }), t('admin.announcementsPage.deleteConfirmTitle'), { type: 'warning' })
   } catch {
     return
   }
   const res = await adminApi.deleteNotify(row.id)
   if (res.code === 0 || res.code === 200) {
-    ElMessage.success('已删除')
+    ElMessage.success(t('admin.announcementsPage.deleted'))
     load()
   } else {
-    handleError(new Error(res.message || '删除失败'))
+    handleError(new Error(res.message || t('admin.announcementsPage.deleteFailed')))
   }
 }
 

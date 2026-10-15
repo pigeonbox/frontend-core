@@ -361,18 +361,12 @@ const fileTypeDist = ref<FileTypeStat[]>([])
 
 const adminName = computed(() => userStore.userInfo?.username || 'Admin')
 const greeting = computed(() => {
-  // 根据小时返回不同时段问候语（仅 zh-CN）
+  // 根据小时返回不同时段问候语
   const h = new Date().getHours()
-  if (locale.value === 'zh-CN') {
-    if (h < 6) return '夜深了'
-    if (h < 12) return '早上好'
-    if (h < 18) return '下午好'
-    return '晚上好'
-  }
-  if (h < 6) return 'Good night'
-  if (h < 12) return 'Good morning'
-  if (h < 18) return 'Good afternoon'
-  return 'Good evening'
+  if (h < 6) return t('dashboard.goodNight')
+  if (h < 12) return t('dashboard.goodMorning')
+  if (h < 18) return t('dashboard.goodAfternoon')
+  return t('dashboard.goodEvening')
 })
 
 
@@ -742,7 +736,9 @@ const generateMockFileTypeDist = () => {
   border-color: var(--primary-color);
 }
 
-/* 图标语义色编码:用户=accent / 文件=紫 / 存储=青绿 / 今日上传=琥珀 */
+/* 图标色调编码:用户=accent / 文件=色调2 / 存储=色调3 / 今日上传=色调4。
+   2-4 默认紫/青绿/琥珀(main.scss),accent 生效时由 utils/accent.ts 按主色
+   色相偏移派生覆盖——随颜色主题选择器联动,深浅模式变量已各自就绪 */
 .stat-icon {
   position: relative;
   z-index: 1;
@@ -758,33 +754,18 @@ const generateMockFileTypeDist = () => {
 }
 
 .tone-violet .stat-icon {
-  background: rgba(124, 58, 237, 0.1);
-  color: #7c3aed;
+  background: var(--stat-tone-2-bg);
+  color: var(--stat-tone-2-color);
 }
 
 .tone-teal .stat-icon {
-  background: rgba(13, 148, 136, 0.1);
-  color: #0d9488;
+  background: var(--stat-tone-3-bg);
+  color: var(--stat-tone-3-color);
 }
 
 .tone-amber .stat-icon {
-  background: rgba(217, 119, 6, 0.1);
-  color: #d97706;
-}
-
-html.dark .tone-teal .stat-icon {
-  background: rgba(45, 212, 191, 0.16);
-  color: #2dd4bf;
-}
-
-html.dark .tone-violet .stat-icon {
-  background: rgba(167, 139, 250, 0.16);
-  color: #a78bfa;
-}
-
-html.dark .tone-amber .stat-icon {
-  background: rgba(245, 158, 11, 0.16);
-  color: #f59e0b;
+  background: var(--stat-tone-4-bg);
+  color: var(--stat-tone-4-color);
 }
 
 .stat-content {

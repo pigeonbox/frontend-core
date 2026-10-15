@@ -64,7 +64,7 @@
           <div class="share-header">
             <div class="logo-section">
               <div class="logo-icon">
-                <img src="/favicon.svg" alt="PigeonBox" class="logo-img" />
+                <BrandLogo class="logo-img" />
               </div>
               <div class="logo-text">
                 <h1>{{ t('share.contentTitle') }}</h1>
@@ -116,7 +116,7 @@
                   <span class="m-size">{{ formatFileSize(f.size) }}</span>
                   <el-button size="small" text type="primary" :loading="e2eBusy" @click="downloadFile(f.id, f.name)">
                     <el-icon><Download /></el-icon>
-                    下载
+                    {{ t('common.download') }}
                   </el-button>
                 </div>
               </div>

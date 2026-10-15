@@ -114,11 +114,11 @@ const mapTagType = (level: string): TagType => {
 const typeLabel = (type: string): string => {
   switch (type) {
     case 'system':
-      return t('notify.system')
+      return t('user.notifications.type_system')
     case 'feature':
-      return t('notify.feature')
+      return t('user.notifications.type_feature')
     case 'maintenance':
-      return t('notify.maintenance')
+      return t('user.notifications.type_maintenance')
     default:
       return '' // 未知类型不展示 chip（避免裸 key 露出）
   }

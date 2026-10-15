@@ -151,7 +151,7 @@ describe('useUploadQueue', () => {
     q.tasks.value[0]!.status = 'uploading'
     q.cancel(id)
     expect(q.tasks.value[0]!.status).toBe('error')
-    expect(q.tasks.value[0]!.error).toBe('upload.presign.abort')
+    expect(q.tasks.value[0]!.error).toBe('upload_view.presign.abort')
   })
 
   it('W3 语义：multi 进行中取消任一任务=中止整批（其余任务标 Cancelled）', async () => {
@@ -169,7 +169,8 @@ describe('useUploadQueue', () => {
     const out = await startPromise
     expect(out).toBeNull()
     expect(q.tasks.value[1]!.status).toBe('error')
-    expect(q.tasks.value[1]!.error).toBe('Cancelled')
+    // 取消文案统一走 upload_view.presign.abort（不再裸抛英文 Cancelled）
+    expect(q.tasks.value[1]!.error).toBe('upload_view.presign.abort')
   })
 
   it('canStart/isUploading 计算正确', () => {

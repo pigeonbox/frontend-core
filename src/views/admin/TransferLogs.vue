@@ -3,9 +3,9 @@
     <el-card v-loading="loading">
       <template #header>
         <div class="card-header">
-          <h3>传输日志</h3>
+          <h3>{{ t('admin.logs') }}</h3>
           <el-button @click="reload()" :icon="Refresh" size="small">
-            刷新
+            {{ t('admin.transferLogs.refresh') }}
           </el-button>
         </div>
       </template>
@@ -15,25 +15,25 @@
         <el-col :span="6">
           <div class="stat-item">
             <div class="stat-value">{{ stats.totalOperations }}</div>
-            <div class="stat-label">总操作次数</div>
+            <div class="stat-label">{{ t('admin.transferLogs.statTotalOps') }}</div>
           </div>
         </el-col>
         <el-col :span="6">
           <div class="stat-item upload">
             <div class="stat-value">{{ stats.uploads }}</div>
-            <div class="stat-label">上传次数</div>
+            <div class="stat-label">{{ t('admin.transferLogs.statUploads') }}</div>
           </div>
         </el-col>
         <el-col :span="6">
           <div class="stat-item download">
             <div class="stat-value">{{ stats.downloads }}</div>
-            <div class="stat-label">下载次数</div>
+            <div class="stat-label">{{ t('admin.transferLogs.statDownloads') }}</div>
           </div>
         </el-col>
         <el-col :span="6">
           <div class="stat-item">
             <div class="stat-value">{{ stats.activeUsers }}</div>
-            <div class="stat-label">活跃用户</div>
+            <div class="stat-label">{{ t('admin.transferLogs.statActiveUsers') }}</div>
           </div>
         </el-col>
       </el-row>
@@ -42,7 +42,7 @@
       <el-table :data="logsList" stripe>
         <el-table-column prop="id" label="ID" width="80" />
 
-        <el-table-column prop="operation" label="操作" width="100">
+        <el-table-column prop="operation" :label="t('admin.transferLogs.colOperation')" width="100">
           <template #default="{ row }">
             <el-tag :type="getOperationType(row.operation)" size="small">
               {{ getOperationLabel(row.operation) }}
@@ -50,34 +50,34 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="file_code" label="文件码" width="120" />
+        <el-table-column prop="file_code" :label="t('admin.transferLogs.colFileCode')" width="120" />
 
-        <el-table-column prop="file_name" label="文件名" show-overflow-tooltip />
+        <el-table-column prop="file_name" :label="t('admin.fileName')" show-overflow-tooltip />
 
-        <el-table-column prop="file_size" label="文件大小" width="120">
+        <el-table-column prop="file_size" :label="t('admin.transferLogs.colFileSize')" width="120">
           <template #default="{ row }">
             {{ formatFileSize(row.file_size) }}
           </template>
         </el-table-column>
 
-        <el-table-column prop="username" label="用户" width="120">
+        <el-table-column prop="username" :label="t('admin.transferLogs.colUser')" width="120">
           <template #default="{ row }">
-            {{ row.username || '匿名' }}
+            {{ row.username || t('admin.transferLogs.anonymous') }}
           </template>
         </el-table-column>
 
         <el-table-column prop="api_key_id" label="Key ID" width="90">
           <template #default="{ row }">
-            <el-tooltip v-if="row.api_key_id" content="该操作经用户 API Key 认证（泄露排查归因）">
+            <el-tooltip v-if="row.api_key_id" :content="t('admin.transferLogs.apiKeyTooltip')">
               <el-tag size="small" type="warning">#{{ row.api_key_id }}</el-tag>
             </el-tooltip>
             <span v-else>-</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="ip" label="IP 地址" width="140" />
+        <el-table-column prop="ip" :label="t('admin.transferLogs.colIp')" width="140" />
 
-        <el-table-column prop="created_at" label="操作时间" width="180">
+        <el-table-column prop="created_at" :label="t('admin.transferLogs.colOperatedAt')" width="180">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
@@ -103,11 +103,13 @@
 <script setup lang="ts">
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
 import { reactive, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 const stats = reactive({
@@ -117,14 +119,16 @@ const stats = reactive({
   activeUsers: 0
 })
 
+const OPERATION_KEYS: Record<string, string> = {
+  upload: 'admin.transferLogs.op.upload',
+  download: 'admin.transferLogs.op.download',
+  delete: 'admin.transferLogs.op.delete',
+  view: 'admin.transferLogs.op.view'
+}
+
 const getOperationLabel = (operation: string): string => {
-  const labels: Record<string, string> = {
-    upload: '上传',
-    download: '下载',
-    delete: '删除',
-    view: '查看'
-  }
-  return labels[operation] || operation
+  const key = OPERATION_KEYS[operation]
+  return key ? t(key) : operation
 }
 
 const getOperationType = (operation: string): 'success' | 'primary' | 'danger' | 'info' => {
@@ -176,7 +180,7 @@ const fetchStats = async () => {
       // (后端只有 total_users),如需真实数直接换 res.data.total_users
     }
   } catch (error) {
-    console.error('获取统计失败:', error)
+    console.error(t('admin.transferLogs.fetchStatsFailed'), error)
   }
 }
 

@@ -17,7 +17,7 @@ import { localHistory } from '@/utils/localHistory'
 export type PickupPhase = 'input' | 'submitting' | 'needPassword'
 
 export interface PickupDeps {
-  router?: { push: (location: { path: string; query: Record<string, string> }) => void }
+  router?: { push: (location: { path: string; query?: Record<string, string> }) => void }
   handleError?: (e: unknown) => void
   /** 成功取件后的本机记录（默认 localHistory.pushPickup） */
   recordPickup?: (rec: { code: string; name?: string; size?: number }) => void
@@ -141,6 +141,13 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
           size: res.data.file_size || undefined,
         })
         phase.value = 'input'
+        // 文本分享无文件渲染形态：后端回传 share_code，跳分享详情页展示文本
+        // （契约 share_anonymous.d.ts：share_code 仅文本分享取件时返回）
+        const shareCode = (res.data as { share_code?: string }).share_code
+        if (shareCode) {
+          router.push({ path: `/share/${encodeURIComponent(shareCode)}` })
+          return
+        }
         router.push({
           path: '/retrieve/result',
           query: { data: encodeURIComponent(JSON.stringify(res.data)) },

@@ -3,44 +3,44 @@
     <el-card shadow="never" class="activities-card">
       <div class="card-header">
         <div class="header-title">
-          <h2>活动流</h2>
-          <p>统一时间线：传输记录 + 管理审计（上传/下载/删除与配置/用户/维护操作一屏回溯）</p>
+          <h2>{{ t('admin.activities') }}</h2>
+          <p>{{ t('admin.activitiesPage.subtitle') }}</p>
         </div>
         <div class="header-actions">
-          <el-select v-model="filterSource" placeholder="来源" style="width: 120px" @change="resetAndLoad">
-            <el-option label="全部" value="" />
-            <el-option label="传输" value="transfer" />
-            <el-option label="审计" value="audit" />
+          <el-select v-model="filterSource" :placeholder="t('admin.activitiesPage.sourcePlaceholder')" style="width: 120px" @change="resetAndLoad">
+            <el-option :label="t('admin.activitiesPage.sourceAll')" value="" />
+            <el-option :label="t('admin.activitiesPage.sourceTransfer')" value="transfer" />
+            <el-option :label="t('admin.activitiesPage.sourceAudit')" value="audit" />
           </el-select>
           <el-select
             v-model="filterAction"
-            placeholder="审计操作"
+            :placeholder="t('admin.activitiesPage.actionPlaceholder')"
             clearable
             style="width: 150px"
             :disabled="filterSource === 'transfer'"
             @change="resetAndLoad"
           >
-            <el-option label="配置变更" value="config.update" />
-            <el-option label="用户操作" value="user." />
-            <el-option label="文件操作" value="file." />
-            <el-option label="维护操作" value="maintenance." />
+            <el-option :label="t('admin.activitiesPage.actionConfig')" value="config.update" />
+            <el-option :label="t('admin.activitiesPage.actionUser')" value="user." />
+            <el-option :label="t('admin.activitiesPage.actionFile')" value="file." />
+            <el-option :label="t('admin.activitiesPage.actionMaintenance')" value="maintenance." />
           </el-select>
           <el-select
             v-model="filterOperation"
-            placeholder="传输操作"
+            :placeholder="t('admin.activitiesPage.operationPlaceholder')"
             clearable
             style="width: 120px"
             :disabled="filterSource === 'audit'"
             @change="resetAndLoad"
           >
-            <el-option label="上传" value="upload" />
-            <el-option label="下载" value="download" />
-            <el-option label="删除" value="delete" />
-            <el-option label="查看" value="view" />
+            <el-option :label="t('admin.activitiesPage.opUpload')" value="upload" />
+            <el-option :label="t('admin.activitiesPage.opDownload')" value="download" />
+            <el-option :label="t('admin.activitiesPage.opDelete')" value="delete" />
+            <el-option :label="t('admin.activitiesPage.opView')" value="view" />
           </el-select>
           <el-button @click="resetAndLoad" :loading="loading">
             <el-icon><Refresh /></el-icon>
-            刷新
+            {{ t('admin.activitiesPage.refresh') }}
           </el-button>
         </div>
       </div>
@@ -48,47 +48,47 @@
       <el-divider />
 
       <el-table :data="rows" v-loading="loading" class="activities-table">
-        <el-table-column label="时间" width="170">
+        <el-table-column :label="t('admin.activitiesPage.colTime')" width="170">
           <template #default="{ row }">
             {{ formatDate(row.time) }}
           </template>
         </el-table-column>
-        <el-table-column label="来源" width="80" align="center">
+        <el-table-column :label="t('admin.activitiesPage.colSource')" width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small" :type="row.source === 'transfer' ? 'primary' : 'info'" effect="plain">
-              {{ row.source === 'transfer' ? '传输' : '审计' }}
+              {{ row.source === 'transfer' ? t('admin.activitiesPage.sourceTransfer') : t('admin.activitiesPage.sourceAudit') }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作者" width="140">
+        <el-table-column :label="t('admin.activitiesPage.colActor')" width="140">
           <template #default="{ row }">
             <el-tag size="small" :type="row.actor === 'system' ? 'info' : 'primary'" effect="plain">
               {{ row.actor || 'system' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200">
+        <el-table-column :label="t('admin.activitiesPage.colAction')" width="200">
           <template #default="{ row }">
             <el-tag size="small" effect="plain">{{ row.action }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="对象" min-width="240" show-overflow-tooltip>
+        <el-table-column :label="t('admin.activitiesPage.colTarget')" min-width="240" show-overflow-tooltip>
           <template #default="{ row }">{{ row.target }}</template>
         </el-table-column>
-        <el-table-column prop="ip" label="来源 IP" width="140" />
-        <el-table-column label="结果" width="90" align="center">
+        <el-table-column prop="ip" :label="t('admin.activitiesPage.colIp')" width="140" />
+        <el-table-column :label="t('admin.activitiesPage.colResult')" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.success ? 'success' : 'danger'" size="small">
-              {{ row.success ? '成功' : '失败' }}
+              {{ row.success ? t('admin.activitiesPage.resultSuccess') : t('admin.activitiesPage.resultFailed') }}
             </el-tag>
           </template>
         </el-table-column>
       </el-table>
 
       <div class="stream-footer">
-        <span class="stream-count">已加载 {{ rows.length }} 条{{ totalCountLabel }}</span>
-        <el-button v-if="hasMore" :loading="loading" @click="loadMore">加载更多</el-button>
-        <span v-else class="stream-end">— 已到末尾 —</span>
+        <span class="stream-count">{{ t('admin.activitiesPage.loadedCount', { n: rows.length }) }}{{ totalCountLabel }}</span>
+        <el-button v-if="hasMore" :loading="loading" @click="loadMore">{{ t('admin.activitiesPage.loadMore') }}</el-button>
+        <span v-else class="stream-end">{{ t('admin.activitiesPage.streamEnd') }}</span>
       </div>
     </el-card>
   </div>
@@ -97,10 +97,12 @@
 <script setup lang="ts">
 import { toLocaleDateTime as formatDate } from '@/utils/format'
 import { ref, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 // 活动聚合流（2026-10-12 对标上游 activities 单一活动流）：
@@ -140,7 +142,7 @@ const hasMore = computed(() => {
 const totalCountLabel = computed(() => {
   const total = (filterSource.value === 'transfer' ? 0 : auditTotal.value) +
     (filterSource.value === 'audit' ? 0 : transferTotal.value)
-  return total > 0 ? ` / 共约 ${total} 条` : ''
+  return total > 0 ? t('admin.activitiesPage.totalLabel', { n: total }) : ''
 })
 
 const timeMs = (t: string) => {
@@ -161,7 +163,7 @@ const auditRow = (r: any): ActivityRow => ({
 const transferRow = (r: any): ActivityRow => ({
   time: r.created_at || r.CreatedAt || '',
   source: 'transfer',
-  actor: r.username || '匿名',
+  actor: r.username || t('admin.activitiesPage.anonymousActor'),
   action: r.operation || '',
   target: [r.file_name, r.file_code ? `#${r.file_code}` : ''].filter(Boolean).join(' ') || '-',
   ip: r.ip || '',

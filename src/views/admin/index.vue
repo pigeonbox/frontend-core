@@ -5,7 +5,7 @@
       <el-aside width="240px" class="admin-aside">
         <div class="admin-logo">
           <div class="logo-icon">
-            <img src="/favicon.svg" alt="PigeonBox" class="logo-img" />
+            <BrandLogo class="logo-img" />
           </div>
           <div class="logo-text">
             <h2>PigeonBox</h2>
@@ -191,7 +191,7 @@ const handleCommand = async (command: string) => {
         router.push(adminBase + '/login')
       } catch (error: unknown) {
         if (error !== 'cancel') {
-          console.error('退出登录失败:', error)
+          console.error(t('admin.logoutFailed'), error)
         }
       }
       break

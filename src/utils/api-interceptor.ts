@@ -50,6 +50,19 @@ const ERRCODE_KEY_MAP: Record<number, string> = {
   40004: 'errcode.40004',
 }
 
+// 非业务码的兜底映射：网络层（request.ts/_xhr.ts 网络/超时失败 code=0）
+// 与纯 HTTP 语义码——没有 errcode 可查时也得给人话，不能裸露英文原文
+const HTTP_FALLBACK_KEY_MAP: Record<number, string> = {
+  0: 'errcode.network_error',
+  401: 'error.unauthorized',
+  403: 'error.forbidden',
+}
+
+const resolveErrorKey = (code: number): string | null =>
+  ERRCODE_KEY_MAP[code] ??
+  HTTP_FALLBACK_KEY_MAP[code] ??
+  (code >= 500 && code <= 599 ? 'error.server' : null)
+
 export class BizError extends Error {
   readonly code: number
   readonly traceId: string
@@ -152,15 +165,14 @@ export function translateError(err: BizError | Error | unknown): {
   traceId: string
 } {
   if (err instanceof BizError) {
-    const i18nKey = ERRCODE_KEY_MAP[err.code] ?? null
+    const i18nKey = resolveErrorKey(err.code)
     return { i18nKey, fallback: err.message, code: err.code, traceId: err.traceId }
   }
   if (err && typeof err === 'object' && 'message' in err) {
     const anyErr = err as { message?: string; code?: number; trace_id?: string }
     // request.ts 拦截器包装的 {code, message, trace_id} 普通对象同样要吃错误码映射，
     // 否则 toast 落英文原文（"pickup code not found" 事件，2026-10-12）
-    const i18nKey =
-      anyErr.code != null ? (ERRCODE_KEY_MAP[anyErr.code] ?? null) : null
+    const i18nKey = anyErr.code != null ? resolveErrorKey(anyErr.code) : null
     return {
       i18nKey,
       fallback: anyErr.message || 'Unknown error',

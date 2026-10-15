@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { host } from '@/host'
 import { adminBasePath } from '@/utils/adminPath'
+import { i18n } from '@/i18n'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -8,19 +9,19 @@ const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Home',
     component: () => import('@/views/home/index.vue'),
-    meta: { title: '首页' },
+    meta: { title: 'route.home' },
   },
   {
     path: '/send',
     name: 'Send',
     component: () => import('@/views/home/Send.vue'),
-    meta: { title: '发送' },
+    meta: { title: 'route.send' },
   },
   {
     path: '/share/:code',
     name: 'ShareView',
     component: () => import('@/views/share/View.vue'),
-    meta: { title: '分享详情' },
+    meta: { title: 'route.share' },
   },
   {
     // 2026-10-09 取件执行融合进首页：/retrieve 退役为兼容重定向——
@@ -36,25 +37,25 @@ const routes: RouteRecordRaw[] = [
     path: '/retrieve/result',
     name: 'AnonymousResult',
     component: () => import('@/views/anonymous/Result.vue'),
-    meta: { title: '取件结果' },
+    meta: { title: 'route.retrieveResult' },
   },
   {
     path: '/user/login',
     name: 'Login',
     component: () => import('@/views/user/Login.vue'),
-    meta: { title: '登录' },
+    meta: { title: 'route.login' },
   },
   {
     path: '/user/register',
     name: 'Register',
     component: () => import('@/views/user/Register.vue'),
-    meta: { title: '注册' },
+    meta: { title: 'route.register' },
   },
   {
     path: '/setup',
     name: 'Setup',
     component: () => import('@/views/setup/Index.vue'),
-    meta: { title: '系统初始化' },
+    meta: { title: 'route.setup' },
   },
   {
     path: '/user',
@@ -65,37 +66,37 @@ const routes: RouteRecordRaw[] = [
         path: 'dashboard',
         name: 'UserDashboard',
         component: () => import('@/views/user/Dashboard.vue'),
-        meta: { title: '用户中心', requiresAuth: true },
+        meta: { title: 'route.userDashboard', requiresAuth: true },
       },
       {
         path: 'shares',
         name: 'UserShares',
         component: () => import('@/views/user/Shares.vue'),
-        meta: { title: '我的分享', requiresAuth: true },
+        meta: { title: 'route.userShares', requiresAuth: true },
       },
       {
         path: 'history',
         name: 'UserHistory',
         component: () => import('@/views/user/History.vue'),
-        meta: { title: '取件历史', requiresAuth: true },
+        meta: { title: 'route.userHistory', requiresAuth: true },
       },
       {
         path: 'notifications',
         name: 'UserNotifications',
         component: () => import('@/views/user/Notifications.vue'),
-        meta: { title: '通知', requiresAuth: true },
+        meta: { title: 'route.userNotifications', requiresAuth: true },
       },
       {
         path: 'tokens',
         name: 'UserTokens',
         component: () => import('@/views/user/Tokens.vue'),
-        meta: { title: 'API 令牌', requiresAuth: true },
+        meta: { title: 'route.userTokens', requiresAuth: true },
       },
       {
         path: 'requests',
         name: 'UserRequests',
         component: () => import('@/views/user/Requests.vue'),
-        meta: { title: '寄件码', requiresAuth: true },
+        meta: { title: 'route.userRequests', requiresAuth: true },
       },
     ],
   },
@@ -103,19 +104,19 @@ const routes: RouteRecordRaw[] = [
     path: '/request/:token',
     name: 'RequestPickup',
     component: () => import('@/views/request/Pickup.vue'),
-    meta: { title: '文件投递' },
+    meta: { title: 'route.requestPickup' },
   },
   {
     path: '/oidc/callback',
     name: 'OidcCallback',
     component: () => import('@/views/user/OidcCallback.vue'),
-    meta: { title: 'OIDC 登录' },
+    meta: { title: 'route.oidcCallback' },
   },
   {
     path: '/api-docs',
     name: 'ApiDocs',
     component: () => import('@/views/Docs.vue'),
-    meta: { title: 'API 文档' },
+    meta: { title: 'route.apiDocs' },
   },
 ]
 
@@ -128,91 +129,91 @@ function adminRoutes(base: string): RouteRecordRaw[] {
     path: `${base}/login`,
     name: 'AdminLogin',
     component: () => import('@/views/admin/Login.vue'),
-    meta: { title: '管理员登录' },
+    meta: { title: 'route.adminLogin' },
   },
   {
     path: base,
     name: 'Admin',
     component: () => import('@/views/admin/index.vue'),
-    meta: { title: '管理后台', requiresAuth: true, requiresAdmin: true },
+    meta: { title: 'route.admin', requiresAuth: true, requiresAdmin: true },
     children: [
       {
         path: '',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/Dashboard.vue'),
-        meta: { title: '仪表盘' },
+        meta: { title: 'route.adminDashboard' },
       },
       {
         path: 'dashboard',
         name: 'AdminDashboardAlias',
         component: () => import('@/views/admin/Dashboard.vue'),
-        meta: { title: '仪表盘' },
+        meta: { title: 'route.adminDashboard' },
       },
       {
         path: 'files',
         name: 'AdminFiles',
         component: () => import('@/views/admin/Files.vue'),
-        meta: { title: '文件管理' },
+        meta: { title: 'route.adminFiles' },
       },
       {
         path: 'local-files',
         name: 'AdminLocalFiles',
         component: () => import('@/views/admin/LocalFiles.vue'),
-        meta: { title: '本地文件' },
+        meta: { title: 'route.adminLocalFiles' },
       },
       {
         path: 'users',
         name: 'AdminUsers',
         component: () => import('@/views/admin/Users.vue'),
-        meta: { title: '用户管理' },
+        meta: { title: 'route.adminUsers' },
       },
       {
         path: 'config',
         name: 'AdminConfig',
         component: () => import('@/views/admin/Config.vue'),
-        meta: { title: '系统配置' },
+        meta: { title: 'route.adminConfig' },
       },
       {
         path: 'storage',
         name: 'AdminStorage',
         component: () => import('@/views/admin/Storage.vue'),
-        meta: { title: '存储管理' },
+        meta: { title: 'route.adminStorage' },
       },
       {
         path: 'logs',
         name: 'AdminLogs',
         component: () => import('@/views/admin/TransferLogs.vue'),
-        meta: { title: '传输日志' },
+        meta: { title: 'route.adminLogs' },
       },
       {
         path: 'moderation',
         name: 'AdminModeration',
         component: () => import('@/views/admin/Moderation.vue'),
-        meta: { title: '内容审核' },
+        meta: { title: 'route.adminModeration' },
       },
       {
         path: 'p2p',
         name: 'AdminP2pTransfer',
         component: () => import('@/views/admin/P2pTransfer.vue'),
-        meta: { title: '设备直传' },
+        meta: { title: 'route.adminP2p' },
       },
       {
         path: 'activities',
         name: 'AdminActivities',
         component: () => import('@/views/admin/Activities.vue'),
-        meta: { title: '活动流' },
+        meta: { title: 'route.adminActivities' },
       },
       {
         path: 'maintenance',
         name: 'AdminMaintenance',
         component: () => import('@/views/admin/Maintenance.vue'),
-        meta: { title: '维护工具' },
+        meta: { title: 'route.adminMaintenance' },
       },
       {
         path: 'announcements',
         name: 'AdminAnnouncements',
         component: () => import('@/views/admin/Announcements.vue'),
-        meta: { title: '公告管理' },
+        meta: { title: 'route.adminAnnouncements' },
       },
     ],
   },
@@ -274,8 +275,8 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  // 设置页面标题
-  const title = (to.meta.title as string) || 'PigeonBox'
+  // 设置页面标题（meta.title 存 i18n key，此处按当前 locale 解析；无 title 落品牌名）
+  const title = to.meta.title ? i18n.global.t(to.meta.title as string) : 'PigeonBox'
   document.title = title
   // 宿主窗口标题同步(经统一网关内嵌宿主时窗口标题由应用管理;无宿主 no-op)
   host.setTitle(title).catch(() => {})

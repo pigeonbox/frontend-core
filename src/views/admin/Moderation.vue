@@ -3,12 +3,12 @@
     <el-card shadow="never" class="moderation-card">
       <div class="card-header">
         <div class="header-title">
-          <h2>内容审核</h2>
-          <p>处理待审核的分享（moderation 命中且策略为 pending 时进入此队列）</p>
+          <h2>{{ t('admin.moderationTitle') }}</h2>
+          <p>{{ t('admin.moderation.subtitle') }}</p>
         </div>
         <el-button @click="reload()" :loading="loading" class="refresh-btn">
           <el-icon><Refresh /></el-icon>
-          刷新
+          {{ t('admin.moderation.refresh') }}
         </el-button>
       </div>
 
@@ -16,20 +16,20 @@
 
       <el-alert
         v-if="!queue.length && !loading"
-        title="队列为空"
-        description="没有待审核的分享。启用敏感词审核需在服务端配置 moderation.enabled 与 blocked_words。"
+        :title="t('admin.moderation.emptyTitle')"
+        :description="t('admin.moderation.emptyDesc')"
         type="info"
         :closable="false"
         show-icon
       />
 
       <el-table v-else :data="queue" v-loading="loading" class="moderation-table">
-        <el-table-column label="内容" min-width="280">
+        <el-table-column :label="t('admin.moderation.colContent')" min-width="280">
           <template #default="{ row }">
             <div class="content-cell">
               <div class="content-title">
                 {{ row.file_name || row.code }}
-                <el-tag v-if="row.is_text" size="small" type="success">文本</el-tag>
+                <el-tag v-if="row.is_text" size="small" type="success">{{ t('admin.moderation.tagText') }}</el-tag>
               </div>
               <div v-if="row.text_preview" class="content-preview">{{ row.text_preview }}</div>
               <div class="content-meta">
@@ -39,32 +39,32 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="上传者" width="160" align="center">
+        <el-table-column :label="t('admin.uploader')" width="160" align="center">
           <template #default="{ row }">
-            <div>{{ row.user_id ? `ID: ${row.user_id}` : '匿名' }}</div>
+            <div>{{ row.user_id ? `ID: ${row.user_id}` : t('admin.moderation.anonymous') }}</div>
             <div class="ip-line">{{ row.owner_ip || '-' }}</div>
           </template>
         </el-table-column>
 
-        <el-table-column prop="size" label="大小" width="100" align="center">
+        <el-table-column prop="size" :label="t('admin.size')" width="100" align="center">
           <template #default="{ row }">
             {{ row.is_text ? '-' : formatFileSize(row.size) }}
           </template>
         </el-table-column>
 
-        <el-table-column prop="created_at" label="提交时间" width="170">
+        <el-table-column prop="created_at" :label="t('admin.moderation.colSubmittedAt')" width="170">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="220" align="center" fixed="right">
+        <el-table-column :label="t('admin.moderation.colActions')" width="220" align="center" fixed="right">
           <template #default="{ row }">
             <el-button type="success" size="small" round :loading="acting === row.id" @click="act(row, 'normal')">
-              通过
+              {{ t('admin.moderation.approve') }}
             </el-button>
             <el-button type="danger" size="small" round :loading="acting === row.id" @click="act(row, 'blocked')">
-              拒绝
+              {{ t('admin.moderation.reject') }}
             </el-button>
           </template>
         </el-table-column>
@@ -90,11 +90,13 @@
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 const acting = ref<number | null>(null)
@@ -123,10 +125,10 @@ const act = async (row: any, status: 'normal' | 'blocked') => {
   try {
     const res = await adminApi.setFileStatus(row.id, status)
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success(status === 'normal' ? '已通过' : '已拒绝并禁用')
+      ElMessage.success(status === 'normal' ? t('admin.moderation.approved') : t('admin.moderation.rejected'))
       await reload()
     } else {
-      handleError(new Error(res.message || '操作失败'))
+      handleError(new Error(res.message || t('admin.moderation.actionFailed')))
     }
   } catch (e: any) {
     handleError(e)

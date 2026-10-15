@@ -3,15 +3,15 @@
     <el-card>
       <template #header>
         <div class="card-header">
-          <span>本地文件（NAS 白名单目录）</span>
+          <span>{{ t('admin.localFilesPage.title') }}</span>
           <div class="header-actions">
             <template v-if="!featureDisabled">
-              <el-select v-model="rootIdx" class="root-select" placeholder="根目录" @change="onRootChange">
+              <el-select v-model="rootIdx" class="root-select" :placeholder="t('admin.localFilesPage.rootPlaceholder')" @change="onRootChange">
                 <el-option v-for="(r, i) in roots" :key="i" :label="r" :value="i" />
               </el-select>
               <el-button :icon="'Refresh'" circle @click="load" />
               <!-- 宿主联动:在宿主文件管理器中打开当前目录 -->
-              <el-button v-if="hostAvailable" @click="openInHostFileManager">在文件管理器中打开</el-button>
+              <el-button v-if="hostAvailable" @click="openInHostFileManager">{{ t('admin.localFilesPage.openInFileManager') }}</el-button>
             </template>
           </div>
         </div>
@@ -20,95 +20,101 @@
       <div v-if="!featureDisabled" class="breadcrumb-bar">
         <el-breadcrumb separator="/">
           <el-breadcrumb-item>
-            <el-link type="primary" @click="goto('')">根目录</el-link>
+            <el-link type="primary" @click="goto('')">{{ t('admin.localFilesPage.root') }}</el-link>
           </el-breadcrumb-item>
           <el-breadcrumb-item v-for="seg in dirSegments" :key="seg.path">
             <el-link type="primary" @click="goto(seg.path)">{{ seg.name }}</el-link>
           </el-breadcrumb-item>
         </el-breadcrumb>
         <span v-if="!roots.length" class="empty-hint">
-          功能未启用：配置 upload.local_import.enabled 与 roots 后可用
+          {{ t('admin.localFilesPage.disabledHint') }}
         </span>
       </div>
 
       <!-- 功能不可用的引导态:不再发注定失败请求弹全局错误,直接说明配置路径。
            两种情形分级:未启用 vs 已启用但白名单目录为空(后端报错文案不同) -->
-      <el-empty v-if="featureDisabled" :description="noRootsGuide ? '未配置白名单目录' : '本地文件功能未启用'">
+      <el-empty v-if="featureDisabled" :description="noRootsGuide ? t('admin.localFilesPage.emptyNoRoots') : t('admin.localFilesPage.emptyDisabled')">
         <div class="disabled-guide">
           <p v-if="noRootsGuide">
-            本地导入已启用，但白名单目录为空。请在系统配置「上传与分享 → 本地导入」中添加绝对路径目录后重试。
+            {{ t('admin.localFilesPage.noRootsGuideBody') }}
           </p>
-          <p v-else>该功能需在服务端配置 <code>upload.local_import.enabled</code> 与白名单 <code>roots</code> 后可用。</p>
-          <el-button type="primary" @click="$router.push(adminBase + '/config')">前往系统配置</el-button>
+          <p v-else>
+            {{ t('admin.localFilesPage.disabledGuidePrefix') }}
+            <code>upload.local_import.enabled</code>
+            {{ t('admin.localFilesPage.disabledGuideMid') }}
+            <code>roots</code>
+            {{ t('admin.localFilesPage.disabledGuideSuffix') }}
+          </p>
+          <el-button type="primary" @click="$router.push(adminBase + '/config')">{{ t('admin.localFilesPage.goConfig') }}</el-button>
         </div>
       </el-empty>
       <el-table v-else v-loading="loading" :data="entries" style="width: 100%">
-        <el-table-column label="名称" min-width="280">
+        <el-table-column :label="t('admin.localFilesPage.colName')" min-width="280">
           <template #default="{ row }">
             <el-icon class="file-icon"><Document v-if="!row.is_dir" /><Folder v-else /></el-icon>
             <el-link v-if="row.is_dir" type="primary" @click="goto(row.path)">{{ row.name }}</el-link>
             <span v-else>{{ row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="大小" width="120">
+        <el-table-column :label="t('admin.size')" width="120">
           <template #default="{ row }">
             {{ row.is_dir ? '—' : formatFileSize(row.size) }}
           </template>
         </el-table-column>
-        <el-table-column label="修改时间" width="180">
+        <el-table-column :label="t('admin.localFilesPage.colModified')" width="180">
           <template #default="{ row }">{{ formatTime(row.mod_time) }}</template>
         </el-table-column>
-        <el-table-column label="操作" :width="hostAvailable ? 330 : 220" fixed="right">
+        <el-table-column :label="t('admin.localFilesPage.colActions')" :width="hostAvailable ? 330 : 220" fixed="right">
           <template #default="{ row }">
             <template v-if="!row.is_dir">
-              <el-button size="small" type="primary" @click="openImport(row)">生成提取码</el-button>
-              <el-button size="small" type="danger" plain @click="onDelete(row)">删除</el-button>
+              <el-button size="small" type="primary" @click="openImport(row)">{{ t('admin.localFilesPage.genCode') }}</el-button>
+              <el-button size="small" type="danger" plain @click="onDelete(row)">{{ t('admin.localFilesPage.delete') }}</el-button>
               <!-- 宿主联动:用宿主应用打开/查看详情 -->
               <template v-if="hostAvailable">
-                <el-button size="small" @click="openInHost(row)">打开</el-button>
-                <el-button size="small" @click="detailsInHost(row)">详情</el-button>
+                <el-button size="small" @click="openInHost(row)">{{ t('admin.localFilesPage.open') }}</el-button>
+                <el-button size="small" @click="detailsInHost(row)">{{ t('admin.localFilesPage.details') }}</el-button>
               </template>
             </template>
-            <el-button v-else-if="hostAvailable" size="small" @click="openDirInHost(row)">打开目录</el-button>
+            <el-button v-else-if="hostAvailable" size="small" @click="openDirInHost(row)">{{ t('admin.localFilesPage.openDir') }}</el-button>
           </template>
         </el-table-column>
-        <template #empty>目录为空</template>
+        <template #empty>{{ t('admin.localFilesPage.emptyDir') }}</template>
       </el-table>
     </el-card>
 
     <!-- 生成提取码对话框 -->
-    <el-dialog v-model="importVisible" title="本地文件生成提取码" width="480px">
+    <el-dialog v-model="importVisible" :title="t('admin.localFilesPage.importTitle')" width="480px">
       <el-form label-width="90px">
-        <el-form-item label="文件">
+        <el-form-item :label="t('admin.localFilesPage.fileLabel')">
           <span class="mono">{{ importForm.path }}</span>
         </el-form-item>
-        <el-form-item label="有效期">
+        <el-form-item :label="t('request.formExpire')">
           <el-input-number v-model="importForm.expire_value" :min="1" :max="3650" />
           <el-select v-model="importForm.expire_style" class="style-select">
-            <el-option label="天" value="day" />
-            <el-option label="周" value="week" />
-            <el-option label="月" value="month" />
-            <el-option label="年" value="year" />
-            <el-option label="永久" value="forever" />
+            <el-option :label="t('request.unitDay')" value="day" />
+            <el-option :label="t('request.unitWeek')" value="week" />
+            <el-option :label="t('request.unitMonth')" value="month" />
+            <el-option :label="t('request.unitYear')" value="year" />
+            <el-option :label="t('request.unitForever')" value="forever" />
           </el-select>
         </el-form-item>
-        <el-form-item label="取件密码">
+        <el-form-item :label="t('admin.localFilesPage.pickupPasswordLabel')">
           <el-switch v-model="importForm.require_auth" />
           <el-input
             v-if="importForm.require_auth"
             v-model="importForm.password"
             class="pwd-input"
-            placeholder="取件密码"
+            :placeholder="t('admin.localFilesPage.pickupPasswordPlaceholder')"
             show-password
           />
         </el-form-item>
-        <el-form-item label="自定义码">
-          <el-input v-model="importForm.custom_code" placeholder="留空则随机生成（登录态生效）" />
+        <el-form-item :label="t('admin.localFilesPage.customCodeLabel')">
+          <el-input v-model="importForm.custom_code" :placeholder="t('admin.localFilesPage.customCodePlaceholder')" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="importVisible = false">取消</el-button>
-        <el-button type="primary" :loading="importing" @click="doImport">生成</el-button>
+        <el-button @click="importVisible = false">{{ t('admin.localFilesPage.cancel') }}</el-button>
+        <el-button type="primary" :loading="importing" @click="doImport">{{ t('admin.localFilesPage.generate') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -120,11 +126,13 @@ const adminBase = getAdminBase()
 import { formatFileSize } from '@/utils/format'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import { Document, Folder } from '@element-plus/icons-vue'
 import { localFilesApi, type LocalFileEntry } from '@/api/localFiles'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { host } from '@/host'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 const roots = ref<string[]>([])
@@ -140,11 +148,11 @@ const noRootsGuide = ref(false)
 const hostAvailable = computed(() => host.capabilities.fileActions)
 
 const isDisabledMessage = (msg?: string) =>
-  !!msg && (msg.includes('本地文件功能未启用') || msg.includes('白名单目录'))
+  !!msg && (msg.includes(t('admin.localFilesPage.serverDisabledPattern')) || msg.includes(t('admin.localFilesPage.serverNoRootsPattern')))
 
 const applyDisabledState = (msg?: string) => {
   featureDisabled.value = true
-  noRootsGuide.value = !!msg && msg.includes('白名单目录')
+  noRootsGuide.value = !!msg && msg.includes(t('admin.localFilesPage.serverNoRootsPattern'))
 }
 
 const dirSegments = computed(() => {
@@ -167,7 +175,7 @@ const load = async () => {
     } else if (isDisabledMessage(resp.message)) {
       applyDisabledState(resp.message)
     } else {
-      ElMessage.error(resp.message || '加载本地文件失败')
+      ElMessage.error(resp.message || t('admin.localFilesPage.loadFailed'))
     }
   } catch (e) {
     const msg = (e as { message?: string })?.message
@@ -196,21 +204,23 @@ const currentDirPath = computed(() => {
 })
 
 // ---- 宿主文件动作(经宿主适配器 SPI;失败提示不含平台专名) ----
+const notInHostWarning = () => ElMessage.warning(t('admin.localFilesPage.notInHost'))
+
 const openInHostFileManager = async () => {
   if (!currentDirPath.value) return
-  if (!(await host.openDir(currentDirPath.value))) ElMessage.warning('当前未运行在受支持的宿主中')
+  if (!(await host.openDir(currentDirPath.value))) notInHostWarning()
 }
 
 const openInHost = async (row: LocalFileEntry) => {
-  if (!(await host.openFile(row.path))) ElMessage.warning('当前未运行在受支持的宿主中')
+  if (!(await host.openFile(row.path))) notInHostWarning()
 }
 
 const detailsInHost = async (row: LocalFileEntry) => {
-  if (!(await host.showFileDetails([row.path]))) ElMessage.warning('当前未运行在受支持的宿主中')
+  if (!(await host.showFileDetails([row.path]))) notInHostWarning()
 }
 
 const openDirInHost = async (row: LocalFileEntry) => {
-  if (!(await host.openDir(row.path))) ElMessage.warning('当前未运行在受支持的宿主中')
+  if (!(await host.openDir(row.path))) notInHostWarning()
 }
 
 const goto = (path: string) => {
@@ -220,17 +230,17 @@ const goto = (path: string) => {
 
 const onDelete = async (row: LocalFileEntry) => {
   try {
-    await ElMessageBox.confirm(`确定删除本地文件「${row.name}」？此操作不可恢复。`, '删除确认', {
+    await ElMessageBox.confirm(t('admin.localFilesPage.deleteConfirmBody', { name: row.name }), t('admin.localFilesPage.deleteConfirmTitle'), {
       type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
+      confirmButtonText: t('admin.localFilesPage.delete'),
+      cancelButtonText: t('admin.localFilesPage.cancel'),
     })
   } catch {
     return
   }
   try {
     await localFilesApi.remove(rootIdx.value, row.path)
-    ElMessage.success('已删除')
+    ElMessage.success(t('admin.localFilesPage.deleted'))
     load()
   } catch (e) {
     handleError(e)
@@ -263,7 +273,7 @@ const openImport = (row: LocalFileEntry) => {
 const doImport = async () => {
   const f = importForm.value
   if (f.require_auth && !f.password) {
-    ElMessage.warning('开启密码保护时必须填写密码')
+    ElMessage.warning(t('admin.localFilesPage.passwordRequired'))
     return
   }
   importing.value = true
@@ -278,16 +288,16 @@ const doImport = async () => {
       custom_code: f.custom_code || undefined,
     })
     if (!(resp.code === 0 || resp.code === 200)) {
-      ElMessage.error(resp.message || '导入失败')
+      ElMessage.error(resp.message || t('admin.localFilesPage.importFailed'))
       return
     }
     const data = resp.data
     importVisible.value = false
-    const codeText = data?.code ? `提取码：${data.code}` : '导入成功'
+    const codeText = data?.code ? t('admin.localFilesPage.importedCode', { code: data.code }) : t('admin.localFilesPage.imported')
     ElMessage.success(codeText)
     if (data?.share_url) {
       await navigator.clipboard?.writeText(data.share_url).catch(() => undefined)
-      ElMessage({ message: `分享链接已复制：${data.share_url}`, type: 'success', duration: 5000 })
+      ElMessage({ message: t('admin.localFilesPage.shareUrlCopied', { url: data.share_url }), type: 'success', duration: 5000 })
     }
   } catch (e) {
     handleError(e)

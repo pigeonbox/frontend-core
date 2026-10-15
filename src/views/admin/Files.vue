@@ -3,8 +3,8 @@
     <el-card shadow="never" class="files-card">
       <div class="card-header">
         <div class="header-title">
-          <h2>文件管理</h2>
-          <p>管理系统中的所有分享文件（支持按上传者 IP / 状态 / 类型定位滥用资源）</p>
+          <h2>{{ t('admin.files') }}</h2>
+          <p>{{ t('admin.filesPage.subtitle') }}</p>
         </div>
         <div class="header-actions">
           <el-button
@@ -13,7 +13,7 @@
             :disabled="!selectedIds.length"
             @click="batchSetStatus('blocked')"
           >
-            批量禁用{{ selectedIds.length ? `（${selectedIds.length}）` : '' }}
+            {{ selectedIds.length ? t('admin.filesPage.batchBlockCount', { n: selectedIds.length }) : t('admin.filesPage.batchBlock') }}
           </el-button>
           <el-button
             type="success"
@@ -21,7 +21,7 @@
             :disabled="!selectedIds.length"
             @click="batchSetStatus('normal')"
           >
-            批量恢复
+            {{ t('admin.filesPage.batchRestore') }}
           </el-button>
           <el-button
             type="warning"
@@ -29,7 +29,7 @@
             :disabled="!selectedIds.length"
             @click="batchExtendVisible = true"
           >
-            批量延期
+            {{ t('admin.filesPage.batchExtend') }}
           </el-button>
           <el-button
             type="danger"
@@ -37,11 +37,11 @@
             :disabled="!selectedIds.length"
             @click="batchDelete"
           >
-            批量删除
+            {{ t('admin.filesPage.batchDelete') }}
           </el-button>
           <el-button @click="reload()" :loading="loading" class="refresh-btn">
             <el-icon><Refresh /></el-icon>
-            刷新数据
+            {{ t('admin.filesPage.refresh') }}
           </el-button>
         </div>
       </div>
@@ -57,7 +57,7 @@
         @close="clearHealth"
       >
         <template #title>
-          健康过滤：{{ HEALTH_LABELS[filters.health] || filters.health }}
+          {{ t('admin.filesPage.healthFilter', { label: healthLabel(filters.health) }) }}
         </template>
       </el-alert>
 
@@ -65,55 +65,55 @@
       <div class="filter-bar">
         <el-input
           v-model="filters.keyword"
-          placeholder="取件码/文件名关键词"
+          :placeholder="t('admin.filesPage.keywordPlaceholder')"
           clearable
           style="width: 180px"
           @keyup.enter="applyFilters"
         />
-        <el-select v-model="filters.status" placeholder="状态" clearable style="width: 130px">
-          <el-option label="正常" value="normal" />
-          <el-option label="已禁用" value="blocked" />
-          <el-option label="待审核" value="pending_review" />
-          <el-option label="回收站（已删除）" value="deleted" />
+        <el-select v-model="filters.status" :placeholder="t('admin.filesPage.statusPlaceholder')" clearable style="width: 130px">
+          <el-option :label="t('admin.filesPage.statusNormal')" value="normal" />
+          <el-option :label="t('admin.filesPage.statusBlocked')" value="blocked" />
+          <el-option :label="t('admin.filesPage.statusPendingReview')" value="pending_review" />
+          <el-option :label="t('admin.filesPage.statusDeleted')" value="deleted" />
         </el-select>
-        <el-select v-model="filters.upload_type" placeholder="上传类型" clearable style="width: 130px">
-          <el-option label="匿名" value="anonymous" />
-          <el-option label="登录用户" value="authenticated" />
+        <el-select v-model="filters.upload_type" :placeholder="t('admin.filesPage.uploadTypePlaceholder')" clearable style="width: 130px">
+          <el-option :label="t('admin.filesPage.uploadTypeAnonymous')" value="anonymous" />
+          <el-option :label="t('admin.filesPage.uploadTypeAuthenticated')" value="authenticated" />
         </el-select>
-        <el-select v-model="filters.expired" placeholder="过期状态" clearable style="width: 120px">
-          <el-option label="未过期" value="false" />
-          <el-option label="已过期" value="true" />
+        <el-select v-model="filters.expired" :placeholder="t('admin.filesPage.expiredPlaceholder')" clearable style="width: 120px">
+          <el-option :label="t('admin.filesPage.expiredNo')" value="false" />
+          <el-option :label="t('admin.filesPage.expiredYes')" value="true" />
         </el-select>
         <el-input
           v-model="filters.owner_ip"
-          placeholder="上传者 IP"
+          :placeholder="t('admin.filesPage.ipPlaceholder')"
           clearable
           style="width: 140px"
           @keyup.enter="applyFilters"
         />
         <el-input
           v-model="filters.user_id"
-          placeholder="用户 ID"
+          :placeholder="t('admin.filesPage.userIdPlaceholder')"
           clearable
           style="width: 110px"
           @keyup.enter="applyFilters"
         />
-        <el-button type="primary" @click="applyFilters">查询</el-button>
-        <el-button @click="resetFilters">重置</el-button>
+        <el-button type="primary" @click="applyFilters">{{ t('admin.filesPage.apply') }}</el-button>
+        <el-button @click="resetFilters">{{ t('admin.filesPage.reset') }}</el-button>
 
         <!-- 保存视图（2026-10-12 对标上游 view-presets）：筛选条件存为命名视图一键切换 -->
         <el-divider direction="vertical" />
         <el-select
           v-model="activeView"
-          placeholder="保存的视图"
+          :placeholder="t('admin.filesPage.savedViewsPlaceholder')"
           clearable
           style="width: 140px"
           @change="applyView"
         >
           <el-option v-for="v in savedViews" :key="v.name" :label="v.name" :value="v.name" />
         </el-select>
-        <el-button @click="saveCurrentView">保存视图</el-button>
-        <el-button :disabled="!activeView" @click="removeActiveView">删除视图</el-button>
+        <el-button @click="saveCurrentView">{{ t('admin.filesPage.saveView') }}</el-button>
+        <el-button :disabled="!activeView" @click="removeActiveView">{{ t('admin.filesPage.deleteView') }}</el-button>
       </div>
 
       <el-table
@@ -123,7 +123,7 @@
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="44" />
-        <el-table-column label="文件信息" min-width="230">
+        <el-table-column :label="t('admin.filesPage.colFileInfo')" min-width="230">
           <template #default="{ row }">
             <div class="file-info">
               <div class="file-icon">
@@ -134,8 +134,8 @@
               <div class="file-details">
                 <div class="file-name">
                   {{ row.file_name || row.code }}
-                  <el-tag v-if="row.is_text" size="small" type="success">文本</el-tag>
-                  <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info">{{ row.file_count }} 个文件</el-tag>
+                  <el-tag v-if="row.is_text" size="small" type="success">{{ t('admin.filesPage.tagText') }}</el-tag>
+                  <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info">{{ t('admin.filesPage.fileCount', { n: row.file_count }) }}</el-tag>
                 </div>
                 <div v-if="row.is_text && row.text_preview" class="text-preview">
                   {{ row.text_preview }}
@@ -150,7 +150,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="size" label="大小" width="100" align="center">
+        <el-table-column prop="size" :label="t('admin.size')" width="100" align="center">
           <template #default="{ row }">
             <el-tag type="info" effect="plain">
               {{ formatFileSize(row.size) }}
@@ -158,7 +158,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="状态" width="96" align="center">
+        <el-table-column :label="t('admin.filesPage.colStatus')" width="96" align="center">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)" effect="dark">
               {{ statusLabel(row.status) }}
@@ -166,22 +166,22 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="上传者" width="100" align="center">
+        <el-table-column :label="t('admin.uploader')" width="100" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.user_id" type="info">
               ID: {{ row.user_id }}
             </el-tag>
-            <span v-else class="anonymous">匿名</span>
+            <span v-else class="anonymous">{{ t('admin.filesPage.anonymous') }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="owner_ip" label="上传 IP" width="130" align="center">
+        <el-table-column prop="owner_ip" :label="t('admin.filesPage.colIp')" width="130" align="center">
           <template #default="{ row }">
             <span class="owner-ip">{{ row.owner_ip || '-' }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="used_count" label="下载次数" width="96" align="center">
+        <el-table-column prop="used_count" :label="t('admin.filesPage.colDownloads')" width="96" align="center">
           <template #default="{ row }">
             <div class="download-count">
               <el-icon><Download /></el-icon>
@@ -190,13 +190,13 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="created_at" label="创建时间" width="170">
+        <el-table-column prop="created_at" :label="t('admin.createdAt')" width="170">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
           </template>
         </el-table-column>
 
-        <el-table-column prop="expired_at" label="过期时间" width="170">
+        <el-table-column prop="expired_at" :label="t('admin.filesPage.colExpiresAt')" width="170">
           <template #default="{ row }">
             <div :class="['expire-time', { expired: isExpired(row.expired_at) }]">
               {{ formatDate(row.expired_at) }}
@@ -204,11 +204,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="260" align="center" fixed="right">
+        <el-table-column :label="t('admin.filesPage.colActions')" width="260" align="center" fixed="right">
           <template #default="{ row }">
             <template v-if="row.deleted">
-              <el-button type="success" size="small" round @click="restoreDeleted(row)">恢复</el-button>
-              <el-button type="danger" size="small" round @click="purgeDeleted(row)">彻底删除</el-button>
+              <el-button type="success" size="small" round @click="restoreDeleted(row)">{{ t('admin.filesPage.restore') }}</el-button>
+              <el-button type="danger" size="small" round @click="purgeDeleted(row)">{{ t('admin.filesPage.purge') }}</el-button>
             </template>
             <template v-else>
             <el-button
@@ -218,7 +218,7 @@
               round
               @click="setStatus(row, 'blocked')"
             >
-              禁用
+              {{ t('admin.filesPage.block') }}
             </el-button>
             <el-button
               v-else
@@ -227,7 +227,7 @@
               round
               @click="setStatus(row, 'normal')"
             >
-              恢复
+              {{ t('admin.filesPage.restore') }}
             </el-button>
             <el-button
               v-if="!row.is_text"
@@ -235,9 +235,9 @@
               round
               @click="downloadFile(row)"
             >
-              下载
+              {{ t('admin.filesPage.download') }}
             </el-button>
-            <el-button size="small" round @click="openEdit(row)">编辑</el-button>
+            <el-button size="small" round @click="openEdit(row)">{{ t('admin.filesPage.edit') }}</el-button>
             <el-button
               type="danger"
               size="small"
@@ -245,7 +245,7 @@
               round
             >
               <el-icon><Delete /></el-icon>
-              删除
+              {{ t('admin.filesPage.delete') }}
             </el-button>
             </template>
           </template>
@@ -267,44 +267,44 @@
     </el-card>
 
     <!-- 编辑（延期/次数） -->
-    <el-dialog v-model="editVisible" title="编辑分享" width="420px">
+    <el-dialog v-model="editVisible" :title="t('admin.filesPage.editTitle')" width="420px">
       <el-form label-width="100px">
-        <el-form-item label="文件">
+        <el-form-item :label="t('admin.filesPage.editFileLabel')">
           <span>{{ editTarget?.file_name || editTarget?.code }}</span>
         </el-form-item>
-        <el-form-item label="延长有效期">
+        <el-form-item :label="t('admin.filesPage.extendLabel')">
           <el-select v-model="editForm.expireValue" style="width: 100%">
-            <el-option label="1 天" :value="1" />
-            <el-option label="7 天" :value="7" />
-            <el-option label="30 天" :value="30" />
-            <el-option label="90 天" :value="90" />
-            <el-option label="1 年" :value="365" />
+            <el-option :label="t('admin.filesPage.dayOption', { n: 1 })" :value="1" />
+            <el-option :label="t('admin.filesPage.dayOption', { n: 7 })" :value="7" />
+            <el-option :label="t('admin.filesPage.dayOption', { n: 30 })" :value="30" />
+            <el-option :label="t('admin.filesPage.dayOption', { n: 90 })" :value="90" />
+            <el-option :label="t('admin.filesPage.yearOption', { n: 1 })" :value="365" />
           </el-select>
         </el-form-item>
-        <el-form-item label="剩余次数">
+        <el-form-item :label="t('admin.filesPage.remainCountLabel')">
           <el-input-number v-model="editForm.expiredCount" :min="-1" :max="999999" />
-          <div class="form-hint">-1 表示不限次数</div>
+          <div class="form-hint">{{ t('admin.filesPage.unlimitedHint') }}</div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitEdit">保存</el-button>
+        <el-button @click="editVisible = false">{{ t('admin.filesPage.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="submitEdit">{{ t('admin.filesPage.save') }}</el-button>
       </template>
     </el-dialog>
 
     <!-- 批量延期 -->
-    <el-dialog v-model="batchExtendVisible" title="批量延期" width="420px">
-      <p class="form-hint">将选中的 {{ selectedIds.length }} 个分享的过期时间重置为：</p>
+    <el-dialog v-model="batchExtendVisible" :title="t('admin.filesPage.batchExtend')" width="420px">
+      <p class="form-hint">{{ t('admin.filesPage.batchExtendHint', { n: selectedIds.length }) }}</p>
       <el-select v-model="batchExtendValue" style="width: 100%">
-        <el-option label="1 天" :value="1" />
-        <el-option label="7 天" :value="7" />
-        <el-option label="30 天" :value="30" />
-        <el-option label="90 天" :value="90" />
-        <el-option label="1 年" :value="365" />
+        <el-option :label="t('admin.filesPage.dayOption', { n: 1 })" :value="1" />
+        <el-option :label="t('admin.filesPage.dayOption', { n: 7 })" :value="7" />
+        <el-option :label="t('admin.filesPage.dayOption', { n: 30 })" :value="30" />
+        <el-option :label="t('admin.filesPage.dayOption', { n: 90 })" :value="90" />
+        <el-option :label="t('admin.filesPage.yearOption', { n: 1 })" :value="365" />
       </el-select>
       <template #footer>
-        <el-button @click="batchExtendVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="submitBatchExtend">确认延期</el-button>
+        <el-button @click="batchExtendVisible = false">{{ t('admin.filesPage.cancel') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="submitBatchExtend">{{ t('admin.filesPage.confirmExtend') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -314,6 +314,7 @@
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI18n } from 'vue-i18n'
 import {
   Refresh, Document, Picture, Download, Delete,
   VideoPlay, Headset, Reading
@@ -323,6 +324,7 @@ import { loadViews, saveView, deleteView } from '@/utils/savedViews'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
+const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
 type FileStatus = 'normal' | 'blocked' | 'pending_review'
@@ -368,13 +370,16 @@ const filters = reactive({
   user_id: ''
 })
 
-const HEALTH_LABELS: Record<string, string> = {
-  active: '可取件',
-  expired: '已过期',
-  expiring_soon: '即将过期',
-  never_picked: '未取件',
-  forever: '永久有效',
+// 健康过滤标签复用 admin.health 族（与仪表盘洞察卡同源）
+const HEALTH_KEYS: Record<string, string> = {
+  active: 'admin.health.active',
+  expired: 'admin.health.expired',
+  expiring_soon: 'admin.health.expiringSoon',
+  never_picked: 'admin.health.neverPicked',
+  forever: 'admin.health.forever',
 }
+
+const healthLabel = (h: string): string => (HEALTH_KEYS[h] ? t(HEALTH_KEYS[h]) : h)
 
 const clearHealth = () => {
   filters.health = ''
@@ -397,9 +402,9 @@ const isExpired = (dateStr: string): boolean => {
 
 const statusLabel = (status: string): string => {
   switch (status) {
-    case 'blocked': return '已禁用'
-    case 'pending_review': return '待审核'
-    default: return '正常'
+    case 'blocked': return t('admin.filesPage.statusBlocked')
+    case 'pending_review': return t('admin.filesPage.statusPendingReview')
+    default: return t('admin.filesPage.statusNormal')
   }
 }
 
@@ -470,14 +475,14 @@ const activeView = ref('')
 
 const saveCurrentView = async () => {
   try {
-    const { value } = await ElMessageBox.prompt('当前筛选条件将保存为命名视图（同名覆盖）', '保存视图', {
+    const { value } = await ElMessageBox.prompt(t('admin.filesPage.saveViewPrompt'), t('admin.filesPage.saveView'), {
       inputValue: activeView.value || '',
       inputPattern: /\S/,
-      inputErrorMessage: '视图名称不能为空'
+      inputErrorMessage: t('admin.filesPage.viewNameRequired')
     })
     savedViews.value = saveView(FILE_VIEWS_KEY, value, { ...filters })
     activeView.value = value.trim()
-    ElMessage.success(`视图「${activeView.value}」已保存`)
+    ElMessage.success(t('admin.filesPage.viewSaved', { name: activeView.value }))
   } catch {
     // 用户取消
   }
@@ -497,17 +502,17 @@ const applyView = (name: string) => {
 const removeActiveView = () => {
   if (!activeView.value) return
   savedViews.value = deleteView(FILE_VIEWS_KEY, activeView.value)
-  ElMessage.success(`视图「${activeView.value}」已删除`)
+  ElMessage.success(t('admin.filesPage.viewDeleted', { name: activeView.value }))
   activeView.value = ''
 }
 
 // ==================== 管控状态机 ====================
 const restoreDeleted = async (row: any) => {
   try {
-    await ElMessageBox.confirm(`确认恢复「${row.code}」到文件列表？`, '恢复', { type: 'info' })
+    await ElMessageBox.confirm(t('admin.filesPage.restoreConfirmBody', { code: row.code }), t('admin.filesPage.restore'), { type: 'info' })
     const res = await adminApi.restoreFiles([row.id])
     if (res.code === 200) {
-      ElMessage.success('已恢复')
+      ElMessage.success(t('admin.filesPage.restored'))
       reload()
     }
   } catch (e) {
@@ -518,13 +523,13 @@ const restoreDeleted = async (row: any) => {
 const purgeDeleted = async (row: any) => {
   try {
     await ElMessageBox.confirm(
-      `彻底删除「${row.code}」？DB 记录与存储对象将被永久删除，不可恢复！`,
-      '彻底删除',
-      { type: 'error', confirmButtonText: '彻底删除' }
+      t('admin.filesPage.purgeConfirmBody', { code: row.code }),
+      t('admin.filesPage.purge'),
+      { type: 'error', confirmButtonText: t('admin.filesPage.purge') }
     )
     const res = await adminApi.purgeFiles([row.id])
     if (res.code === 200) {
-      ElMessage.success('已彻底删除')
+      ElMessage.success(t('admin.filesPage.purged'))
       reload()
     }
   } catch (e) {
@@ -533,13 +538,14 @@ const purgeDeleted = async (row: any) => {
 }
 
 const setStatus = async (row: any, status: FileStatus) => {
-  const action = status === 'blocked' ? '禁用' : '恢复'
+  const isBlock = status === 'blocked'
   try {
     await ElMessageBox.confirm(
-      `确定要${action}分享 ${row.file_name || row.code} 吗？` +
-        (status === 'blocked' ? '禁用后任何人无法取件，记录保留可恢复。' : ''),
-      `确认${action}`,
-      { type: status === 'blocked' ? 'warning' : 'info' }
+      isBlock
+        ? t('admin.filesPage.blockConfirmBody', { name: row.file_name || row.code })
+        : t('admin.filesPage.restoreShareConfirmBody', { name: row.file_name || row.code }),
+      isBlock ? t('admin.filesPage.blockConfirmTitle') : t('admin.filesPage.restoreShareConfirmTitle'),
+      { type: isBlock ? 'warning' : 'info' }
     )
   } catch {
     return
@@ -547,23 +553,25 @@ const setStatus = async (row: any, status: FileStatus) => {
   try {
     const res = await adminApi.setFileStatus(row.id, status)
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success(`${action}成功`)
+      ElMessage.success(isBlock ? t('admin.filesPage.blockDone') : t('admin.filesPage.restoreDone'))
       await fetchFiles()
     } else {
-      ElMessage.error(res.message || `${action}失败`)
+      ElMessage.error(res.message || (isBlock ? t('admin.filesPage.blockFailed') : t('admin.filesPage.restoreFailed')))
     }
   } catch (e: any) {
-    ElMessage.error(e.message || `${action}失败`)
+    ElMessage.error(e.message || (isBlock ? t('admin.filesPage.blockFailed') : t('admin.filesPage.restoreFailed')))
   }
 }
 
 const batchSetStatus = async (status: FileStatus) => {
-  const action = status === 'blocked' ? '禁用' : '恢复'
+  const isBlock = status === 'blocked'
   try {
     await ElMessageBox.confirm(
-      `确定要批量${action}选中的 ${selectedIds.value.length} 个分享吗？`,
-      `批量${action}`,
-      { type: status === 'blocked' ? 'warning' : 'info' }
+      isBlock
+        ? t('admin.filesPage.batchBlockConfirmBody', { n: selectedIds.value.length })
+        : t('admin.filesPage.batchRestoreConfirmBody', { n: selectedIds.value.length }),
+      isBlock ? t('admin.filesPage.batchBlock') : t('admin.filesPage.batchRestore'),
+      { type: isBlock ? 'warning' : 'info' }
     )
   } catch {
     return
@@ -571,39 +579,40 @@ const batchSetStatus = async (status: FileStatus) => {
   try {
     const res = await adminApi.batchSetFileStatus(selectedIds.value, status)
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success(`已${action} ${res.data?.affected ?? selectedIds.value.length} 个`)
+      const n = res.data?.affected ?? selectedIds.value.length
+      ElMessage.success(isBlock ? t('admin.filesPage.batchBlockDone', { n }) : t('admin.filesPage.batchRestoreDone', { n }))
       await fetchFiles()
     } else {
-      ElMessage.error(res.message || `批量${action}失败`)
+      ElMessage.error(res.message || (isBlock ? t('admin.filesPage.batchBlockFailed') : t('admin.filesPage.batchRestoreFailed')))
     }
   } catch (e: any) {
-    ElMessage.error(e.message || `批量${action}失败`)
+    ElMessage.error(e.message || (isBlock ? t('admin.filesPage.batchBlockFailed') : t('admin.filesPage.batchRestoreFailed')))
   }
 }
 
 const deleteFile = async (file: any) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除文件 ${file.file_name || file.code} 吗？`,
-      '确认删除',
+      t('admin.filesPage.deleteConfirmBody', { name: file.file_name || file.code }),
+      t('admin.filesPage.deleteConfirmTitle'),
       {
         type: 'warning',
-        confirmButtonText: '确定删除',
-        cancelButtonText: '取消'
+        confirmButtonText: t('admin.filesPage.deleteConfirmBtn'),
+        cancelButtonText: t('admin.filesPage.cancel')
       }
     )
 
     // 使用 code 而不是 ID
     const res = await adminApi.deleteFileByCode(file.code)
     if (res.code === 200 || res.code === 0) {
-      ElMessage.success('删除成功')
+      ElMessage.success(t('admin.filesPage.deleteDone'))
       await fetchFiles()
     } else {
-      handleError(new Error(res.message || '删除失败'))
+      handleError(new Error(res.message || t('admin.filesPage.deleteFailed')))
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+      ElMessage.error(t('admin.filesPage.deleteFailed'))
     }
   }
 }
@@ -620,8 +629,8 @@ const onSelectionChange = (rows: any[]) => {
 const batchDelete = async () => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除选中的 ${selectedIds.value.length} 个分享吗？`,
-      '批量删除',
+      t('admin.filesPage.batchDeleteConfirmBody', { n: selectedIds.value.length }),
+      t('admin.filesPage.batchDelete'),
       { type: 'warning' }
     )
   } catch {
@@ -631,10 +640,10 @@ const batchDelete = async () => {
   try {
     const res = await adminApi.batchDeleteFilesByIds(selectedIds.value)
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success(`已删除 ${res.data?.deleted ?? selectedIds.value.length} 个`)
+      ElMessage.success(t('admin.filesPage.batchDeleteDone', { n: res.data?.deleted ?? selectedIds.value.length }))
       await fetchFiles()
     } else {
-      handleError(new Error(res.message || '批量删除失败'))
+      handleError(new Error(res.message || t('admin.filesPage.batchDeleteFailed')))
     }
   } catch (e: any) {
     handleError(e)
@@ -650,11 +659,11 @@ const submitBatchExtend = async () => {
   try {
     const res = await adminApi.batchExtendFiles(selectedIds.value, batchExtendValue.value, 'day')
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success(`已延期 ${res.data?.extended ?? selectedIds.value.length} 个`)
+      ElMessage.success(t('admin.filesPage.batchExtendDone', { n: res.data?.extended ?? selectedIds.value.length }))
       batchExtendVisible.value = false
       await fetchFiles()
     } else {
-      handleError(new Error(res.message || '批量延期失败'))
+      handleError(new Error(res.message || t('admin.filesPage.batchExtendFailed')))
     }
   } catch (e: any) {
     handleError(e)
@@ -684,11 +693,11 @@ const submitEdit = async () => {
       expired_count: editForm.expiredCount
     })
     if (res.code === 0 || res.code === 200) {
-      ElMessage.success('已保存')
+      ElMessage.success(t('admin.filesPage.saved'))
       editVisible.value = false
       await fetchFiles()
     } else {
-      handleError(new Error(res.message || '保存失败'))
+      handleError(new Error(res.message || t('admin.filesPage.saveFailed')))
     }
   } catch (e: any) {
     handleError(e)
@@ -715,7 +724,7 @@ const downloadFile = async (row: any) => {
     a.remove()
     URL.revokeObjectURL(url)
   } catch (e: any) {
-    ElMessage.error(e?.response?.status === 401 ? '登录已过期，请重新登录' : '下载失败')
+    ElMessage.error(e?.response?.status === 401 ? t('admin.filesPage.sessionExpired') : t('admin.filesPage.downloadFailed'))
   }
 }
 

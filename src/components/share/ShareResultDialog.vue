@@ -143,7 +143,7 @@ const shareCode = ref('')
 const qrCodeDataUrl = ref('')
 // E2E 密钥（有值时弹窗提示"链接含解密密钥"）
 const shareE2EKey = ref('')
-// 6 位取件码（文件分享铸造；空=文本/永久分享）
+// 6 位取件码（文本/文件分享同权铸造；空=E2E 密文等未铸造场景）
 const sharePickupCode = ref('')
 // 命令行 Tab 可用性判定载荷
 const shareFileName = ref('')
@@ -228,7 +228,7 @@ const copyShareUrl = async () => {
 
 const copyShareCode = async () => {
   const ok = await copyToClipboard(shareCode.value)
-  if (ok) ElMessage.success(t('home.codeCopied') || t('home.linkCopied'))
+  if (ok) ElMessage.success(t('home.shareMethod.codeCopied'))
   else ElMessage.error(t('home.copyLinkFailed'))
 }
 

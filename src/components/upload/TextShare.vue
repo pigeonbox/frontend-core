@@ -42,6 +42,7 @@ import { Promotion } from '@element-plus/icons-vue'
 import { encryptText, generateKeyB64 } from '@/utils/e2e'
 import { useUserStore } from '@/stores/user'
 import { useShareSettings } from '@/composables/useShareSettings'
+import { translateError } from '@/utils/api-interceptor'
 import ShareSettingsForm from '@/components/share/ShareSettingsForm.vue'
 
 const { t } = useI18n()
@@ -55,6 +56,7 @@ const emit = defineEmits<{
     e2e_key?: string
     file_name?: string
     has_password?: boolean
+    pickup_code?: string
   }]
 }>()
 
@@ -109,6 +111,8 @@ const handleShare = async () => {
         e2e_key: e2eKey || undefined,
         // file_name 故意不传：文本分享无直链下载端点，成功弹窗据此隐藏命令行 Tab
         has_password: !!settings.password,
+        // 文本/文件分享同权铸造 6 位取件码（E2E 密文分享为空），成功弹窗展示快捷卡
+        pickup_code: res.data.pickup_code || undefined,
       })
 
       // 重置
@@ -116,8 +120,10 @@ const handleShare = async () => {
     } else {
       throw new Error(res.message || t('upload.textShareFailed'))
     }
-  } catch (error: any) {
-    ElMessage.error(error.message || t('upload.textShareFailed'))
+  } catch (error: unknown) {
+    // 错误码统一翻译（errcode/网络/HTTP 兜底），不裸抛后端英文原文
+    const tr = translateError(error)
+    ElMessage.error(tr.i18nKey ? t(tr.i18nKey) : tr.fallback || t('upload.textShareFailed'))
   } finally {
     sharing.value = false
   }
