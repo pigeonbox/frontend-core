@@ -33,6 +33,13 @@ const ACCENT_PROPS = [
   '--primary-bg',
   '--primary-color-rgb',
   '--primary-gradient',
+  // 仪表盘统计卡图标色调 2-4（Dashboard.vue tone-violet/teal/amber 消费）
+  '--stat-tone-2-color',
+  '--stat-tone-2-bg',
+  '--stat-tone-3-color',
+  '--stat-tone-3-bg',
+  '--stat-tone-4-color',
+  '--stat-tone-4-bg',
 ]
 
 const WHITE: Rgb = { r: 255, g: 255, b: 255 }
@@ -62,8 +69,58 @@ const lighten = (c: Rgb, ratio: number): Rgb => mix(c, WHITE, ratio)
 
 const rgb = (c: Rgb): string => `rgb(${c.r}, ${c.g}, ${c.b})`
 
+function hslToRgb(h: number, s: number, l: number): Rgb {
+  const c = (1 - Math.abs(2 * l - 1)) * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = l - c / 2
+  let t: [number, number, number]
+  if (h < 60) t = [c, x, 0]
+  else if (h < 120) t = [x, c, 0]
+  else if (h < 180) t = [0, c, x]
+  else if (h < 240) t = [0, x, c]
+  else if (h < 300) t = [x, 0, c]
+  else t = [c, 0, x]
+  return {
+    r: Math.round((t[0] + m) * 255),
+    g: Math.round((t[1] + m) * 255),
+    b: Math.round((t[2] + m) * 255),
+  }
+}
+
+/** 色相旋转 deg 度（饱和度/亮度不变）；灰阶（d≈0）原样返回 */
+function rotateHue(c: Rgb, deg: number): Rgb {
+  const r = c.r / 255, g = c.g / 255, b = c.b / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b)
+  const d = max - min
+  if (d < 1e-6) return c
+  const l = (max + min) / 2
+  const s = d / (1 - Math.abs(2 * l - 1))
+  let h: number
+  if (max === r) h = ((g - b) / d) % 6
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+  h = ((h * 60 + deg) % 360 + 360) % 360
+  return hslToRgb(h, s, l)
+}
+
+// 统计卡图标色调 2-4 = 主色色相偏移派生（+30/-60/+160）：默认靛蓝(#5e6ad2)
+// 下恰好落在 main.scss 预填的紫/青绿/琥珀色相上，语义四色构图不变；
+// 灰阶主题（ink）旋转后仍近灰阶，图标随之去彩色。
+const TONE_HUE_OFFSETS = [30, -60, 160] as const
+
+function toneVars(base: Rgb, dark: boolean): Record<string, string> {
+  const out: Record<string, string> = {}
+  TONE_HUE_OFFSETS.forEach((off, i) => {
+    const tone = dark ? lighten(rotateHue(base, off), 0.3) : rotateHue(base, off)
+    const alpha = dark ? 0.16 : 0.1
+    out[`--stat-tone-${i + 2}-color`] = rgb(tone)
+    out[`--stat-tone-${i + 2}-bg`] = `rgba(${tone.r}, ${tone.g}, ${tone.b}, ${alpha})`
+  })
+  return out
+}
+
 export interface ResolvedAccent {
-  /** CSS 变量 → 值（含 --el-color-primary 系与 --primary-* 家族） */
+  /** CSS 变量 → 值（含 --el-color-primary 系、--primary-* 家族与 --stat-tone-* 派生色调） */
   vars: Record<string, string>
   /** 规范化为 6 位 hex 的 accent（供首帧引导缓存） */
   hex: string
@@ -98,6 +155,9 @@ export function resolveAccent(raw: string | null | undefined, dark: boolean): Re
     '--primary-bg': dark ? `rgba(${base.r}, ${base.g}, ${base.b}, 0.14)` : rgb(mix(base, WHITE, 0.9)),
     '--primary-color-rgb': `${base.r}, ${base.g}, ${base.b}`,
     '--primary-gradient': `linear-gradient(135deg, ${rgb(base)} 0%, ${rgb(base)} 100%)`,
+    // 仪表盘统计卡图标色调 2-4（随主色派生；深浅模式各自的底色透明度与
+    // main.scss 预填值同款）
+    ...toneVars(accent, dark),
   }
   const hex = '#' + [accent.r, accent.g, accent.b]
     .map((v) => v.toString(16).padStart(2, '0'))

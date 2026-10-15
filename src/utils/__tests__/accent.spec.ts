@@ -53,9 +53,39 @@ describe('resolveAccent', () => {
     }
   })
 
-  it('输出恰好覆盖 13 个主题变量', () => {
+  it('浅色：统计卡图标色调 2-4 按主色色相偏移(+30/-60/+160)派生', () => {
+    const v = V('#5e6ad2', false)
+    // 偏移量按默认靛蓝(#5e6ad2)校准,恰好落在 main.scss 预填的紫/青绿/琥珀色相上
+    expect(v['--stat-tone-2-color']).toBe('rgb(140, 94, 210)')
+    expect(v['--stat-tone-2-bg']).toBe('rgba(140, 94, 210, 0.1)')
+    expect(v['--stat-tone-3-color']).toBe('rgb(94, 210, 198)')
+    expect(v['--stat-tone-3-bg']).toBe('rgba(94, 210, 198, 0.1)')
+    expect(v['--stat-tone-4-color']).toBe('rgb(210, 159, 94)')
+    expect(v['--stat-tone-4-bg']).toBe('rgba(210, 159, 94, 0.1)')
+  })
+
+  it('深色：色调 2-4 同步提亮 30%，底色透明度 0.16', () => {
+    const v = V('#5e6ad2', true)
+    expect(v['--stat-tone-2-color']).toBe('rgb(175, 142, 224)')
+    expect(v['--stat-tone-2-bg']).toBe('rgba(175, 142, 224, 0.16)')
+    expect(v['--stat-tone-3-color']).toBe('rgb(142, 224, 215)')
+    expect(v['--stat-tone-4-color']).toBe('rgb(224, 188, 142)')
+  })
+
+  it('灰阶 accent（ink）旋转后仍近灰阶，图标随主题去彩色', () => {
+    const v = V('#18181b', false)
+    const channelSpread = (s: string) => {
+      const n = (s.match(/\d+/g) ?? []).map(Number)
+      return Math.max(...n) - Math.min(...n)
+    }
+    for (const key of ['--stat-tone-2-color', '--stat-tone-3-color', '--stat-tone-4-color']) {
+      expect(channelSpread(v[key] ?? '')).toBeLessThanOrEqual(4)
+    }
+  })
+
+  it('输出恰好覆盖 19 个主题变量', () => {
     const v = V('#7c3aed', false)
-    expect(Object.keys(v).length).toBe(13)
+    expect(Object.keys(v).length).toBe(19)
     expect(v[ACCENT_CACHE_KEY as never]).toBeUndefined()
   })
 })

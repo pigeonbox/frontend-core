@@ -4,7 +4,7 @@
       <!-- Logo 区 -->
       <div class="setup-header">
         <div class="logo-icon">
-          <img src="/favicon.svg" alt="PigeonBox" class="logo-img" />
+          <BrandLogo class="logo-img" />
         </div>
         <h1>{{ t('setup.title') }}</h1>
         <p class="setup-desc">{{ t('setup.description') }}</p>

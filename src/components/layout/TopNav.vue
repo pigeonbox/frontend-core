@@ -4,7 +4,7 @@
       <slot name="leading" />
       <div class="logo-section" @click="goHome">
         <div class="logo-icon">
-          <img src="/favicon.svg" alt="PigeonBox" class="logo-img" />
+          <BrandLogo class="logo-img" />
         </div>
         <component :is="variant === 'home' ? 'h1' : 'span'" class="logo-text">
           {{ configStore.siteName() }}

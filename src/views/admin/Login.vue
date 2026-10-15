@@ -3,7 +3,7 @@
     <div class="login-card">
       <div class="login-header">
         <div class="logo-icon">
-          <img src="/favicon.svg" alt="PigeonBox" class="logo-img" />
+          <BrandLogo class="logo-img" />
         </div>
         <h1>PigeonBox</h1>
         <p>{{ t('admin.adminLogin.title') }}</p>
