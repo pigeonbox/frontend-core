@@ -966,7 +966,13 @@ const fireNotify = (task: P2pTask) => {
       body: `${task.kind === 'send' ? t('admin.p2p.kindSend') : t('admin.p2p.kindRecv')} · ${task.code || task.id}`,
       tag: `p2p-${task.id}`,
     })
-    n.onclick = () => { window.focus(); n.close() }
+    n.onclick = () => {
+      window.focus()
+      n.close()
+      // 点击直达:聚焦并打开该任务的详情抽屉（刚到终态,列表必含）
+      const fresh = tasks.value.find((x) => x.id === task.id)
+      if (fresh) openDetail(fresh)
+    }
   } catch { /* 通知通道异常静默 */ }
 }
 
