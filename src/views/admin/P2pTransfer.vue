@@ -51,26 +51,60 @@
         <el-col :xs="24" :md="12">
           <el-card class="p2p-card">
             <template #header>{{ t('admin.p2p.sendTitle') }}</template>
-            <el-input
-              v-model="sendPathsText"
-              type="textarea"
-              :rows="4"
-              :placeholder="t('admin.p2p.sendPathsPlaceholder')"
-            />
-            <div class="whitelist-chips" v-if="sendRoots.length">
-              <span class="dim">{{ t('admin.p2p.whitelistChipsLabel') }}</span>
-              <el-tag
-                v-for="root in sendRoots"
-                :key="root"
-                class="whitelist-chip"
-                @click="appendSendRoot(root)"
-              >{{ root }}</el-tag>
-            </div>
-            <div class="whitelist-chips" v-else>
-              <span class="dim">{{ t('admin.p2p.whitelistEmpty') }}
-                <el-link size="small" @click="goConfig">{{ t('admin.p2p.goConfig') }}</el-link>
-              </span>
-            </div>
+            <!-- 双来源：本机文件（浏览器上传直发）/ 服务器路径（白名单）2026-10-15 -->
+            <el-radio-group v-model="sendMode" size="small" class="send-mode">
+              <el-radio-button value="upload">{{ t('admin.p2p.sendModeUpload') }}</el-radio-button>
+              <el-radio-button value="path">{{ t('admin.p2p.sendModePath') }}</el-radio-button>
+            </el-radio-group>
+
+            <!-- 本机文件：拖放上传直发（p2pcweb 同款体验） -->
+            <template v-if="sendMode === 'upload'">
+              <el-upload
+                v-model:file-list="uploadFiles"
+                drag
+                multiple
+                :auto-upload="false"
+                :limit="20"
+                :on-exceed="onUploadExceed"
+              >
+                <div class="upload-drop">
+                  <el-icon class="upload-ic"><UploadFilled /></el-icon>
+                  <div class="upload-t">{{ t('admin.p2p.uploadDrag') }}</div>
+                  <div class="dim">{{ t('admin.p2p.uploadLimit') }}</div>
+                </div>
+              </el-upload>
+              <el-progress
+                v-if="uploading"
+                :percentage="uploadPct"
+                :stroke-width="8"
+                class="upload-progress"
+              />
+            </template>
+
+            <!-- 服务器路径：白名单路径直发 -->
+            <template v-else>
+              <el-input
+                v-model="sendPathsText"
+                type="textarea"
+                :rows="4"
+                :placeholder="t('admin.p2p.sendPathsPlaceholder')"
+              />
+              <div class="whitelist-chips" v-if="sendRoots.length">
+                <span class="dim">{{ t('admin.p2p.whitelistChipsLabel') }}</span>
+                <el-tag
+                  v-for="root in sendRoots"
+                  :key="root"
+                  class="whitelist-chip"
+                  @click="appendSendRoot(root)"
+                >{{ root }}</el-tag>
+              </div>
+              <div class="whitelist-chips" v-else>
+                <span class="dim">{{ t('admin.p2p.whitelistEmpty') }}
+                  <el-link size="small" @click="goConfig">{{ t('admin.p2p.goConfig') }}</el-link>
+                </span>
+              </div>
+            </template>
+
             <div class="peer-row">
               <el-select
                 v-model="inviteTo"
@@ -98,7 +132,14 @@
               />
             </div>
             <div class="card-actions">
-              <el-button type="primary" :loading="sending" @click="doSend">{{ t('admin.p2p.sendBtn') }}</el-button>
+              <el-button
+                v-if="sendMode === 'upload'"
+                type="primary"
+                :loading="uploading"
+                :disabled="!uploadFiles.length"
+                @click="doUploadSend"
+              >{{ t('admin.p2p.uploadBtn') }}</el-button>
+              <el-button v-else type="primary" :loading="sending" @click="doSend">{{ t('admin.p2p.sendBtn') }}</el-button>
               <span class="field-hint">{{ inviteTo ? t('admin.p2p.peerHint') : t('admin.p2p.sendHint') }}</span>
             </div>
           </el-card>
@@ -175,8 +216,19 @@
               <el-tag :type="stateTagType(row.state)" size="small">{{ stateLabel(row.state) }}<template v-if="row.state === 'retrying' && row.attempts > 0">({{ row.attempts }})</template></el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="t('admin.p2p.colBytes')" width="110">
-            <template #default="{ row }">{{ formatBytes(row.bytes_done) }}</template>
+          <el-table-column :label="t('admin.p2p.colProgress')" min-width="150">
+            <template #default="{ row }">
+              <template v-if="row.bytes_total > 0">
+                <el-progress
+                  :percentage="taskPct(row)"
+                  :stroke-width="6"
+                  :show-text="false"
+                  :status="row.state === 'done' ? 'success' : row.state === 'failed' ? 'exception' : undefined"
+                />
+                <div class="dim progress-bytes">{{ formatBytes(row.bytes_done) }} / {{ formatBytes(row.bytes_total) }}</div>
+              </template>
+              <span v-else>{{ formatBytes(row.bytes_done) }}</span>
+            </template>
           </el-table-column>
           <el-table-column :label="t('admin.p2p.colError')" min-width="180">
             <template #default="{ row }">
@@ -271,7 +323,8 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Key } from '@element-plus/icons-vue'
+import type { UploadUserFile } from 'element-plus'
+import { Key, UploadFilled } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { p2pApi, type P2pTask, type P2pStatus, type P2pInvite, type P2pDirectoryPeer } from '@/api/p2p'
 import { adminApi } from '@/api/admin'
@@ -310,6 +363,63 @@ const sendPathsText = ref('')
 const sending = ref(false)
 const recvCode = ref('')
 const recving = ref(false)
+
+// 发送双来源（2026-10-15:p2pcweb 体验融入）——本机文件（浏览器上传直发，
+// 免手抄服务器路径）/ 服务器路径（白名单直发）
+const sendMode = ref<'upload' | 'path'>('upload')
+const uploadFiles = ref<UploadUserFile[]>([])
+const uploading = ref(false)
+const uploadPct = ref(0)
+
+const onUploadExceed = () => {
+  ElMessage.warning(t('admin.p2p.uploadMaxFiles'))
+}
+
+const doUploadSend = async () => {
+  const files = uploadFiles.value.map((f) => f.raw as File).filter(Boolean)
+  if (!files.length) {
+    ElMessage.warning(t('admin.p2p.uploadRequired'))
+    return
+  }
+  uploading.value = true
+  uploadPct.value = 0
+  try {
+    const res = await p2pApi.uploadSend(files, {
+      inviteTo: inviteTo.value || undefined,
+      inviteNote: inviteNote.value || undefined,
+      onProgress: (loaded, total) => {
+        uploadPct.value = Math.min(99, Math.round((loaded / Math.max(total, 1)) * 100))
+      },
+    })
+    if (res.code === 200 || res.code === 0) {
+      uploadPct.value = 100
+      ElMessage.success(t('admin.p2p.sendStarted'))
+      const invited = !!inviteTo.value
+      const tid = res.data?.task?.id ?? ''
+      const code = res.data?.task?.code ?? ''
+      if (code && !invited) {
+        lastSentCode.value = code
+        codeVisible.value = true
+      } else if (tid && !invited) {
+        pendingCodeTaskId.value = tid
+      }
+      if (invited) {
+        const peer = peers.value.find((p) => p.node_id === inviteTo.value)
+        ElMessage.info(t('admin.p2p.peerInviteQueued', { peer: peerLabel(peer ?? { node_id: inviteTo.value, name: '', url: '', box_pub: '', online_since: 0 }) }))
+        rememberPeer(inviteTo.value)
+      }
+      uploadFiles.value = []
+      inviteTo.value = ''
+      inviteNote.value = ''
+      await fetchTasks()
+      if (!pollTimer) pollTimer = setInterval(fetchTasks, 2000)
+    }
+  } catch (e) {
+    handleError(e)
+  } finally {
+    uploading.value = false
+  }
+}
 
 // 发送白名单（系统配置 p2p.direct.send_roots）点选快速填入（2026-10-15 易用性重设计：
 // 免得让用户手抄服务器内部路径）
@@ -605,6 +715,11 @@ const formatBytes = (n: number) => {
   return `${(n / 2 ** (10 * i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 const formatTime = (s: string) => (s ? new Date(s).toLocaleString() : '-')
+// taskPct 传输进度百分比（bytes_total=0 视为未知,不画条）
+const taskPct = (row: P2pTask) => {
+  if (!row.bytes_total || row.bytes_total <= 0) return 0
+  return Math.min(100, Math.round((row.bytes_done / row.bytes_total) * 100))
+}
 const stateLabel = (s: string) => t(`admin.p2p.state.${s}`)
 const stateTagType = (s: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' => {
   switch (s) {
@@ -653,6 +768,12 @@ onUnmounted(() => {
 .status-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .status-item { font-size: 13px; }
 .dim { color: var(--el-text-color-secondary); font-size: 12px; }
+.send-mode { margin-bottom: 12px; }
+.upload-drop { padding: 18px 0 14px; }
+.upload-ic { font-size: 36px; color: var(--el-color-primary); margin-bottom: 6px; }
+.upload-t { font-size: 14px; font-weight: 600; }
+.upload-progress { margin-top: 10px; }
+.progress-bytes { margin-top: 2px; }
 .card-actions { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
 .field-hint { color: var(--el-text-color-secondary); font-size: 12px; }
 .whitelist-chips { margin-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

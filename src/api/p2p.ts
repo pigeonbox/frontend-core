@@ -1,6 +1,7 @@
 // api/p2p.ts — 设备直传管理端 API（P2a；与 contracts idl/p2p.thrift 对齐）。
 // 复用 request 封装（自动带 CSRF 头/401 重放/错误信封）。
 import { request } from '@/utils/request'
+import { xhrSend } from '@/api/_xhr'
 
 export interface P2pTask {
   id: string
@@ -9,6 +10,8 @@ export interface P2pTask {
   code: string
   paths: string[]
   bytes_done: number
+  /** 传输总字节（0=未知；p2pc 进度行回填，前端画进度条） */
+  bytes_total: number
   error: string
   attempts: number
   created_at: string
@@ -52,6 +55,13 @@ export interface PublishOpts {
   custom_code?: string
 }
 
+export interface UploadSendOpts {
+  inviteTo?: string
+  inviteNote?: string
+  onProgress?: (loaded: number, total: number) => void
+  signal?: AbortSignal
+}
+
 interface ApiResponse<T> {
   code: number
   message: string
@@ -67,6 +77,24 @@ export const p2pApi = {
       method: 'POST',
       data: { paths, invite_to: inviteTo || undefined, invite_note: inviteNote || undefined },
     }),
+  // uploadSend 浏览器文件直发（2026-10-15:p2pcweb 体验融入管理台）。
+  // multipart files[] → 服务器上传临时区 → p2pc send；invite 元数据走 query。
+  // 走 xhrSend 才有上传进度；timeout=0（大文件上传不限时，与访客投递同规）。
+  uploadSend: (files: File[], opts: UploadSendOpts = {}) => {
+    const fd = new FormData()
+    for (const f of files) fd.append('files', f)
+    const qs = new URLSearchParams()
+    if (opts.inviteTo) qs.set('invite_to', opts.inviteTo)
+    if (opts.inviteNote) qs.set('invite_note', opts.inviteNote)
+    const q = qs.toString()
+    return xhrSend<{ task: P2pTask }>({
+      url: '/admin/p2p/send/upload' + (q ? `?${q}` : ''),
+      form: fd,
+      timeout: 0,
+      signal: opts.signal,
+      onProgress: opts.onProgress,
+    })
+  },
   recv: (code: string) => request<ApiResponse<{ task: P2pTask }>>({ url: '/admin/p2p/recv', method: 'POST', data: { code } }),
   cancel: (taskId: string) =>
     request<ApiResponse<{ task_id: string }>>({ url: '/admin/p2p/cancel', method: 'POST', data: { task_id: taskId } }),
