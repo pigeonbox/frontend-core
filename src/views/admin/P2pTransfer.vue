@@ -37,6 +37,13 @@
           <span class="status-item">{{ t('admin.p2p.inbox') }}: {{ formatBytes(status.inbox_used) }} / {{ formatBytes(status.inbox_quota) }}</span>
           <span class="status-item dim">p2pc: {{ status.binary_path }}</span>
         </div>
+        <!-- 注册中心不可达：最近任务失败归因到注册中心时亮提示（2026-10-15 失败态易用性） -->
+        <el-alert v-if="registryUnreachable" type="warning" :closable="false" class="p2p-registry-alert">
+          <template #title>
+            {{ t('admin.p2p.registryUnreachable', { url: status.registry_url }) }}
+            <el-link size="small" @click="goConfig">{{ t('admin.p2p.goConfig') }}</el-link>
+          </template>
+        </el-alert>
       </el-card>
 
       <el-row :gutter="16">
@@ -134,10 +141,13 @@
         <template #header>
           <div class="tasks-header">
             <span>{{ t('admin.p2p.tasksTitle') }}</span>
-            <el-button size="small" text @click="fetchTasks">{{ t('common.refresh') }}</el-button>
+            <div class="tasks-header-actions">
+              <el-checkbox v-model="hideEnded" size="small">{{ t('admin.p2p.hideEnded') }}</el-checkbox>
+              <el-button size="small" text @click="fetchTasks">{{ t('common.refresh') }}</el-button>
+            </div>
           </div>
         </template>
-        <el-table :data="tasks" size="small" v-loading="tasksLoading">
+        <el-table :data="visibleTasks" size="small" v-loading="tasksLoading">
           <template #empty>
             <el-empty :description="t('admin.p2p.taskEmpty')" :image-size="72" />
           </template>
@@ -170,7 +180,7 @@
           </el-table-column>
           <el-table-column :label="t('admin.p2p.colError')" min-width="180">
             <template #default="{ row }">
-              <span class="error-text">{{ row.error }}</span>
+              <span class="error-text">{{ plainError(row.error) }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="t('admin.p2p.colCreated')" width="170">
@@ -275,6 +285,26 @@ const status = ref<P2pStatus | null>(null)
 const statusLoaded = ref(false)
 const tasks = ref<P2pTask[]>([])
 const tasksLoading = ref(false)
+// 失败态易用性（2026-10-15）：已结束任务可折叠；注册中心不可达自动亮提示条
+const hideEnded = ref(false)
+const visibleTasks = computed(() => {
+  if (!hideEnded.value) return tasks.value
+  const active = new Set(['waiting', 'running', 'retrying'])
+  return tasks.value.filter((t) => active.has(t.state))
+})
+const registryUnreachable = computed(() =>
+  tasks.value.some((t) => /注册中心不可用|注册中心均无/.test(t.error ?? '')),
+)
+// p2pc 原始错误 → 白话+对策（前缀 "p2pc 退出: exit status N; " 一并剥除）
+const plainError = (raw: string): string => {
+  if (!raw) return ''
+  const msg = raw.replace(/^p2pc 退出:\s*exit status \d+;\s*/, '')
+  if (/注册中心不可用/.test(msg)) return t('admin.p2p.errRegistryDown')
+  if (/均无该口令|无该口令|not found/i.test(msg)) return t('admin.p2p.errCodeUnknown')
+  if (/配对等待|配对/.test(msg) && /timeout|超时/i.test(msg)) return t('admin.p2p.errPairTimeout')
+  if (/i\/o timeout/.test(msg)) return t('admin.p2p.errNetworkTimeout')
+  return msg
+}
 
 const sendPathsText = ref('')
 const sending = ref(false)
@@ -631,6 +661,8 @@ onUnmounted(() => {
 .recv-intro { margin: 0 0 10px; font-size: 13px; color: var(--el-text-color-secondary); line-height: 1.6; }
 .task-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; letter-spacing: 1px; }
 .tasks-header { display: flex; justify-content: space-between; align-items: center; }
+.tasks-header-actions { display: flex; align-items: center; gap: 12px; }
+.p2p-registry-alert { margin-top: 10px; }
 .error-text { color: var(--el-color-danger); font-size: 12px; word-break: break-all; }
 .invite-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; flex-wrap: wrap; }
 .invite-from { font-size: 13px; }
