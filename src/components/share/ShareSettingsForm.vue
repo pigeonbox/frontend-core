@@ -85,7 +85,7 @@
               :inactive-text="t('upload.e2e.off')"
             />
           </div>
-          <div class="e2e-hint">{{ t('upload.e2e.hint') }}</div>
+          <div class="e2e-hint">{{ t(e2eHintKey) }}</div>
         </div>
       </el-collapse-item>
     </el-collapse>
@@ -112,12 +112,15 @@ const props = withDefaults(defineProps<{
   showE2e?: boolean
   /** 文件备注（随文件分享展示给取件人）；文本分享不适用不传 */
   showNote?: boolean
+  /** 场景：E2E 提示按场景区分（文件有 ≤100MB 限制,文本没有） */
+  context?: 'file' | 'text'
   units?: ShareExpireStyle[]
 }>(), {
   showPassword: true,
   showCustomCode: 'auto',
   showE2e: true,
   showNote: false,
+  context: 'file',
   // 对标上游：管理台"允许的过期样式"白名单驱动前端可选集（/api/config.expireStyle）
   units: () => {
     const allowed = useConfigStore().config?.expireStyle
@@ -128,6 +131,10 @@ const props = withDefaults(defineProps<{
 
 const userStore = useUserStore()
 const { t } = useI18n()
+
+const e2eHintKey = computed(() =>
+  props.context === 'text' ? 'upload.e2e.hintText' : 'upload.e2e.hint'
+)
 
 const showCustom = computed(() =>
   props.showCustomCode === 'auto' ? userStore.isLoggedIn : props.showCustomCode

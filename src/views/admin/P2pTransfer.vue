@@ -120,9 +120,13 @@
                   <span class="dim peer-fp">{{ shortFp(p.node_id) }}</span>
                 </el-option>
                 <template #empty>
-                  <span class="dim">{{ t('admin.p2p.peerEmpty') }}</span>
+                  <span v-if="peersError" class="dim peer-error">{{ t('admin.p2p.peerUnavailable') }}</span>
+                  <span v-else class="dim">{{ t('admin.p2p.peerEmpty') }}</span>
                 </template>
               </el-select>
+              <el-tooltip v-if="peersError" :content="t('admin.p2p.peerUnavailableTip')">
+                <el-button link size="small" @click="fetchPeers">{{ t('admin.p2p.peerRetry') }}</el-button>
+              </el-tooltip>
               <el-input
                 v-if="inviteTo"
                 v-model="inviteNote"
@@ -527,6 +531,7 @@ const fetchSendRoots = async () => {
 
 // 在线名录对端选择(2026-10-14 邀请信箱:密封邀请免手抄口令,近用优先)
 const peers = ref<P2pDirectoryPeer[]>([])
+const peersError = ref(false)
 const peersLoading = ref(false)
 const inviteTo = ref('')
 const inviteNote = ref('')
@@ -558,9 +563,16 @@ const fetchPeers = async () => {
   peersLoading.value = true
   try {
     const res = await p2pApi.directory()
-    if (res.code === 200 || res.code === 0) peers.value = res.data.peers ?? []
+    if (res.code === 200 || res.code === 0) {
+      peers.value = res.data.peers ?? []
+      peersError.value = false
+    } else {
+      peersError.value = true
+    }
   } catch {
-    /* 名录不可达静默(公共注册中心波动常见,不该打断发送卡) */
+    // 名录不可达不打断发送卡,但不再全静默:下拉空态/重试入口可见(此前
+    // 500 静默渲染空列表,admin 无法区分「没有对端」和「名录服务挂了」)
+    peersError.value = true
   } finally {
     peersLoading.value = false
   }

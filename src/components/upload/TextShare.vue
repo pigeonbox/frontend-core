@@ -1,6 +1,16 @@
 <template>
   <div class="text-share-container">
-    <div class="text-input-area">
+    <!-- 访客准入：管理后台关闭匿名上传时，未登录用户显示提示而非输入区（与 FileUpload 对齐；
+         此前文本 tab 不提示,访客填完提交才吃 403） -->
+    <el-alert
+      v-if="visitorUploadBlocked"
+      type="warning"
+      :title="t('upload.visitorDisabled')"
+      :closable="false"
+      show-icon
+      class="visitor-blocked"
+    />
+    <div v-else class="text-input-area">
       <el-input
         v-model="textContent"
         type="textarea"
@@ -13,10 +23,11 @@
       />
     </div>
 
-    <!-- 分享设置（与 FileUpload 共用 ShareSettingsForm） -->
-    <ShareSettingsForm :settings="settings" />
+    <!-- 分享设置（与 FileUpload 共用 ShareSettingsForm；text 场景,E2E 提示不带文件体积限制） -->
+    <ShareSettingsForm :settings="settings" context="text" />
 
     <el-button
+      v-if="!visitorUploadBlocked"
       type="primary"
       size="large"
       class="share-btn"
@@ -33,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { shareApi } from '@/api/share'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
@@ -47,6 +58,12 @@ import ShareSettingsForm from '@/components/share/ShareSettingsForm.vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
+const configStore = useConfigStore()
+
+// 与 FileUpload 同款访客准入判定：公开配置 openUpload=false 时未登录不可上传
+const visitorUploadBlocked = computed(
+  () => !userStore.isLoggedIn && configStore.config?.openUpload === false
+)
 
 const emit = defineEmits<{
   success: [result: {

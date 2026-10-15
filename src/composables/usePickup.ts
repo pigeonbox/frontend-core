@@ -11,10 +11,22 @@ import { localHistory } from '@/utils/localHistory'
  * 匿名取件状态机（2026-10-09 自 /retrieve 页融合进首页输入组件）：
  * 输入码 → submit 就地 Peek 预检——无密码直接取件跳结果页；
  * 有密码进 needPassword 相位，由宿主渲染内联密码框（密码永不做自动尝试）；
- * 本站未命中走联邦回退（ElMessageBox 引导跳源节点），未命中才落全局错误 toast。
+ * 本站未命中（404/20005）走联邦回退，与本地错误 toast 做 800ms 竞速——
+ * 注册中心快且命中只弹引导框，否则本地错误立即落地、命中后台补弹；
+ * 非未命中形态（密码错误/限流等）直接本地报错，不外查公网注册中心。
  * deps 全部可注入（router/handleError/记录/弹窗/i18n），便于 vitest 纯逻辑测试。
  */
 export type PickupPhase = 'input' | 'submitting' | 'needPassword'
+
+/** 未命中形态（HTTP 404 或业务码 20005=errcode.CodePickupCodeNotFound）才值得问联邦 */
+const isNotFoundShape = (code?: number): boolean => code === 404 || code === 20005
+
+/**
+ * 本地错误与联邦解析的竞速窗：注册中心在此窗口内给出结果则按原语义只弹引导
+ * （避免「不存在」toast + 跳转确认框双弹）；超窗本地错误立即落地，解析继续
+ * 后台跑、命中再补弹。错码反馈从此不被公网注册中心往返卡住（实测 ~5s → ≤0.8s）。
+ */
+const FEDERATION_RACE_MS = 800
 
 export interface PickupDeps {
   router?: { push: (location: { path: string; query?: Record<string, string> }) => void }
@@ -122,6 +134,13 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
     return false
   }
 
+  // 联邦解析与本地错误反馈的竞速（须在 tryFederationJump 同作用域内）
+  const raceFederation = (code: string): Promise<boolean> =>
+    Promise.race([
+      tryFederationJump(code),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), FEDERATION_RACE_MS)),
+    ])
+
   // 双击/连击防抖：Peek 与取件全程占住（phase 翻转前有 await 窗口，不能用相位做闸）
   let inFlight = false
 
@@ -153,9 +172,14 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
           query: { data: encodeURIComponent(JSON.stringify(res.data)) },
         })
       } else {
-        // 本站未命中 → 联邦回退：命中则引导直跳源节点取件页
-        const jumped = await tryFederationJump(code)
-        if (!jumped) {
+        // 本站未命中：仅「未命中」形态（404/20005）值得问联邦（竞速窗内命中
+        // 则只弹引导不弹本地错误）；密码错误/限流等直接本地报错，不外查公网
+        if (isNotFoundShape(res.code)) {
+          const jumped = await raceFederation(code)
+          if (!jumped) {
+            handleError({ code: res.code, message: res.message, trace_id: res.trace_id })
+          }
+        } else {
           handleError({ code: res.code, message: res.message, trace_id: res.trace_id })
         }
         // 密码相位失败留在相位内，密码保留可重试；其余回输入态
@@ -164,8 +188,12 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
     } catch (e) {
       // 本站 miss 表现为 HTTP 404 → request util 抛异常走这里:
       // 联邦回退必须在 catch 路径同样尝试,否则 404 形态的未命中永远绕过全网取件
-      const jumped = await tryFederationJump(code)
-      if (!jumped) {
+      if (isNotFoundShape((e as { code?: number })?.code)) {
+        const jumped = await raceFederation(code)
+        if (!jumped) {
+          handleError(e)
+        }
+      } else {
         handleError(e)
       }
       phase.value = pwd !== undefined ? 'needPassword' : 'input'

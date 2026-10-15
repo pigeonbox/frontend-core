@@ -10,11 +10,11 @@
         </div>
       </template>
 
-      <!-- 统计卡片 -->
+      <!-- 统计卡片（口径=今日,来自 /admin/stats;累计维度见第 4 卡=传输日志总条数） -->
       <el-row :gutter="20" class="stats-row">
         <el-col :span="6">
           <div class="stat-item">
-            <div class="stat-value">{{ stats.totalOperations }}</div>
+            <div class="stat-value">{{ todayOps }}</div>
             <div class="stat-label">{{ t('admin.transferLogs.statTotalOps') }}</div>
           </div>
         </el-col>
@@ -32,8 +32,8 @@
         </el-col>
         <el-col :span="6">
           <div class="stat-item">
-            <div class="stat-value">{{ stats.activeUsers }}</div>
-            <div class="stat-label">{{ t('admin.transferLogs.statActiveUsers') }}</div>
+            <div class="stat-value">{{ total }}</div>
+            <div class="stat-label">{{ t('admin.transferLogs.statTotalLogs') }}</div>
           </div>
         </el-col>
       </el-row>
@@ -102,7 +102,7 @@
 
 <script setup lang="ts">
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
-import { reactive, onMounted } from 'vue'
+import { reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
@@ -112,12 +112,14 @@ import { useErrorHandler } from '@/composables/useErrorHandler'
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
 
+// /admin/stats 只下发今日口径（today_uploads/today_downloads）；「总操作」=两者之和。
+// 此前 totalOperations 直接别名 today_uploads,与上传卡同值且顶表格全量口径,已修。
 const stats = reactive({
-  totalOperations: 0,
   uploads: 0,
-  downloads: 0,
-  activeUsers: 0
+  downloads: 0
 })
+
+const todayOps = computed(() => stats.uploads + stats.downloads)
 
 const OPERATION_KEYS: Record<string, string> = {
   upload: 'admin.transferLogs.op.upload',
@@ -171,13 +173,10 @@ const fetchStats = async () => {
   try {
     const res = await adminApi.getStats()
     if (res.code === 200 && res.data) {
-      stats.totalOperations = res.data.today_uploads || 0
       stats.uploads = res.data.today_uploads || 0
       stats.downloads = res.data.today_downloads || 0
-      stats.activeUsers = ((res.data as unknown as Record<string, unknown>).active_users as number) || 0
-      // ^ 幻影字段记录(P1 类型切换发现):wire/契约 AdminStatsData 均无 active_users,
-      // 此读恒 undefined→0 兜底(行为零变化保守保留);"活跃用户"语义待产品定义
-      // (后端只有 total_users),如需真实数直接换 res.data.total_users
+      // 「活跃用户」卡已移除:契约无 active_users(幻影字段,恒 0),真实累计维度
+      // 由第 4 卡「累计日志」= 传输日志分页 total 承担,与下方表格同源同口径
     }
   } catch (error) {
     console.error(t('admin.transferLogs.fetchStatsFailed'), error)

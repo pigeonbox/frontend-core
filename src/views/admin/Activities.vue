@@ -69,7 +69,7 @@
         </el-table-column>
         <el-table-column :label="t('admin.activitiesPage.colAction')" width="200">
           <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row.action }}</el-tag>
+            <el-tag size="small" effect="plain" :title="row.action">{{ actionLabel(row.action) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column :label="t('admin.activitiesPage.colTarget')" min-width="240" show-overflow-tooltip>
@@ -148,6 +148,46 @@ const totalCountLabel = computed(() => {
 const timeMs = (t: string) => {
   const ms = Date.parse((t || '').replace(' ', 'T'))
   return Number.isFinite(ms) ? ms : 0
+}
+
+// 审计/传输操作码 → 本地化标签（码表对齐 core audit(ctx, "<op>", ...) 全量；
+// 未收录码原样展示并在 title 悬浮保留原始码,便于与日志/工单对照）
+const ACTION_KEYS: Record<string, string> = {
+  upload: 'admin.activitiesPage.op.upload',
+  download: 'admin.activitiesPage.op.download',
+  'p2p.send': 'admin.activitiesPage.op.p2pSend',
+  'p2p.upload_send': 'admin.activitiesPage.op.p2pUploadSend',
+  'p2p.recv': 'admin.activitiesPage.op.p2pRecv',
+  'p2p.cancel': 'admin.activitiesPage.op.p2pCancel',
+  'p2p.publish': 'admin.activitiesPage.op.p2pPublish',
+  'p2p.invite': 'admin.activitiesPage.op.p2pInvite',
+  'p2p.invite.accept': 'admin.activitiesPage.op.p2pInviteAccept',
+  'p2p.invite.push': 'admin.activitiesPage.op.p2pInvitePush',
+  'file.update': 'admin.activitiesPage.op.fileUpdate',
+  'file.delete': 'admin.activitiesPage.op.fileDelete',
+  'file.block': 'admin.activitiesPage.op.fileBlock',
+  'file.unblock': 'admin.activitiesPage.op.fileUnblock',
+  'file.status': 'admin.activitiesPage.op.fileStatus',
+  'file.purge': 'admin.activitiesPage.op.filePurge',
+  'file.restore': 'admin.activitiesPage.op.fileRestore',
+  'file.batch_delete': 'admin.activitiesPage.op.fileBatchDelete',
+  'file.batch_extend': 'admin.activitiesPage.op.fileBatchExtend',
+  'user.create': 'admin.activitiesPage.op.userCreate',
+  'user.update': 'admin.activitiesPage.op.userUpdate',
+  'user.delete': 'admin.activitiesPage.op.userDelete',
+  'user.reset_password': 'admin.activitiesPage.op.userResetPassword',
+  'user.update_status': 'admin.activitiesPage.op.userUpdateStatus',
+  'config.update': 'admin.activitiesPage.op.configUpdate',
+  'maintenance.clean_expired_files': 'admin.activitiesPage.op.maintenanceCleanExpired',
+  'maintenance.clean_incomplete_uploads': 'admin.activitiesPage.op.maintenanceCleanIncomplete',
+  'notify.created': 'admin.activitiesPage.op.notifyCreated',
+}
+
+const actionLabel = (action: string): string => {
+  if (ACTION_KEYS[action]) return t(ACTION_KEYS[action])
+  // 动态形态 file.batch-<status>（批量启用/禁用）
+  if (action.startsWith('file.batch-')) return t('admin.activitiesPage.op.fileBatchStatus')
+  return action
 }
 
 const auditRow = (r: any): ActivityRow => ({

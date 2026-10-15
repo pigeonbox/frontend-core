@@ -157,17 +157,11 @@ const userStore = useUserStore()
 const { t } = useI18n()
 
 const pageTitle = computed(() => {
-  const titles: Record<string, string> = {
-    '/admin/dashboard': t('admin.dashboard'),
-    '/admin': t('admin.dashboard'),
-    '/admin/files': t('admin.files'),
-    '/admin/users': t('admin.users'),
-    '/admin/config': t('admin.config'),
-    '/admin/storage': t('admin.storage'),
-    '/admin/logs': t('admin.logs'),
-    '/admin/maintenance': t('admin.maintenance'),
-  }
-  return titles[route.path] || t('admin.title')
+  // 单一真相源=路由 meta.title（i18n key,router/index.ts 已全量覆盖 12 个子路由,
+  // 与 document.title 同源）。此前此处维护第二份硬编码路径表,漏配 p2p/activities/
+  // moderation/local-files/announcements 五页,顶栏面包屑恒回退「管理后台」
+  const key = route.meta.title as string | undefined
+  return key ? t(key) : t('admin.title')
 })
 
 const goToUser = () => {

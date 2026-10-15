@@ -118,6 +118,14 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/Docs.vue'),
     meta: { title: 'route.apiDocs' },
   },
+  // 未知路由兜底：admin 路由族由守卫在首个导航 lazy addRoute（静态路由排序恒
+  // 高于通配,注册后的 admin 路由不受影响;守卫对 admin 前缀有重新解析逻辑）
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'NotFound',
+    component: () => import('@/views/NotFound.vue'),
+    meta: { title: 'route.notFound' },
+  },
 ]
 
 // adminRoutes 管理后台路由族（登录页+后台）：base 可替换实现管理入口路径混淆

@@ -192,8 +192,9 @@
             </el-table-column>
             <el-table-column :label="t('common.status')" width="100">
               <template #default="{ row }">
-                <el-tag :type="row.status === 'active' ? 'success' : 'danger'" size="small">
-                  {{ row.status === 'active' ? t('common.normal') : t('common.disabled') }}
+                <!-- status wire 形态两代并存：数字 1/0（/admin/users 列表）与 'active' 旧串 -->
+                <el-tag :type="isActiveStatus(row.status) ? 'success' : 'danger'" size="small">
+                  {{ isActiveStatus(row.status) ? t('common.normal') : t('common.disabled') }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -279,6 +280,10 @@ const loading = ref(false)
 
 // 服务端构建版本（/version,管理员门禁;拉取失败静默,页脚显示 —）
 const serverVersion = ref('')
+
+// 用户状态激活判定：/admin/users wire 返回数字 1/0（Users.vue 同款双形态兼容）；
+// 此前只比对 'active' 旧串,数字形态恒判假→最新用户表全员显示「禁用」
+const isActiveStatus = (s: unknown): boolean => s === 1 || s === 'active'
 
 // 页脚版本号展示:空值显示 —;dev/commit 哈希等非语义化版本不带 v 前缀
 const formatVersion = (v: string) => {

@@ -100,10 +100,9 @@ describe('usePickup（匿名取件状态机）', () => {
     expect(deps.handleError).not.toHaveBeenCalled()
   })
 
-  it('取件未命中 + 联邦未接管 → 全局错误 toast，密码相位保留可重试', async () => {
+  it('密码错误（非未命中形态）→ 直接本地报错，不外查联邦注册中心', async () => {
     mockedSearch.mockReturnValue(ok({ require_password: true }) as never)
     mockedRetrieve.mockReturnValue({ code: 20003, message: '密码错误', data: null, trace_id: '' } as never)
-    mockedResolve.mockReturnValue(ok({ available: false }) as never)
     const deps = makeDeps()
     const ctl = usePickup(deps)
 
@@ -115,10 +114,13 @@ describe('usePickup（匿名取件状态机）', () => {
     // 密码错误留在 needPassword 相位，密码保留可重试
     expect(ctl.phase.value).toBe('needPassword')
     expect(ctl.password.value).toBe('bad')
+    // 非未命中形态不外查公网注册中心（也不被其往返拖慢反馈）
+    expect(mockedResolve).not.toHaveBeenCalled()
   })
 
   it('404 形态未命中（reject）→ 联邦接管跳源节点，不再弹本地错误', async () => {
     mockedSearch.mockRejectedValue({ code: 404, message: 'not found' })
+    mockedRetrieve.mockReturnValue({ code: 404, message: 'not found', data: null, trace_id: '' } as never)
     mockedResolve.mockReturnValue(
       ok({ available: true, url: 'https://node-b.example.com', name: '节点B' }) as never,
     )
@@ -129,6 +131,33 @@ describe('usePickup（匿名取件状态机）', () => {
     expect(deps.confirm).toHaveBeenCalledTimes(1)
     expect(deps.jumpExternal).toHaveBeenCalledWith('https://node-b.example.com/#/retrieve?code=abc123')
     expect(deps.handleError).not.toHaveBeenCalled()
+  })
+
+  it('联邦解析慢于竞速窗 → 本地错误立即落地，迟到命中仍补弹引导', async () => {
+    mockedRetrieve.mockReturnValue({ code: 404, message: 'not found', data: null, trace_id: '' } as never)
+    let resolveLate!: (v: unknown) => void
+    mockedResolve.mockImplementation(
+      () => new Promise((res) => { resolveLate = res }) as never,
+    )
+    const deps = makeDeps()
+    const ctl = usePickup(deps)
+
+    vi.useFakeTimers()
+    try {
+      const p = ctl.submit('ABC123')
+      // 推过 800ms 竞速窗：本地错误不等公网注册中心
+      await vi.advanceTimersByTimeAsync(850)
+      await p
+      expect(deps.handleError).toHaveBeenCalledTimes(1)
+      expect(ctl.phase.value).toBe('input')
+      // 解析迟到返回命中：引导框照常补弹
+      resolveLate(ok({ available: true, url: 'https://node-b.example.com', name: '节点B' }))
+      await vi.advanceTimersByTimeAsync(1)
+      expect(deps.confirm).toHaveBeenCalledTimes(1)
+      expect(deps.jumpExternal).toHaveBeenCalledWith('https://node-b.example.com/#/retrieve?code=ABC123')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('设备直传占位 url（direct.invalid）→ 弹 alert 引导设备端接收', async () => {
