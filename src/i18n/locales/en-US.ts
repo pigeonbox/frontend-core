@@ -850,6 +850,8 @@ export default {
       pasteDenied: 'Cannot read the clipboard; paste manually',
       resendBtn: 'Send Again',
       resendPrefilled: 'Original paths filled in — review and start the send',
+      notifyToggle: 'Desktop alerts',
+      notifyDenied: 'Notification permission denied; allow it in system settings and retry',
       notifyDone: '✓ Transfer done',
       colError: 'Message',
       colCreated: 'Created',

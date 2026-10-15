@@ -843,6 +843,8 @@ export default {
       pasteDenied: '无法读取剪贴板，请手动粘贴',
       resendBtn: '再次发送',
       resendPrefilled: '已填入原路径，确认无误后发起发送',
+      notifyToggle: '桌面提醒',
+      notifyDenied: '浏览器已拒绝通知权限，请在系统设置中放行后重试',
       notifyDone: '✓ 直传完成',
       colError: '信息',
       colCreated: '创建时间',

@@ -187,6 +187,7 @@
           <div class="tasks-header">
             <span>{{ t('admin.p2p.tasksTitle') }}</span>
             <div class="tasks-header-actions">
+              <el-checkbox v-model="notifyEnabled" size="small" @change="onNotifyToggle">{{ t('admin.p2p.notifyToggle') }}</el-checkbox>
               <el-checkbox v-model="hideEnded" size="small">{{ t('admin.p2p.hideEnded') }}</el-checkbox>
               <el-button size="small" text @click="fetchTasks">{{ t('common.refresh') }}</el-button>
             </div>
@@ -296,6 +297,13 @@
           </el-descriptions-item>
           <el-descriptions-item :label="t('admin.p2p.colProgress')" :span="2">
             <template v-if="detailTask.bytes_total > 0">
+              <el-progress
+                :percentage="taskPct(detailTask)"
+                :stroke-width="8"
+                :show-text="false"
+                :status="detailTask.state === 'done' ? 'success' : detailTask.state === 'failed' ? 'exception' : undefined"
+                class="detail-bar"
+              />
               {{ formatBytes(detailTask.bytes_done) }} / {{ formatBytes(detailTask.bytes_total) }}
               （{{ taskPct(detailTask) }}%）
             </template>
@@ -606,10 +614,13 @@ const fetchTasks = async () => {
       const prevById = new Map(tasks.value.map((x) => [x.id, x]))
       tasks.value = (res.data.tasks ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))
       updateSpeeds(tasks.value)
-      // 后台 tab 有任务刚到完成态 → 标题闪烁提醒（回焦即停）
+      // 后台 tab 有任务刚到完成态 → 标题闪烁 + 可选系统通知（回焦即停）
       if (document.hidden) {
-        const newlyDone = tasks.value.some((x) => x.state === 'done' && prevById.get(x.id)?.state !== 'done')
-        if (newlyDone) startTitleFlash()
+        const newlyDone = tasks.value.find((x) => x.state === 'done' && prevById.get(x.id)?.state !== 'done')
+        if (newlyDone) {
+          startTitleFlash()
+          fireNotify(newlyDone)
+        }
       }
       // 待弹口令的任务：轮询到 p2pc 生成口令后弹结果框（仅一次）
       if (pendingCodeTaskId.value) {
@@ -910,7 +921,8 @@ const pasteCode = async () => {
   }
 }
 
-// 后台 tab 完成提醒:标签页不可见时有任务到终态,标题闪烁直至回焦
+// 后台 tab 完成提醒:标签页不可见时有任务到终态,标题闪烁直至回焦;
+// 开关「桌面提醒」后升级为系统级 Notification(点击聚焦回页面)。
 const BASE_TITLE = document.title
 let flashTimer: ReturnType<typeof setInterval> | null = null
 const stopTitleFlash = () => {
@@ -929,6 +941,34 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) stopTitleFlash()
 })
 onUnmounted(stopTitleFlash)
+
+// 桌面系统通知（opt-in;权限在开关动作里请求——浏览器要求用户手势）
+const NOTIFY_KEY = 'pb.p2p.notify'
+const notifySupported = typeof window !== 'undefined' && 'Notification' in window
+const notifyEnabled = ref(notifySupported && localStorage.getItem(NOTIFY_KEY) === '1')
+const onNotifyToggle = async (v: boolean | string | number) => {
+  const on = v === true
+  if (on && notifySupported && Notification.permission === 'default') {
+    try { await Notification.requestPermission() } catch { /* 老浏览器忽略 */ }
+  }
+  if (on && notifySupported && Notification.permission === 'denied') {
+    ElMessage.warning(t('admin.p2p.notifyDenied'))
+    notifyEnabled.value = false
+    localStorage.setItem(NOTIFY_KEY, '0')
+    return
+  }
+  localStorage.setItem(NOTIFY_KEY, on ? '1' : '0')
+}
+const fireNotify = (task: P2pTask) => {
+  if (!notifyEnabled.value || !notifySupported || Notification.permission !== 'granted') return
+  try {
+    const n = new Notification(t('admin.p2p.notifyDone'), {
+      body: `${task.kind === 'send' ? t('admin.p2p.kindSend') : t('admin.p2p.kindRecv')} · ${task.code || task.id}`,
+      tag: `p2p-${task.id}`,
+    })
+    n.onclick = () => { window.focus(); n.close() }
+  } catch { /* 通知通道异常静默 */ }
+}
 
 // 再次发送:send 任务已结束且源路径仍在白名单内 → 预填服务器路径模式
 const canResend = (row: P2pTask): boolean => {
@@ -1001,6 +1041,7 @@ onUnmounted(() => {
 .pickup-cd { margin-top: 4px; font-size: 11px; color: var(--el-color-warning); }
 .pickup-cd.hot { color: var(--el-color-danger); font-weight: 600; }
 .detail-sec { margin: 14px 0 8px; font-size: 13px; font-weight: 600; }
+.detail-bar { margin-bottom: 6px; max-width: 320px; }
 .detail-log-head { display: flex; justify-content: space-between; align-items: center; }
 .detail-paths { display: flex; flex-direction: column; gap: 4px; }
 .detail-path {
