@@ -1,8 +1,8 @@
 <template>
   <div class="file-upload-container">
-    <!-- 全局拖拽高亮 -->
+    <!-- 全局拖拽高亮（点击即撤兜底：拖拽事件任何漏网形态下用户点一下即可脱困，勿依赖刷新） -->
     <transition name="fade">
-      <div v-if="isDragging" class="global-drop-overlay">
+      <div v-if="isDragging" class="global-drop-overlay" @click="isDragging = false">
         <div class="drop-hint">
           <el-icon size="64" class="icon-primary"><UploadFilled /></el-icon>
           <h2>{{ t('upload.dragHint') }}</h2>
