@@ -47,11 +47,14 @@ export const shareApi = {
   },
 
   // 获取分享内容(响应契约 v0.6.0 起 = ShareDetail 全字段,含 download_url/token/files)
+  // 取件密码经 X-Share-Password 请求头(2026-10-16 拍板;query 形态有访问日志/
+  // Referer 泄漏面,与下载端点停收 ?password= 同批收敛;IDL GetShareReq api.header)
   getShare: (code: string, password?: string) => {
     return request<ApiResponse<shareContract.ShareDetail>>({
       url: '/share/select/',
       method: 'GET',
-      params: { code, password },
+      params: { code },
+      headers: password ? { 'X-Share-Password': password } : undefined,
     })
   },
 
