@@ -460,7 +460,7 @@ export default {
       subtitle: '谁取走了你的文件（IP / 时间 / 次数）',
       viewedAt: '取件时间',
       viewerIp: '取件人 IP',
-      shareCode: '分享码',
+      codeLabel: '取件码 / 分享码',
       fileName: '文件名',
       viewerCount: '累计次数',
       times: '次',

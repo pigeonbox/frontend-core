@@ -40,9 +40,12 @@
           <code class="mono">{{ row.viewer_ip || '—' }}</code>
         </template>
       </el-table-column>
-      <el-table-column :label="t('user.history.shareCode')" width="140">
+      <el-table-column :label="t('user.history.codeLabel')" width="150">
         <template #default="{ row }">
-          <code class="mono code-cell">{{ row.code }}</code>
+          <div class="code-stack">
+            <code v-if="row.pickup_code" class="mono code-cell code-primary">{{ row.pickup_code }}</code>
+            <code class="mono" :class="row.pickup_code ? 'code-sub' : 'code-cell'">{{ row.code }}</code>
+          </div>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.history.fileName')" min-width="200" show-overflow-tooltip>
@@ -177,6 +180,22 @@ onMounted(() => reload())
   background: var(--color-muted);
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-sm);
+}
+
+.code-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.code-primary {
+  font-weight: 600;
+}
+
+.code-sub {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
 }
 
 .text-preview {

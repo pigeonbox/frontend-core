@@ -460,7 +460,7 @@ export default {
       subtitle: 'Who picked up your files (IP / time / count)',
       viewedAt: 'Picked Up At',
       viewerIp: 'Viewer IP',
-      shareCode: 'Share Code',
+      codeLabel: 'Pickup / Share Code',
       fileName: 'File Name',
       viewerCount: 'Total Count',
       times: 'times',
