@@ -9,6 +9,24 @@
         <p>{{ t('admin.adminLogin.title') }}</p>
       </div>
 
+      <!-- 一键提权（2026-10-16 双登录拍板）：user login 给 admin 账号签发的会话
+           本就携带 role=admin（服务端 AdminMiddleware 只认 token 角色），双登录
+           摩擦纯属客户端 userRole 标记缺失。已登录用户经服务端确认角色后免密放行，
+           会话模型/时效/审计零改动 -->
+      <div v-if="elevateAvailable" class="elevate-card">
+        <p class="elevate-text">{{ t('admin.adminLogin.elevateHint', { name: elevateUsername }) }}</p>
+        <el-button
+          type="primary"
+          size="large"
+          class="login-button"
+          :loading="elevating"
+          @click="handleElevate"
+        >
+          {{ t('admin.adminLogin.elevateGo', { name: elevateUsername }) }}
+        </el-button>
+        <el-divider class="elevate-divider">{{ t('admin.adminLogin.elevateOr') }}</el-divider>
+      </div>
+
       <el-form
         ref="loginFormRef"
         :model="loginForm"
@@ -84,7 +102,7 @@
 
 <script setup lang="ts">
 import { getAdminBase } from '@/router'
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock, Back } from '@element-plus/icons-vue'
@@ -109,6 +127,37 @@ const loginForm = reactive({
   username: '',
   password: ''
 })
+
+// 一键提权：已登录会话经 /user/info 服务端确认 admin 角色后，补写客户端
+// userRole 标记即入台（服务端每请求仍按 token 角色强制鉴权，此处纯 UX 放行）
+const elevateAvailable = ref(false)
+const elevating = ref(false)
+const elevateUsername = ref('')
+
+onMounted(async () => {
+  if (!userStore.isLoggedIn) return
+  try {
+    await userStore.fetchUserInfo()
+    if (userStore.userInfo?.role === 'admin') {
+      elevateUsername.value = userStore.userInfo.username || ''
+      elevateAvailable.value = true
+    }
+  } catch {
+    /* 会话失效/网络失败：静默回落常规登录表单 */
+  }
+})
+
+const handleElevate = () => {
+  elevating.value = true
+  try {
+    userStore.markSessionActive()
+    localStorage.setItem('userRole', 'admin')
+    ElMessage.success(t('admin.adminLogin.success'))
+    router.push(getAdminBase())
+  } finally {
+    elevating.value = false
+  }
+}
 
 // 登录表单不做密码长度校验：口令由运维设定（PB_ADMIN_PASSWORD 可短于 6 位），
 // 客户端长度门禁只会拦下合法口令（长度约束属注册场景）
@@ -236,6 +285,24 @@ const handleLogin = async () => {
 
 .login-button {
   width: 100%;
+}
+
+.elevate-card {
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--radius-md);
+  background: var(--primary-bg);
+}
+
+.elevate-text {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-regular);
+}
+
+.elevate-divider {
+  margin: var(--spacing-md) 0 var(--spacing-xs);
 }
 
 .login-footer {

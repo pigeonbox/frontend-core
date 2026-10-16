@@ -88,10 +88,8 @@
               <el-switch v-model="exForm.upload_ex.open_upload" />
               <span class="field-hint">{{ t('admin.configPage.upload.openUploadHint') }}</span>
             </el-form-item>
-            <el-form-item :label="t('admin.configPage.upload.requireLogin')">
-              <el-switch v-model="exForm.upload_ex.require_login" />
-              <span class="field-hint">{{ t('admin.configPage.upload.requireLoginHint') }}</span>
-            </el-form-item>
+            <!-- require_login 开关已收敛（2026-10-16 拍板）：与 open_upload 对匿名
+                 上传效果完全等价，服务端 apply 时恒派生自单开关，双开关只制造矛盾态 -->
             <el-form-item :label="t('admin.configPage.upload.anonymousDailyCount')">
               <el-input-number v-model="exForm.upload_ex.anonymous_daily_count" :min="0" :max="100000" />
               <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyCountHint') }}</span>

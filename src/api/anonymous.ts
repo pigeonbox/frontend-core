@@ -57,9 +57,7 @@ export const anonymousApi = {
     })
   },
 
-  // 下载（流式）
-  downloadUrl: (code: string, password?: string) => {
-    const params = password ? `?password=${encodeURIComponent(password)}` : ''
-    return `/anonymous/download/${code}${params}`
-  },
+  // 下载地址一律取服务端回传的 download_url（取件/详情响应均带,含下载令牌;
+  // 密码经 POST body 交给 retrieve,绝不拼进 URL query——2026-10-16 拍板移除
+  // 客户端自拼 ?password= 的死代码通道）
 }

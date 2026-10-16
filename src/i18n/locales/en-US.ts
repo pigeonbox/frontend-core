@@ -139,14 +139,10 @@ export default {
       others: 'Share with Others',
     },
     shareMethod: {
-      code: 'Share Code',
       url: 'Full Link',
       qrcode: 'QR Code',
       terminal: 'Command Line',
-      codeHint: 'Send the full link — opening it picks up the share. The 8-character share code can also be pasted whole into the home pickup box; it is auto-detected',
       urlHint: 'Send the full link — it opens right in the browser to view and download',
-      copyCode: 'Copy Share Code',
-      codeCopied: 'Share code copied',
       wgetCopy: 'Copy Command',
       wgetHint: 'The recipient can paste and run it in a terminal to download directly (no browser needed)',
       wgetCopied: 'Command copied to clipboard',
@@ -162,8 +158,9 @@ export default {
       history: 'Pickup / Send History',
     },
     pickupStrip: {
-      label: '6-digit pickup code (the recipient can pick up with it)',
+      label: '6-digit pickup code (the recipient picks up with it on the home page)',
       copy: 'Copy',
+      heroHint: 'The recipient can also just open the full link (see tabs below)',
     },
     codeCopied: 'Pickup code copied',
     apiDocs: 'API Docs',
@@ -574,6 +571,9 @@ export default {
       success: 'Signed in',
       notAdmin: 'This account is not an administrator',
       backHome: 'Back to Home',
+      elevateHint: '"{name}" is already signed in on this browser with administrator access',
+      elevateGo: 'Continue as {name}',
+      elevateOr: 'or sign in with another account',
       demoTitle: 'Demo account',
       demoBody: 'Defaults to admin / admin123; if PB_ADMIN_PASSWORD was set at startup, use that password instead',
     },
@@ -686,7 +686,7 @@ export default {
         expireDefault: 'Default Expiry (Days)',
         days: 'days',
         uploadGates: 'Upload Gates',
-        uploadGatesHint: 'Visitor upload toggle, upload size, login requirement and chunking are managed by deployment config (config.yaml transfer section / PB_* env vars) and cannot be edited here'
+        uploadGatesHint: 'Anonymous upload admission is governed online by the single "Allow guest uploads" switch above (the legacy login-requirement field is exactly equivalent and is now derived server-side); upload size and chunking switches remain deployment-config managed (config.yaml / PB_* env vars)'
       },
       user: {
         allowRegistration: 'Allow User Registration',

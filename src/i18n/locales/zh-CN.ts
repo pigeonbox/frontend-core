@@ -139,14 +139,10 @@ export default {
       others: '分享给他人',
     },
     shareMethod: {
-      code: '分享码',
       url: '完整链接',
       qrcode: '二维码',
       terminal: '命令行下载',
-      codeHint: '把完整链接发给对方，打开即可取件；8 位分享码也可整段复制，粘贴到首页取件框会自动识别直达',
       urlHint: '把完整链接发给对方，浏览器打开即可查看和下载',
-      copyCode: '复制分享码',
-      codeCopied: '分享码已复制',
       wgetCopy: '复制命令',
       wgetHint: '对方在终端粘贴执行即可直接下载（无需打开网页）',
       wgetCopied: '命令已复制到剪贴板',
@@ -162,8 +158,9 @@ export default {
       history: '取件 / 发件记录',
     },
     pickupStrip: {
-      label: '6 位取件码（对方也可凭此取件）',
+      label: '6 位取件码（对方凭此在首页取件）',
       copy: '复制',
+      heroHint: '对方也可直接打开完整链接取件（见下方页签）',
     },
     codeCopied: '取件码已复制',
     apiDocs: 'API 文档',
@@ -574,6 +571,9 @@ export default {
       success: '登录成功',
       notAdmin: '该账号不是管理员',
       backHome: '返回首页',
+      elevateHint: '检测到「{name}」已在本浏览器登录，且具备管理员身份',
+      elevateGo: '以 {name} 身份进入管理后台',
+      elevateOr: '或使用其他账号登录',
       demoTitle: '演示账号',
       demoBody: '默认 admin / admin123；若启动时设置了 PB_ADMIN_PASSWORD，以该口令为准',
     },
@@ -686,7 +686,7 @@ export default {
         expireDefault: '默认过期天数',
         days: '天',
         uploadGates: '上传门禁',
-        uploadGatesHint: '匿名上传开关/上传大小/需登录/分片开关由部署配置管理（config.yaml transfer 段 / PB_* 环境变量），不在线编辑'
+        uploadGatesHint: '匿名上传准入由上方「允许访客上传」单开关在线管理（历史「上传需登录」字段与其效果完全等价，已在服务端收敛为派生值）；上传大小、分片开关等仍由部署配置（config.yaml / PB_* 环境变量）管理，不在线编辑'
       },
       user: {
         allowRegistration: '允许用户注册',

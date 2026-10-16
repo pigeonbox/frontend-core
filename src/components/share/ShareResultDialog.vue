@@ -18,37 +18,20 @@
         style="margin-bottom: 12px"
       />
 
-      <!-- 6 位取件码快捷卡（2026-10-07 文件分享铸造；快递柜模式取件） -->
-      <div v-if="sharePickupCode" class="pickup-strip">
-        <el-icon><Postcard /></el-icon>
+      <!-- 6 位取件码主视觉（2026-10-16 双码收敛拍板：主推取件码，8 位分享码从弹窗
+           退场——/share/{code} 链接通道与首页粘贴兜底保留，兼容零破坏） -->
+      <div v-if="sharePickupCode" class="pickup-hero">
         <span class="pickup-label">{{ t('home.pickupStrip.label') }}</span>
-        <span class="pickup-code">{{ sharePickupCode }}</span>
-        <el-button size="small" text type="primary" @click="copyPickup">
+        <div class="code-big">{{ sharePickupCode }}</div>
+        <el-button type="primary" size="large" @click="copyPickup">
           <el-icon><CopyDocument /></el-icon>
           {{ t('home.pickupStrip.copy') }}
         </el-button>
+        <p class="code-hint">{{ t('home.pickupStrip.heroHint') }}</p>
       </div>
 
-      <!-- 分享方式三选一 Tab -->
+      <!-- 分享方式页签（链接 / 二维码 / 命令行） -->
       <el-tabs v-model="shareMethod" class="share-method-tabs">
-        <!-- 6 位码 -->
-        <el-tab-pane name="code">
-          <template #label>
-            <span class="tab-label">
-              <el-icon><Postcard /></el-icon>
-              {{ t('home.shareMethod.code') }}
-            </span>
-          </template>
-          <div class="code-display">
-            <div class="code-big">{{ shareCode }}</div>
-            <p class="code-hint">{{ t('home.shareMethod.codeHint') }}</p>
-            <el-button type="primary" size="large" @click="copyShareCode">
-              <el-icon><CopyDocument /></el-icon>
-              {{ t('home.shareMethod.copyCode') }}
-            </el-button>
-          </div>
-        </el-tab-pane>
-
         <!-- 完整 URL -->
         <el-tab-pane name="url">
           <template #label>
@@ -122,7 +105,7 @@ import { ElMessage } from 'element-plus'
 import QRCode from 'qrcode'
 import { useI18n } from 'vue-i18n'
 import {
-  Postcard, Link, CopyDocument, PictureFilled, Loading, Monitor, InfoFilled
+  Link, CopyDocument, PictureFilled, Loading, Monitor, InfoFilled
 } from '@element-plus/icons-vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { localHistory } from '@/utils/localHistory'
@@ -148,8 +131,8 @@ const sharePickupCode = ref('')
 // 命令行 Tab 可用性判定载荷
 const shareFileName = ref('')
 const shareHasPassword = ref(false)
-// 分享方式：6 位码 / URL / 二维码 / 命令行
-const shareMethod = ref<'code' | 'url' | 'qrcode' | 'terminal'>('code')
+// 分享方式：URL / 二维码 / 命令行（取件码已升主视觉，不再作为页签）
+const shareMethod = ref<'url' | 'qrcode' | 'terminal'>('url')
 
 // 匿名直链下载端点仅文件分享可用（文本分享走 /share/:code 详情页）
 const wgetAvailable = computed(() => !!shareFileName.value && !shareHasPassword.value && !shareE2EKey.value)
@@ -197,7 +180,7 @@ const open = async (result: ShareResult) => {
   }
 
   shareUrl.value = url
-  shareMethod.value = 'code' // 默认显示 6 位码
+  shareMethod.value = 'url' // 主视觉=取件码；页签默认完整链接
   visible.value = true
 
   // 发件记录（本机 localStorage；仅 code+归一化链接+文件名，永不含密码/密钥）
@@ -223,12 +206,6 @@ const open = async (result: ShareResult) => {
 const copyShareUrl = async () => {
   const ok = await copyToClipboard(shareUrl.value)
   if (ok) ElMessage.success(t('home.linkCopied'))
-  else ElMessage.error(t('home.copyLinkFailed'))
-}
-
-const copyShareCode = async () => {
-  const ok = await copyToClipboard(shareCode.value)
-  if (ok) ElMessage.success(t('home.shareMethod.codeCopied'))
   else ElMessage.error(t('home.copyLinkFailed'))
 }
 
@@ -268,28 +245,6 @@ defineExpose({ open })
   gap: 6px;
   font-size: var(--text-sm);
   font-weight: 500;
-}
-
-.code-display {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: var(--spacing-2xl) var(--spacing-md);
-}
-
-/* 对标上游取件码卡：墨底白字重音块（明暗模式同形态，天然高对比） */
-.code-big {
-  font-size: 46px;
-  font-weight: 700;
-  letter-spacing: 10px;
-  text-indent: 10px; /* 抵消末字符字距，保持视觉居中 */
-  color: #ffffff;
-  background: #1b1c20;
-  padding: var(--spacing-lg) var(--spacing-2xl);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  font-family: 'SF Mono', 'Courier New', monospace;
-  margin-bottom: var(--spacing-md);
 }
 
 .code-hint {
@@ -340,29 +295,36 @@ defineExpose({ open })
   font-size: 13px;
 }
 
-.pickup-strip {
+/* 取件码主视觉卡：墨底大码+虚线描边卡（原 6 位码快捷条升格，双码收敛后唯一码面） */
+.pickup-hero {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 10px 14px;
+  gap: 10px;
+  margin: 12px 0 4px;
+  padding: 18px 14px 16px;
   border: 1px dashed var(--primary-color);
   border-radius: var(--radius-lg);
   background: var(--primary-bg);
-  color: var(--color-text-primary);
-  font-size: 13px;
 }
 
 .pickup-label {
   color: var(--color-text-secondary);
+  font-size: 13px;
 }
 
-.pickup-code {
-  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+/* 墨底白字重音大码块（明暗模式同形态，天然高对比） */
+.code-big {
+  font-size: 46px;
   font-weight: 700;
-  font-size: 16px;
-  letter-spacing: 2px;
-  color: var(--primary-color);
+  letter-spacing: 10px;
+  text-indent: 10px; /* 抵消末字符字距，保持视觉居中 */
+  color: #ffffff;
+  background: #1b1c20;
+  padding: var(--spacing-lg) var(--spacing-2xl);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  font-family: 'SF Mono', 'Courier New', monospace;
 }
 
 .wget-note {
