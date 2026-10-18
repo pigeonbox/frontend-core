@@ -16,6 +16,12 @@ export interface P2pTask {
   attempts: number
   created_at: string
   finished_at: string
+  /** 配对码（2026-10-18）：有待裁决敲门请求（接受门） */
+  pair_pending?: boolean
+  /** 配对码：敲门方 node_id */
+  pair_from?: string
+  /** 配对码：敲门方显示名（接受门展示） */
+  pair_name?: string
 }
 
 export interface P2pStatus {
@@ -74,11 +80,23 @@ export const p2pApi = {
   // taskLog 任务日志（p2pc 行级环,时间正序;详情抽屉诊断用——失败免登服务器）
   taskLog: (taskId: string) =>
     request<ApiResponse<{ lines: string[] }>>({ url: `/admin/p2p/tasks/${encodeURIComponent(taskId)}/log`, method: 'GET' }),
-  send: (paths: string[], inviteTo?: string, inviteNote?: string) =>
+  send: (paths: string[], inviteTo?: string, inviteNote?: string, pair?: boolean) =>
     request<ApiResponse<{ task: P2pTask }>>({
       url: '/admin/p2p/send',
       method: 'POST',
-      data: { paths, invite_to: inviteTo || undefined, invite_note: inviteNote || undefined },
+      data: {
+        paths,
+        invite_to: inviteTo || undefined,
+        invite_note: inviteNote || undefined,
+        pair: pair || undefined,
+      },
+    }),
+  // pairApprove 配对接受门裁决（2026-10-18）：拒绝即烧码并自动重铸新配对码。
+  pairApprove: (taskId: string, accept: boolean) =>
+    request<ApiResponse<{ task: P2pTask }>>({
+      url: `/admin/p2p/tasks/${encodeURIComponent(taskId)}/approve`,
+      method: 'POST',
+      data: { accept },
     }),
   // uploadSend 浏览器文件直发（2026-10-15:p2pcweb 体验融入管理台）。
   // multipart files[] → 服务器上传临时区 → p2pc send；invite 元数据走 query。

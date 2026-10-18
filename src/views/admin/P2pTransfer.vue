@@ -135,6 +135,11 @@
                 class="peer-note"
               />
             </div>
+            <!-- 配对码模式（2026-10-18）：亮 4 位定时码，对方输码即连（需管理员裁决敲门） -->
+            <div v-if="sendMode === 'path'" class="card-actions">
+              <el-switch v-model="pairMode" :disabled="sending" active-text="" />
+              <span class="field-hint">{{ pairMode ? t('admin.p2p.pairHintOn') : t('admin.p2p.pairHintOff') }}</span>
+            </div>
             <div class="card-actions">
               <el-button
                 v-if="sendMode === 'upload'"
@@ -144,7 +149,7 @@
                 @click="doUploadSend"
               >{{ t('admin.p2p.uploadBtn') }}</el-button>
               <el-button v-else type="primary" :loading="sending" @click="doSend">{{ t('admin.p2p.sendBtn') }}</el-button>
-              <span class="field-hint">{{ inviteTo ? t('admin.p2p.peerHint') : t('admin.p2p.sendHint') }}</span>
+              <span class="field-hint">{{ inviteTo ? t('admin.p2p.peerHint') : (sendMode === 'path' && pairMode ? t('admin.p2p.pairHintOn') : t('admin.p2p.sendHint')) }}</span>
             </div>
           </el-card>
         </el-col>
@@ -218,6 +223,16 @@
                 </el-button>
               </template>
               <span v-else class="dim">…</span>
+              <!-- 配对接受门（2026-10-18）：敲门请求就地裁决；拒绝即烧码自动换新码 -->
+              <div v-if="row.pair_pending" class="pair-approve">
+                <span class="dim">{{ t('admin.p2p.pairAsk', { name: row.pair_name || (row.pair_from || '').slice(0, 8) }) }}</span>
+                <el-button size="small" type="primary" :loading="pairDeciding === row.id" @click="decidePair(row, true)">
+                  {{ t('admin.p2p.pairAccept') }}
+                </el-button>
+                <el-button size="small" :loading="pairDeciding === row.id" @click="decidePair(row, false)">
+                  {{ t('admin.p2p.pairDeny') }}
+                </el-button>
+              </div>
             </template>
           </el-table-column>
           <el-table-column :label="t('admin.p2p.colState')" width="130">
@@ -443,6 +458,9 @@ const plainError = (raw: string): string => {
 
 const sendPathsText = ref('')
 const sending = ref(false)
+// 配对码模式（2026-10-18）：亮 4 位定时码，管理员在任务列表就地裁决敲门请求
+const pairMode = ref(false)
+const pairDeciding = ref('')
 const recvCode = ref('')
 const recving = ref(false)
 
@@ -716,7 +734,7 @@ const doSend = async () => {
   }
   sending.value = true
   try {
-    const res = await p2pApi.send(paths, inviteTo.value || undefined, inviteNote.value || undefined)
+    const res = await p2pApi.send(paths, inviteTo.value || undefined, inviteNote.value || undefined, pairMode.value)
     if (res.code === 200 || res.code === 0) {
       ElMessage.success(t('admin.p2p.sendStarted'))
       const invited = !!inviteTo.value
@@ -743,6 +761,26 @@ const doSend = async () => {
     handleError(e)
   } finally {
     sending.value = false
+  }
+}
+
+// decidePair 配对接受门就地裁决：成功后用返回快照原位刷新行（拒绝=烧码重铸，
+// 快照带新配对码）
+const decidePair = async (row: P2pTask, accept: boolean) => {
+  pairDeciding.value = row.id
+  try {
+    const res = await p2pApi.pairApprove(row.id, accept)
+    if (res.code === 200 || res.code === 0) {
+      const updated = res.data?.task
+      const i = tasks.value.findIndex((x) => x.id === row.id)
+      if (i >= 0 && updated) tasks.value[i] = updated
+      if (accept) ElMessage.success(t('admin.p2p.pairAccepted'))
+      else ElMessage.info(t('admin.p2p.pairDeniedNewCode'))
+    }
+  } catch (e) {
+    handleError(e)
+  } finally {
+    pairDeciding.value = ''
   }
 }
 
@@ -1049,6 +1087,7 @@ onUnmounted(() => {
 .status-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .status-item { font-size: 13px; }
 .dim { color: var(--el-text-color-secondary); font-size: 12px; }
+.pair-approve { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
 .send-mode { margin-bottom: 12px; }
 .upload-drop { padding: 18px 0 14px; }
 .upload-ic { font-size: 36px; color: var(--el-color-primary); margin-bottom: 6px; }
