@@ -35,7 +35,7 @@
         </div>
         <div class="upload-text">
           <h3>{{ t('upload.dragHint') }}</h3>
-          <p>{{ t('upload.clickHint') }}</p>
+          <p>{{ t('upload.clickHint', { clause: maxFileClause }) }}</p>
         </div>
       </div>
     </el-upload>
@@ -80,6 +80,7 @@ import { ElMessage, type UploadFile } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { UploadFilled, Promotion } from '@element-plus/icons-vue'
 import { useConfigStore } from '@/stores/config'
+import { formatFileSize } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
 import { useShareSettings } from '@/composables/useShareSettings'
 import { useUploadQueue } from '@/composables/useUploadQueue'
@@ -97,6 +98,15 @@ import FileItemRow from './FileItemRow.vue'
  */
 const { t } = useI18n()
 const configStore = useConfigStore()
+// 单文件上限文案随站点配置（maxFileSize，0=不限）——硬编码「5GB」曾与真实
+// 生效限制脱节（2026-10-19 事故）；登录用户的用户级上限超限时由服务端
+// 413 文案给出准确值
+const maxFileClause = computed(() => {
+  const v = configStore.config?.maxFileSize ?? 0
+  return v > 0
+    ? t('upload.maxFileLimited', { size: formatFileSize(v) })
+    : t('upload.maxFileUnlimited')
+})
 const userStore = useUserStore()
 const visitorUploadBlocked = computed(
   () => !userStore.isLoggedIn && configStore.config?.openUpload === false

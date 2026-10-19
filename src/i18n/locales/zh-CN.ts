@@ -217,7 +217,9 @@ export default {
   upload: {
     title: '上传文件',
     dragHint: '将文件拖到此处，或点击选择',
-    clickHint: '支持多文件上传，单文件最大 5GB',
+    clickHint: '支持多文件上传，{clause}',
+    maxFileLimited: '单文件最大 {size}',
+    maxFileUnlimited: '单文件大小不限',
     formatHint: '支持任意格式文件，可直接 Ctrl/Cmd + V 粘贴',
     largeFileHint: '大文件将走对象存储直传通道，更快更稳',
     presignFallback: '匿名直传未开放，已切换为普通上传通道',

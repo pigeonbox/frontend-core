@@ -5,6 +5,8 @@ export interface PublicConfig {
   name: string
   description: string
   uploadSize: number
+  /** 站点级单文件上限（upload.max_file_size，字节，0=不限）；上传提示动态化数据源 */
+  maxFileSize?: number
   enableChunk: number
   openUpload: boolean
   /** 匿名上传需登录（upload.require_login）；缺省=false */

@@ -217,7 +217,9 @@ export default {
   upload: {
     title: 'Upload Files',
     dragHint: 'Drag files here, or click to choose',
-    clickHint: 'Multiple files supported, up to 5GB per file',
+    clickHint: 'Multiple files supported, {clause}',
+    maxFileLimited: 'up to {size} per file',
+    maxFileUnlimited: 'no per-file size limit',
     formatHint: 'Any file type; you can also paste with Ctrl/Cmd + V',
     largeFileHint: 'Large files go through direct object-storage upload — faster and more reliable',
     presignFallback: 'Anonymous direct upload is disabled; switched to the standard channel',
