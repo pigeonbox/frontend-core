@@ -831,6 +831,7 @@ export default {
       sendHint: 'Generates a 12-char code; the peer picks up within 10 minutes. The code is the authorization — keep it secret',
       pairHintOn: 'Pairing mode: shows a 4-digit timed code (5 min). After the peer enters it, approve their request here',
       pairHintOff: 'Pairing mode off — a 12-character passcode will be generated',
+      pairHintUpload: 'Browser uploads do not support pairing codes yet — use "Server path" mode, or show a code from Desktop/Web',
       pairAsk: 'Device {name} requests to connect:',
       pairAccept: 'Accept',
       pairDeny: 'Deny',

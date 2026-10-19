@@ -140,6 +140,9 @@
               <el-switch v-model="pairMode" :disabled="sending" active-text="" />
               <span class="field-hint">{{ pairMode ? t('admin.p2p.pairHintOn') : t('admin.p2p.pairHintOff') }}</span>
             </div>
+            <div v-else class="card-actions">
+              <span class="field-hint">{{ t('admin.p2p.pairHintUpload') }}</span>
+            </div>
             <div class="card-actions">
               <el-button
                 v-if="sendMode === 'upload'"

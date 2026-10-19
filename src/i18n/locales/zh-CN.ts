@@ -824,6 +824,7 @@ export default {
       sendHint: '生成 12 位口令，对端 10 分钟内凭口令取件；口令即授权，勿泄露',
       pairHintOn: '配对码模式：亮 4 位定时码（5 分钟），对方输码后需你在此裁决敲门请求',
       pairHintOff: '配对码模式已关，将生成 12 位口令',
+      pairHintUpload: '本机文件直发暂不支持配对码（请用「服务器路径」模式，或经桌面端/网页版亮码）',
       pairAsk: '设备 {name} 请求连接：',
       pairAccept: '接受',
       pairDeny: '拒绝',
