@@ -1368,7 +1368,7 @@ export default {
     '10007': 'Request timed out',
     '10008': 'Internal server error',
     '10009': 'Method not allowed',
-    '10010': 'Request body too large',
+    '10010': 'Upload size exceeds the limit',
     '10011': 'Too many attempts; temporarily locked',
     '20001': 'Share not found',
     '20002': 'Share expired',
