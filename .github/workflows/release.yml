@@ -3,7 +3,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  # tagger 显式 dispatch 兜底(GITHUB_TOKEN 推 tag 不产生 push 事件);ref=目标 tag
+  # 手动 dispatch 兜底（库线 tag 人工打；若推 tag 未触发本工作流，手动指定
+  # ref=目标 tag 重跑）；ref=目标 tag
   workflow_dispatch: {}
 
 permissions:
@@ -16,15 +17,18 @@ jobs:
     # 与 contracts 的 gen-ts tgz 同模式)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "22"
       - name: 版本对齐(package.json.version ← tag)
+        # 仅对齐本次 pack 用的版本号（保证 tgz 文件名与 tag 一致）；
+        # 仓库里的 package.json version 须与发布 tag 手工保持同步
+        # （库线先手打 tag，发布列车再消费该 tag），本步骤不回写仓库
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --no-workspaces-update --allow-same-version
       - name: Pack 源码包
         run: npm pack --pack-destination .
       - name: Upload to release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: pigeonbox-frontend-core-*.tgz

@@ -281,9 +281,9 @@ const buildDownloadUrl = (fileId?: number): string => {
   // 旧后端无此字段时回退到手工拼接
   const data = shareData.value as Record<string, unknown> | null
   let url = (data?.download_url as string | undefined) || `/share/download?code=${encodeURIComponent(shareCode.value)}`
-  if (password.value && !url.includes('password=')) {
-    url += `&password=${encodeURIComponent(password.value)}`
-  }
+  // 口令绝不入 URL：core v0.24.0 起取件端点停收 ?password=，取件密码走
+  // X-Share-Password 请求头（见 shareApi.getShare），下载地址一律用服务端下发的
+  // 令牌化 download_url；拼 query 会把明文口令泄进浏览器历史/Referer/代理日志
   if (fileId != null && fileId > 0) {
     url += `&file=${fileId}`
   }
