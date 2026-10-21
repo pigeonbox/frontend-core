@@ -32,6 +32,15 @@
 
           <!-- ============ 站点与外观（base + ui） ============ -->
           <el-form v-if="activeSection === 'site'" label-width="180px" class="config-form">
+            <!-- 未配置公网地址时告警：分享链接会带内网地址，外部用户打不开 -->
+            <el-alert
+              v-if="publicUrlMissing"
+              type="warning"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.basic.publicUrlWarn')"
+            />
             <el-divider content-position="left">{{ t('admin.configPage.sections.site') }}</el-divider>
             <el-form-item :label="t('admin.configPage.basic.siteName')">
               <el-input v-model="configForm.base.name" />
@@ -39,6 +48,16 @@
 
             <el-form-item :label="t('admin.configPage.basic.siteDescription')">
               <el-input v-model="configForm.base.description" type="textarea" :rows="3" />
+            </el-form-item>
+
+            <el-form-item :label="t('admin.configPage.basic.publicUrl')">
+              <el-input
+                v-model="configForm.base.public_url"
+                :placeholder="t('admin.configPage.basic.publicUrlPlaceholder')"
+                clearable
+                style="max-width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.basic.publicUrlHint') }}</span>
             </el-form-item>
 
             <el-divider content-position="left">{{ t('admin.configPage.sections.appearance') }}</el-divider>
@@ -503,7 +522,9 @@ const configForm = reactive({
   base: {
     name: '',
     description: '',
-    port: 12346
+    port: 12346,
+    // 站点公网地址（base 值段字段，整段随 base 提交；空串=未配置→前端回退 location.origin）
+    public_url: ''
   },
   transfer: {
     max_count: 100,
@@ -517,6 +538,9 @@ const configForm = reactive({
   }
 })
 
+// 公网地址未配置告警（内网部署时分享链接会带内网地址，外部用户打不开）
+const publicUrlMissing = computed(() => !configForm.base.public_url.trim())
+
 const fetchConfig = async () => {
   loading.value = true
   try {
@@ -525,6 +549,8 @@ const fetchConfig = async () => {
       // 映射配置数据
       if (res.data.base) {
         Object.assign(configForm.base, res.data.base)
+        // 后端可能下发 null（未配置）→ 归一为空串，避免把 null 提交回配置段
+        if (!configForm.base.public_url) configForm.base.public_url = ''
       }
       if (res.data.transfer) {
         Object.assign(configForm.transfer, res.data.transfer)

@@ -70,9 +70,16 @@
       class="shares-table"
     >
       <el-table-column type="selection" width="46" :selectable="(row: UserShareItem) => !row.deleted_at || activeStatus === 'deleted'" />
-      <el-table-column :label="t('user.shares.code')" min-width="140">
+      <el-table-column :label="t('share.codeLabel')" min-width="140">
         <template #default="{ row }">
           <code class="mono code-cell">{{ row.code }}</code>
+        </template>
+      </el-table-column>
+      <!-- 6 位取件码（2026-10-22）：发件后找回的唯一凭据，此前列表不展示（双码断裂） -->
+      <el-table-column :label="t('user.shares.code')" width="110">
+        <template #default="{ row }">
+          <code v-if="row.pickup_code" class="mono code-cell code-primary">{{ row.pickup_code }}</code>
+          <span v-else class="muted">—</span>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.shares.type')" width="90">
@@ -221,6 +228,7 @@ import {
 } from '@element-plus/icons-vue'
 import { userSharesApi, type UserShareItem } from '@/api/userShares'
 import { copyToClipboard } from '@/utils/clipboard'
+import { withBase } from '@/utils/base'
 import { useTableQuery } from '@/composables/useTableQuery'
 import PageHeader from '@/components/data/PageHeader.vue'
 import ExpireText from '@/components/data/ExpireText.vue'
@@ -276,15 +284,23 @@ const { list, total, page, pageSize, loading, load, reload, handlePageChange, ha
 // 操作后刷新适配器：带参=跳页，无参=刷新当前页
 const loadList = (resetPage?: number) => (resetPage ? load(resetPage) : load())
 
+// 复制链接：优先用 6 位取件码深链（收件人凭此在首页取件，发件后找回的唯一凭据）；
+// 无取件码（E2E 密文分享/历史数据）时回退 8 位分享码链接。
+// withBase 补部署前缀（统一网关 /app/pigeonbox/ 部署下裸 origin+hash 会丢前缀）
 const copyLink = async (row: UserShareItem) => {
-  const url = `${window.location.origin}/#/share/${row.code}`
+  const path = row.pickup_code
+    ? `/#/?code=${encodeURIComponent(row.pickup_code)}`
+    : `/#/share/${row.code}`
+  const url = `${window.location.origin}${withBase(path)}`
   const ok = await copyToClipboard(url)
   if (ok) ElMessage.success(t('user.shares.linkCopied'))
   else ElMessage.error(t('common.failed'))
 }
 
+// 复制取件码：优先 6 位取件码（按钮文案即「复制取件码」），无则回退 8 位分享码
 const copyCode = async (row: UserShareItem) => {
-  const ok = await copyToClipboard(row.code)
+  const code = row.pickup_code || row.code
+  const ok = await copyToClipboard(code)
   if (ok) ElMessage.success(t('user.shares.codeCopied'))
   else ElMessage.error(t('common.failed'))
 }
@@ -481,6 +497,12 @@ onMounted(() => {
   background: var(--color-muted);
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-sm);
+}
+
+/* 6 位取件码：主色高亮（与 8 位分享码区分，参照 user/History.vue） */
+.code-primary {
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
 .text-preview {

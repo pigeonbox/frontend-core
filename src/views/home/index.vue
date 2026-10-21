@@ -21,13 +21,20 @@
               <el-icon size="22"><Postcard /></el-icon>
             </div>
             <h2 class="card-head-title">{{ t('home.cardTitle.get') }}</h2>
+            <!-- 首次访问的一句产品说明：这是什么柜子、怎么用 -->
+            <p class="card-head-desc">{{ t('home.pickupIntro') }}</p>
           </div>
           <div class="card-pane"><GetShare ref="getShareRef" :deep-code="deepCode" /></div>
 
-          <!-- 卡内页脚：去发送 / 本机记录（两条次级入口并排一行,不与主 CTA 抢层级） -->
-          <div class="card-footer">
-            <a class="footer-link" @click="router.push('/send')">{{ t('home.goSend') }}</a>
-            <span class="footer-dot">·</span>
+          <!-- 跨站提示：仅联邦启用时出现（单站部署不该出现联邦词汇） -->
+          <p v-if="federationEnabled" class="federation-hint">{{ t('home.federationHint') }}</p>
+
+          <!-- 双动词同级：取件输入 + 主 CTA「我也要寄」（同卡片、同权重），本机记录降为次级入口 -->
+          <div class="card-actions">
+            <el-button size="large" class="send-cta" @click="router.push('/send')">
+              <el-icon><Promotion /></el-icon>
+              {{ t('home.ctaSend') }}
+            </el-button>
             <a class="footer-link" @click="getShareRef?.openHistory()">{{ t('home.getShare.history') }}</a>
           </div>
         </div>
@@ -67,7 +74,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { Postcard } from '@element-plus/icons-vue'
+import { Postcard, Promotion } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import { useLocaleStore } from '@/stores/locale'
@@ -89,6 +96,8 @@ const localeStore = useLocaleStore()
 const { t, locale } = useI18n()
 // 宿主可用性(页脚「应用设置」入口显隐;default 适配器恒 false)
 const hostAppSettings = computed(() => host.capabilities.appSettings)
+// 联邦启用（多副本部署下后端强制降级为 false）→ 取件台显式提示跨站取件能力
+const federationEnabled = computed(() => configStore.federationEnabled)
 
 // 取件专属页（2026-10-07 拆分：文件/文本分享迁往 /send,避免 tab 切换
 // 撑高卡片使取件失焦）。旧 ?tab=file|text 深链重定向到发送页
@@ -137,10 +146,12 @@ onMounted(async () => {
   background: var(--color-bg);
 }
 
+/* 主容器宽度：随视口自适应（桌面端收紧留白，移动端单列贴边） */
 .main-wrapper {
-  max-width: 1100px;
+  width: 100%;
+  max-width: 960px;
   margin: 0 auto;
-  padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-2xl);
+  padding: var(--spacing-xl) clamp(16px, 4vw, 40px) var(--spacing-2xl);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -222,6 +233,15 @@ onMounted(async () => {
   color: var(--color-text-primary);
 }
 
+/* 一句产品说明：首次访问的人一眼知道这是什么柜子 */
+.card-head-desc {
+  margin: 0;
+  max-width: 460px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
 
 /* 功能卡片 —— 视觉焦点（在剩余空间垂直居中;auto margin 在内容超高时安全塌缩为 0,不裁剪） */
 .function-card {
@@ -238,14 +258,47 @@ onMounted(async () => {
   padding: 0 var(--spacing-sm);
 }
 
-/* 卡内页脚（次级入口行:去发送 · 取件/发件记录） */
-.card-footer {
+/* 跨站取件提示（联邦启用时才出现）——弱化排版，不与取件输入抢焦点 */
+.federation-hint {
+  margin: var(--spacing-sm) 0 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--color-text-tertiary);
+}
+
+/* 卡内动作区：主 CTA「我也要寄」与取件输入同权重（同样尺寸的胶囊按钮），
+   本机记录降为文字次级入口 */
+.card-actions {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin-top: var(--spacing-sm);
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
   padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-md);
+}
+
+/* 描边胶囊（与卡内取件主按钮同几何：48px 高 / 999px 圆角 / 500px 上限），
+   填充态留给"取件"，本按钮承担"寄"这一同权重动词 */
+.send-cta {
+  width: 100%;
+  max-width: 500px;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 999px;
+  border-width: 2px;
+  color: var(--primary-color);
+  background: transparent;
+  border-color: var(--primary-color);
+  transition: opacity 0.2s ease;
+}
+
+.send-cta:hover:not(.is-disabled) {
+  opacity: 0.85;
+  color: var(--primary-color);
+  background: var(--primary-bg);
+  border-color: var(--primary-color);
 }
 
 .footer-link {
@@ -260,10 +313,6 @@ onMounted(async () => {
 
 .footer-link:hover {
   color: var(--primary-color);
-}
-
-.footer-dot {
-  color: var(--color-border);
 }
 
 /* 分段切换器：圆角轨道 + 活动白块（对标上游 发送文件/发送文本） */
@@ -318,6 +367,10 @@ onMounted(async () => {
 
 /* ===== 响应式：手机端 (≤768px) ===== */
 @media (max-width: 768px) {
+  .main-wrapper {
+    padding: var(--spacing-md) var(--spacing-md) var(--spacing-xl);
+  }
+
   .function-card {
     padding: var(--spacing-xs) var(--spacing-md);
     /* 圆角大卡片贴边留 2px 呼吸,避免"框中框"的局促 */

@@ -113,10 +113,28 @@ export default {
     hostAppSettings: '应用设置',
     needRetrieve: '需要取件？',
     goSend: '去发送',
+    // 柜面（首页）改版：一句产品说明 + 双动词主 CTA
+    pickupIntro: '这是一个文件柜。把 6 位取件码发给别人，对方在这里输入即可取件。',
+    // 跨站取件提示（仅联邦启用时出现）
+    federationHint: '本柜与其它站点联网：凭取件码取件时若本柜没有，会自动到联网站点查找。',
+    ctaSend: '我也要寄',
     cardTitle: {
       get: '提取文件',
       file: '文件发送',
       text: '文本分享',
+      p2p: '设备直传',
+    },
+    // 寄件台：投递路径选择器（到柜 / 直连设备）
+    path: {
+      label: '投递路径',
+      box: '到柜（本服务器）',
+      p2p: '直连设备',
+      p2pTitle: '直连设备 · PigeonBeam 信鸽直传',
+      p2pDesc: '文件端到端加密直传到对方设备，不经过本服务器；对方设备也需要安装 PigeonBeam。',
+      p2pOpen: '打开信鸽直传',
+      p2pReady: '直传组件已就绪，点击进入。',
+      p2pNeedLogin: '需先登录 PigeonBox 后再进入本页面。',
+      p2pNotReady: '直传组件未就绪（p2pcweb 未安装或未启动），请联系管理员。',
     },
     tabs: {
       file: '文件分享',
@@ -151,7 +169,8 @@ export default {
     },
     getShare: {
       pickupTitle: '输入取件码 / 分享码',
-      autoHint: '取件码 6 位，填满自动取件；8 位分享码可整段粘贴',
+      autoHint: '取件码 6 位，填满自动取件；分享码/自定义口令请整段粘贴',
+      codeLengthInvalid: '码长不合法：取件码为 6 位；分享码/自定义口令为 3-64 位',
       caseSensitive: '区分大小写',
       caseInsensitive: '大小写不限',
       emptyCode: '请输入取件码或分享码',
@@ -161,6 +180,30 @@ export default {
       label: '6 位取件码（对方凭此在首页取件）',
       copy: '复制',
       heroHint: '对方也可直接打开完整链接取件（见下方页签）',
+    },
+    // 交付面（分享成功态）：一次投递 = 一件可直接转发的交付物
+    delivery: {
+      label: '交付文本',
+      hint: '把下面这段直接发给对方：对方打开站点、输入取件码即可取件',
+      copy: '复制交付文本',
+      copied: '交付文本已复制到剪贴板',
+      share: '系统分享',
+      shareUnavailable: '当前浏览器不支持系统分享',
+      guideCard: '下载引导卡',
+      guideCardDone: '引导卡已下载',
+      guideCardFailed: '引导卡生成失败',
+      text: '取件码 {code} · 站点 {site} · {action}',
+      action: '打开站点输入取件码即可取件',
+      textLink: '取件链接 {url}（站点 {site}）',
+      expireDays: '{n} 天后失效',
+      expireHours: '{n} 小时后失效',
+      expireMinutes: '{n} 分钟后失效',
+      expireForever: '永久有效',
+      expirePassed: '已失效',
+      cardSubtitle: '扫码或输入取件码即可取件',
+      cardCodeLabel: '取件码',
+      cardLinkLabel: '取件链接',
+      cardInstruction: '打开 {site} 输入取件码即可取件',
     },
     codeCopied: '取件码已复制',
     apiDocs: 'API 文档',
@@ -189,6 +232,8 @@ export default {
     empty: '暂无记录（仅保存在本设备，不上传服务器）',
     clear: '清空',
     cleared: '已清空',
+    expired: '已过期',
+    expiredHint: '该分享已过期',
   },
   federation: {
     title: '联邦取件',
@@ -198,6 +243,7 @@ export default {
     go: '前往取件',
   },
   anonymous: {
+    resultExpired: '链接已失效，请重新取件',
     passwordPlaceholder: '若分享者设置了密码请输入',
     submit: '取件',
     resultTitle: '取件成功',
@@ -244,6 +290,13 @@ export default {
     chunk_size: '分片大小',
     expires: '有效期',
     expire: '有效期',
+    // 有效期胶囊预设（1/7/30 天 + 永久）
+    expirePreset: {
+      day1: '1 天',
+      day7: '7 天',
+      day30: '30 天',
+      forever: '永久',
+    },
     expires_forever: '永久',
     expires_1h: '1 小时',
     expires_1d: '1 天',
@@ -292,6 +345,7 @@ export default {
   },
   share: {
     title: '文件分享',
+    passwordDownloadHint: '该分享受密码保护，请通过取件页获取下载凭证',
     expires_at: '过期时间',
     size: '大小',
     downloads: '下载次数',
@@ -538,6 +592,11 @@ export default {
     },
   },
   admin: {
+    group: {
+      delivery: '投递与文件',
+      operations: '用户与运营',
+      system: '系统',
+    },
     serverVersion: '服务端版本',
     frontendVersion: '前端版本',
     health: {
@@ -679,7 +738,11 @@ export default {
       basic: {
         siteName: '站点名称',
         siteDescription: '站点描述',
-        port: '端口'
+        port: '端口',
+        publicUrl: '站点公网地址',
+        publicUrlPlaceholder: 'https://box.example.com',
+        publicUrlHint: '这是别人用来取件的地址；留空则用浏览器当前地址（内网部署时分享出去可能打不开）',
+        publicUrlWarn: '未配置站点公网地址：内网访问时生成的分享链接将带内网地址，外部用户可能无法打开'
       },
       transfer: {
         maxCount: '传输次数上限',
@@ -1610,6 +1673,41 @@ export default {
   },
 
   setup: {
+    // 四步向导（2026-10-22）：管理员 → 站点地址 → 投递策略 → 完成
+    stepAdmin: '管理员',
+    stepSite: '站点地址',
+    stepPolicy: '投递策略',
+    stepDone: '完成',
+    next: '下一步',
+    prev: '上一步',
+    finish: '完成设置',
+    publicUrlLabel: '站点公网地址',
+    publicUrlHint: '别人用它取件。留空则按浏览器当前地址生成——内网部署时分享出去可能打不开。',
+    publicUrlDetected: '本机当前地址',
+    publicUrlInvalid: '公网地址需以 http:// 或 https:// 开头',
+    doneTitle: '设置完成',
+    doneSummary: '站点已就绪，可以开始投递与取件了',
+    doneSiteAddress: '取件地址',
+    doneUrlNotSaved: '站点公网地址未能自动保存（请稍后到管理后台「系统配置 → 基础」补设）',
+    donePickupCode: '取件码',
+    // 端到端自检（2026-10-22）：发一个测试文件并立刻取回，当场验掉
+    // 「存储不可写 / 取件码没铸上 / 公网地址填错」这三件控制台看不出来的事。
+    selfCheckLabel: '端到端自检',
+    selfCheckRun: '试一次投递',
+    selfCheckRunning: '正在自检（上传并取回一个测试文件）…',
+    selfCheckPassed: '自检通过：投递与取件链路正常',
+    selfCheckFailed: '自检未通过',
+    selfCheckNoCode: '未能铸造取件码',
+    selfCheckRetrieveFailed: '取件失败（存储或取件链路不可用）',
+    selfCheckUrlMismatch: '分享链接地址与配置的公网地址不一致——分享出去可能打不开',
+    selfCheckLinkOrigin: '链接地址',
+    selfCheckCfgOrigin: '配置地址',
+    selfCheckHint: '自检会发一个测试文件并立刻取回，用来验证存储与取件链路是否通；测试文件 1 小时后自动过期。',
+    goHome: '进入首页',
+    tryShare: '试一次投递',
+    tokenLabel: '首启令牌',
+    tokenHint: '服务端要求首启令牌：请从服务启动日志中复制令牌，或直接打开带 ?token= 的链接',
+    tokenInvalid: '首启令牌无效或缺失，请填入服务启动日志中的令牌',
     title: '系统初始化',
     description: '创建首个管理员账号，完成部署初始化',
     alreadyInitialized: '系统已初始化，即将返回首页',

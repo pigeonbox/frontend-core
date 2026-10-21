@@ -18,65 +18,87 @@
           class="admin-menu"
           router
         >
+          <!-- 管理台 IA 三组化（2026-10-22）：此前 12 个平铺项，自托管用户
+               每天只碰其中 2-3 个（文件管理/系统配置/用户），其余靠滚动找。
+               分组后「投递与文件」是日常面，「系统」是低频面。
+               仪表盘留顶层 —— 它是管理台落地页，藏进分组会让首屏是三个折叠组。 -->
           <el-menu-item :index="adminBase + '/dashboard'">
             <el-icon><Monitor /></el-icon>
             <span>{{ t('admin.dashboard') }}</span>
           </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/files'">
-            <el-icon><Folder /></el-icon>
-            <span>{{ t('admin.files') }}</span>
-          </el-menu-item>
+          <el-sub-menu :index="adminBase + '/g-delivery'">
+            <template #title>
+              <el-icon><Box /></el-icon>
+              <span>{{ t('admin.group.delivery') }}</span>
+            </template>
+            <el-menu-item :index="adminBase + '/files'">
+              <el-icon><Folder /></el-icon>
+              <span>{{ t('admin.files') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/local-files'">
-            <el-icon><FolderOpened /></el-icon>
-            <span>{{ t('admin.localFiles') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/local-files'">
+              <el-icon><FolderOpened /></el-icon>
+              <span>{{ t('admin.localFiles') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/users'">
-            <el-icon><User /></el-icon>
-            <span>{{ t('admin.users') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/moderation'">
+              <el-icon><View /></el-icon>
+              <span>{{ t('admin.moderationTitle') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/storage'">
-            <el-icon><Box /></el-icon>
-            <span>{{ t('admin.storage') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/logs'">
+              <el-icon><Document /></el-icon>
+              <span>{{ t('admin.logs') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/logs'">
-            <el-icon><Document /></el-icon>
-            <span>{{ t('admin.logs') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/p2p'">
+              <el-icon><Connection /></el-icon>
+              <span>{{ t('admin.p2pTitle') }}</span>
+            </el-menu-item>
+          </el-sub-menu>
 
-          <el-menu-item :index="adminBase + '/moderation'">
-            <el-icon><View /></el-icon>
-            <span>{{ t('admin.moderationTitle') }}</span>
-          </el-menu-item>
+          <el-sub-menu :index="adminBase + '/g-operations'">
+            <template #title>
+              <el-icon><User /></el-icon>
+              <span>{{ t('admin.group.operations') }}</span>
+            </template>
+            <el-menu-item :index="adminBase + '/users'">
+              <el-icon><User /></el-icon>
+              <span>{{ t('admin.users') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/p2p'">
-            <el-icon><Connection /></el-icon>
-            <span>{{ t('admin.p2pTitle') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/announcements'">
+              <el-icon><Bell /></el-icon>
+              <span>{{ t('admin.announcements') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/activities'">
-            <el-icon><List /></el-icon>
-            <span>{{ t('admin.activities') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/activities'">
+              <el-icon><List /></el-icon>
+              <span>{{ t('admin.activities') }}</span>
+            </el-menu-item>
+          </el-sub-menu>
 
-          <el-menu-item :index="adminBase + '/config'">
-            <el-icon><Setting /></el-icon>
-            <span>{{ t('admin.config') }}</span>
-          </el-menu-item>
+          <el-sub-menu :index="adminBase + '/g-system'">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              <span>{{ t('admin.group.system') }}</span>
+            </template>
+            <el-menu-item :index="adminBase + '/storage'">
+              <el-icon><Box /></el-icon>
+              <span>{{ t('admin.storage') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/maintenance'">
-            <el-icon><Tools /></el-icon>
-            <span>{{ t('admin.maintenance') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/config'">
+              <el-icon><Setting /></el-icon>
+              <span>{{ t('admin.config') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/announcements'">
-            <el-icon><Bell /></el-icon>
-            <span>{{ t('admin.announcements') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/maintenance'">
+              <el-icon><Tools /></el-icon>
+              <span>{{ t('admin.maintenance') }}</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
 
         <div class="sidebar-footer">

@@ -52,11 +52,29 @@ export function useUploadQueue(opts: {
   // 单文件直传的中断控制器（multi 用共享 controller）
   const controllers = new Map<string, AbortController>()
   let multiAbort: AbortController | null = null
+  /**
+   * 当前批次（start() 正在处理的任务行）+ 批次取消标记（2026-10-22）。
+   * multi 取消中止整批时，批次内其余任务必须一并落到终态——只标被点的那一个
+   * 会让其余停在 uploading/encrypting/binding，isUploading 恒真、按钮永久 loading。
+   */
+  let currentBatch: UploadTask[] = []
+  let batchRunning = false
+  let batchCancelled = false
 
   const isUploading = computed(() => tasks.value.some((f) => f.status === 'uploading' || f.status === 'encrypting' || f.status === 'binding'))
   const canStart = computed(
     () => tasks.value.length > 0 && tasks.value.some((f) => f.status === 'pending' || f.status === 'error')
   )
+
+  /** 批次内未到终态的任务统一落到终态（error）——取消/中断后必须收敛，否则按钮卡 loading */
+  const settleBatch = (msg: string) => {
+    for (const task of currentBatch) {
+      if (task.status === 'success' || task.status === 'error') continue
+      task.status = 'error'
+      task.error = msg
+      task.statusText = ''
+    }
+  }
 
   const newId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
@@ -94,12 +112,34 @@ export function useUploadQueue(opts: {
     }
     // W3 语义改进：multi 进行中取消任一任务=中止整批（multi-bind 需全部文件，
     // 单独移除一个无法成享；原行为仅标记、最终仍被成功覆盖且文件留在分享内）
-    if (multiAbort) {
-      multiAbort.abort()
+    if (multiAbort || batchRunning) {
+      multiAbort?.abort()
+      // 整批收敛（2026-10-22）：批次内未到终态的任务一并落到终态。
+      // 只标被点的那一个 → 其余停在 uploading/encrypting/binding →
+      // isUploading 恒真 → 上传按钮永久 loading。
+      batchCancelled = true
+      settleBatch(t('upload_view.presign.abort'))
+      return
     }
     task.status = 'error'
     task.error = t('upload_view.presign.abort')
     task.statusText = ''
+  }
+
+  /**
+   * 单任务重试（2026-10-22）：把失败任务复位回 pending 并重新入队。
+   * 多文件批量语义下单文件重试不成立（批量分享需整批文件同时成享）：
+   * 队列多于 1 个任务时只复位（由主按钮整批重跑），不自动发起。
+   */
+  const retry = async (id: string): Promise<ShareResult | null> => {
+    const task = tasks.value.find((f) => f.id === id)
+    if (!task || task.status !== 'error') return null
+    task.status = 'pending'
+    task.error = ''
+    task.statusText = ''
+    task.progress = 0
+    if (tasks.value.length > 1) return null
+    return await start()
   }
 
   const dispose = () => {
@@ -107,6 +147,9 @@ export function useUploadQueue(opts: {
     controllers.clear()
     multiAbort?.abort()
     multiAbort = null
+    // 卸载即中止：批次内未到终态的任务一并收敛（避免残留 uploading 态）
+    batchCancelled = true
+    settleBatch(t('upload_view.presign.abort'))
   }
 
   const multiOptions = (): MultiShareOptions => ({
@@ -120,6 +163,13 @@ export function useUploadQueue(opts: {
     note: settings.note || undefined,
   })
 
+  /** 结束批次登记（提前返回路径必须调用，否则 batchRunning 残留 true） */
+  const endBatch = () => {
+    multiAbort = null
+    batchRunning = false
+    currentBatch = []
+  }
+
   const start = async (): Promise<ShareResult | null> => {
     const pending = tasks.value.filter((f) => f.status === 'pending' || f.status === 'error')
     if (pending.length === 0) return null
@@ -129,6 +179,10 @@ export function useUploadQueue(opts: {
         task.error = ''
       }
     }
+    // 批次登记（取消时整批收敛用）
+    currentBatch = pending
+    batchRunning = true
+    batchCancelled = false
 
     // E2E：单密钥 + 逐文件预加密（密文作为实际上传内容）
     let e2eKey = ''
@@ -136,11 +190,13 @@ export function useUploadQueue(opts: {
       const tooBig = pending.filter((f) => f.file.size > E2E_MAX_BYTES)
       if (tooBig.length > 0) {
         ElMessage.error(t('upload.e2e.tooLarge'))
+        endBatch()
         return null
       }
       try {
         e2eKey = await generateKeyB64()
         for (const task of pending) {
+          if (batchCancelled) break
           task.status = 'encrypting'
           task.statusText = t('upload.e2e.encrypting')
           task.progress = 0
@@ -157,6 +213,13 @@ export function useUploadQueue(opts: {
           }
         }
         ElMessage.error(msg)
+        endBatch()
+        return null
+      }
+      // 加密阶段被取消：整批收敛，不再进入上传通道
+      if (batchCancelled) {
+        settleBatch(t('upload_view.presign.abort'))
+        endBatch()
         return null
       }
     }
@@ -355,15 +418,17 @@ export function useUploadQueue(opts: {
         msg = t('upload_view.presign.abort')
       }
       for (const task of pending) {
-        if (task.status !== 'success') {
-          task.status = 'error'
-          task.error = msg
-        }
+        if (task.status === 'success') continue
+        // 已有终态错误（如用户取消）不覆盖——保留「已取消」与真实失败原因的区分
+        if (task.status === 'error' && task.error) continue
+        task.status = 'error'
+        task.error = msg
       }
-      ElMessage.error(msg)
+      // 不再弹全局 toast（2026-10-22）：行内已有逐条错误文本，重复弹窗是噪音；
+      // 混合成功/失败态下全局文案也无法准确表达——行内文本才是真相。
       return null
     } finally {
-      multiAbort = null
+      endBatch()
     }
   }
 
@@ -374,6 +439,7 @@ export function useUploadQueue(opts: {
     addFiles,
     remove,
     cancel,
+    retry,
     start,
     dispose,
   }

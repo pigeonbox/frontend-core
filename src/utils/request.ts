@@ -85,6 +85,10 @@ instance.interceptors.response.use(
       '/anonymous/download',
       '/share/download',
       '/preview',
+      // /setup（2026-10-22 首启门禁）：401 = **首启令牌缺失/错误**，与会话无关
+      // —— 首启时根本没有会话，触发刷新必然失败并把用户弹去登录页，令牌输入
+      // 框永远不出现。与上面几条同族：业务语义 401 不许触发刷新或跳登录。
+      '/setup',
     ].some((p) => url.includes(p))
     if (
       error.response?.status === 401 &&

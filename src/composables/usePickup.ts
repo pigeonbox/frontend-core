@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { anonymousApi } from '@/api/anonymous'
 import { federationApi } from '@/api/federation'
 import { useErrorHandler } from '@/composables/useErrorHandler'
-import { localHistory } from '@/utils/localHistory'
+import { localHistory, newSessionKey, putSession } from '@/utils/localHistory'
 
 /**
  * 匿名取件状态机（2026-10-09 自 /retrieve 页融合进首页输入组件）：
@@ -167,9 +167,15 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
           router.push({ path: `/share/${encodeURIComponent(shareCode)}` })
           return
         }
+        // 结果数据走 sessionStorage + URL 只带一个不透明 key（2026-10-22）：
+        // 结果元信息（文件名/大小/下载地址）不再进 URL —— 地址栏、浏览器历史、
+        // Referer 都不再留痕。此前把 JSON 塞进 ?data= 是把取件内容挂在
+        // URL 上（截图即泄露、转发即泄露）。
+        const sessionKey = newSessionKey()
+        putSession(sessionKey, res.data)
         router.push({
           path: '/retrieve/result',
-          query: { data: encodeURIComponent(JSON.stringify(res.data)) },
+          query: { k: sessionKey },
         })
       } else {
         // 本站未命中：仅「未命中」形态（404/20005）值得问联邦（竞速窗内命中

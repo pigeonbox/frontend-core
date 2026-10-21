@@ -1,8 +1,9 @@
 <template>
   <div class="file-upload-container">
-    <!-- 全局拖拽高亮（点击即撤兜底：拖拽事件任何漏网形态下用户点一下即可脱困，勿依赖刷新） -->
+    <!-- 全局拖拽高亮。遮罩不可点击（pointer-events: none，见样式）：全屏遮罩不应
+         拦截指针事件；熄灭靠 dragleave/drop，blur 兜底见 useFileDrop -->
     <transition name="fade">
-      <div v-if="isDragging" class="global-drop-overlay" @click="isDragging = false">
+      <div v-if="isDragging" class="global-drop-overlay">
         <div class="drop-hint">
           <el-icon size="64" class="icon-primary"><UploadFilled /></el-icon>
           <h2>{{ t('upload.dragHint') }}</h2>
@@ -46,8 +47,10 @@
         v-for="task in tasks"
         :key="task.id"
         :task="task"
+        :multi-mode="tasks.length > 1"
         @remove="remove"
         @cancel="cancel"
+        @retry="handleRetry"
       />
     </transition-group>
 
@@ -142,7 +145,7 @@ const queue = useUploadQueue({
       e2e: s.e2e,
     }),
 })
-const { tasks, isUploading, canStart, addFiles, remove, cancel, start, dispose } = queue
+const { tasks, isUploading, canStart, addFiles, remove, cancel, retry, start, dispose } = queue
 
 const { isDragging } = useFileDrop({ onFiles: addFiles })
 
@@ -158,6 +161,14 @@ const handleUploadAll = async () => {
     return
   }
   const outcome = await start()
+  if (outcome) {
+    emit('success', outcome)
+  }
+}
+
+// 行内单文件重试（2026-10-22）：失败任务复位后重跑该文件，成功同样走 success 事件
+const handleRetry = async (id: string) => {
+  const outcome = await retry(id)
   if (outcome) {
     emit('success', outcome)
   }

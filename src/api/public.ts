@@ -33,9 +33,30 @@ export interface PublicConfig {
   accentColor?: string
   /** 分享码/口令查询是否不区分大小写（download.code_case_insensitive，缺省=开；旧后端无此键） */
   codeCaseInsensitive?: boolean
+  /** 站点公网地址（base.public_url，空串=未配置）；分享链接/交付文本按它拼，缺省回退 location.origin */
+  publicUrl?: string
+  /** 联邦是否启用（多副本模式下后端强制降级为 false）；取件台据此显式给出「跨站取件」提示 */
+  federationEnabled?: boolean
   expireStyle: string[]
   textMaxBytes: number
   initialized?: boolean
+}
+
+/** 取件元数据（GET /share/metadata/:code，免密码、不扣次数；仅用于回显有效期） */
+export interface ShareMetadata {
+  code: string
+  /** text | file */
+  type: string
+  name?: string
+  size: number
+  has_password: boolean
+  /** 过期时间（RFC3339；null=永久有效） */
+  expired_at: string | null
+  expired_count: number
+  used_count: number
+  encrypted: boolean
+  file_count: number
+  created_at: string
 }
 
 // 系统初始化请求（字段名与后端 thrift 模型 snake_case 对齐）
@@ -72,6 +93,14 @@ export const publicApi = {
       message: string
     }>({
       url: '/setup/check',
+      method: 'GET',
+    })
+  },
+
+  // 取件元数据（分享成功态回显有效期用）：免密码、不扣取件次数、不外泄内容
+  getShareMetadata: (code: string) => {
+    return request<ApiResponse<ShareMetadata>>({
+      url: `/share/metadata/${encodeURIComponent(code)}`,
       method: 'GET',
     })
   },

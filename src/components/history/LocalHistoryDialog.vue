@@ -14,10 +14,14 @@
               v-for="rec in pickupList"
               :key="rec.code + rec.time"
               class="hist-row"
+              :class="{ 'hist-row-expired': rec.expired }"
               @click="onPickup(rec)"
             >
-              <span class="hist-code">{{ rec.code }}</span>
+              <span class="hist-code">{{ rec.pickup_code || rec.code }}</span>
               <span class="hist-name">{{ rec.name || t('history.share') }}</span>
+              <el-tag v-if="rec.expired" size="small" type="info" class="hist-expired-tag">
+                {{ t('history.expired') }}
+              </el-tag>
               <span class="hist-time">{{ formatTime(rec.time) }}</span>
             </div>
           </div>
@@ -43,10 +47,17 @@
               v-for="rec in sendList"
               :key="rec.code + rec.time"
               class="hist-row"
+              :class="{ 'hist-row-expired': rec.expired }"
               @click="onCopySend(rec)"
             >
-              <span class="hist-code">{{ rec.code }}</span>
+              <!-- 发件记录回显**用户手上真正持有的 6 位取件码**（2026-10-22）：
+                   此前回显 8 位分享码，与用户在成功弹窗里拿到的码不是同一个，
+                   复制出来的东西对不上。pickup_code 缺失时回退分享码。 -->
+              <span class="hist-code">{{ rec.pickup_code || rec.code }}</span>
               <span class="hist-name">{{ rec.name || t('history.share') }}</span>
+              <el-tag v-if="rec.expired" size="small" type="info" class="hist-expired-tag">
+                {{ t('history.expired') }}
+              </el-tag>
               <span class="hist-time">{{ formatTime(rec.time) }}</span>
             </div>
           </div>
@@ -100,11 +111,21 @@ const formatTime = (ts: number) => {
 }
 
 const onPickup = (rec: LocalShareRecord) => {
+  // 已过期的记录不再跳取件（2026-10-22）：跳过去只会在取件页拿到一句过期，
+  // 用户以为是自己输错了码。留在列表里置灰即可。
+  if (rec.expired) {
+    ElMessage.warning(t('history.expiredHint'))
+    return
+  }
   visible.value = false
-  emit('pickup', rec.code)
+  emit('pickup', rec.pickup_code || rec.code)
 }
 
 const onCopySend = async (rec: LocalShareRecord) => {
+  if (rec.expired) {
+    ElMessage.warning(t('history.expiredHint'))
+    return
+  }
   if (!rec.url) return
   const ok = await copyToClipboard(rec.url)
   if (ok) ElMessage.success(t('home.linkCopied'))
@@ -151,6 +172,17 @@ defineExpose({ open })
 
 .hist-row:last-child {
   border-bottom: none;
+}
+
+/* 已过期记录置灰（2026-10-22）：记录无过期标识时，过期分享长期滞留，
+   点「取件」才知过期——用户会以为是自己输错了码。 */
+.hist-row-expired {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.hist-expired-tag {
+  flex: 0 0 auto;
 }
 
 .hist-row:hover {

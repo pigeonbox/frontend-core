@@ -18,9 +18,16 @@
         :placeholder="t('upload.textPlaceholder')"
         resize="none"
         class="text-area"
-        maxlength="10000"
-        show-word-limit
-      />
+      >
+        <!-- 字节口径计数（2026-10-22）：上限判定本就是字节（textMaxBytes），
+             此前 maxlength="10000"（字符）会把超长文本静默截断，
+             字节预检永远触发不到；改为不设字符上限 + 显示字节数。 -->
+        <template #counter>
+          <span :class="{ 'over-limit': byteLength > textMaxBytes }">
+            {{ formatSize(byteLength) }} / {{ formatSize(textMaxBytes) }}
+          </span>
+        </template>
+      </el-input>
     </div>
 
     <!-- 分享设置（与 FileUpload 共用 ShareSettingsForm；text 场景,E2E 提示不带文件体积限制） -->
@@ -54,6 +61,7 @@ import { encryptText, generateKeyB64 } from '@/utils/e2e'
 import { useUserStore } from '@/stores/user'
 import { useShareSettings } from '@/composables/useShareSettings'
 import { translateError } from '@/utils/api-interceptor'
+import { formatFileSize as formatSize } from '@/utils/format'
 import ShareSettingsForm from '@/components/share/ShareSettingsForm.vue'
 
 const { t } = useI18n()
@@ -80,6 +88,11 @@ const emit = defineEmits<{
 const textContent = ref('')
 const sharing = ref(false)
 
+// 文本上限：字节口径（后端公开配置 textMaxBytes，缺省 222KB）
+const textMaxBytes = computed(() => configStore.config?.textMaxBytes || 222 * 1024)
+// 当前文本字节数（UTF-8，与后端入库口径一致）
+const byteLength = computed(() => new TextEncoder().encode(textContent.value).length)
+
 // 分享设置（过期/密码/自定义码/E2E）——与 FileUpload 共用同一状态机
 const { settings, validate } = useShareSettings()
 
@@ -94,8 +107,7 @@ const handleShare = async () => {
   }
 
   // 超限预检（对标上游"内容过多，建议改用文件"引导）：byte 级而非字符级
-  const textMax = useConfigStore().config?.textMaxBytes || 222 * 1024
-  if (new Blob([textContent.value]).size > textMax) {
+  if (byteLength.value > textMaxBytes.value) {
     ElMessage.warning(t('upload.textTooLargeHint'))
     return
   }
@@ -182,6 +194,11 @@ const handleShare = async () => {
 
 .text-area :deep(.el-textarea__inner:focus) {
   border-color: var(--primary-color);
+}
+
+/* 字节计数超限标红（提示改用文件分享） */
+.over-limit {
+  color: var(--color-danger);
 }
 
 /* 设置表单样式内聚于 ShareSettingsForm 组件 */

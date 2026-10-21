@@ -82,6 +82,15 @@
           <!-- 文件分享（回归：select 响应恒带 url/download_url，不能作文件判据；
                文本分享 = 有 text 且无 file_name/files，否则文本被当文件渲染） -->
           <div v-if="hasFileContent" class="file-share-content">
+            <!-- 密码保护且无服务端直链：无可用下载地址（2026-10-22） -->
+            <el-alert
+              v-if="downloadBlocked"
+              type="warning"
+              :title="t('share.passwordDownloadHint')"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+            />
             <!-- 文件备注（发送者随文件投递的附言） -->
             <div v-if="shareData.note" class="note-box">
               <div class="note-label">
@@ -100,7 +109,7 @@
                   <el-tag v-if="shareData.encrypted" type="warning" size="small">{{ t('share.e2eTag') }}</el-tag>
                 </div>
                 <el-button
-                  v-if="!shareData.encrypted"
+                  v-if="!shareData.encrypted && !downloadBlocked"
                   type="primary"
                   class="download-btn"
                   @click="downloadAll"
@@ -114,7 +123,7 @@
                   <el-icon class="icon-secondary"><Document /></el-icon>
                   <span class="m-name" :title="f.name">{{ f.name }}</span>
                   <span class="m-size">{{ formatFileSize(f.size) }}</span>
-                  <el-button size="small" text type="primary" :loading="e2eBusy" @click="downloadFile(f.id, f.name)">
+                  <el-button v-if="!downloadBlocked" size="small" text type="primary" :loading="e2eBusy" @click="downloadFile(f.id, f.name)">
                     <el-icon><Download /></el-icon>
                     {{ t('common.download') }}
                   </el-button>
@@ -138,7 +147,7 @@
                   </el-tag>
                 </div>
               </div>
-              <el-button type="primary" size="large" class="download-btn" @click="downloadFile()">
+              <el-button v-if="!downloadBlocked" type="primary" size="large" class="download-btn" @click="downloadFile()">
                 <el-icon><Download /></el-icon>
                 {{ t('share.downloadFile') }}
               </el-button>
@@ -213,6 +222,19 @@ const totalShareSize = computed(() =>
   shareFiles.value.reduce((s, f) => s + (Number(f.size) || 0), 0)
 )
 
+// 分享受密码保护？（契约 ShareDetail.has_password）
+const shareHasPassword = computed(() => !!shareData.value?.has_password)
+// 服务端下发的令牌化直链（缺失 = 旧后端或该分享未下发）
+const serverDownloadUrl = computed(
+  () => (shareData.value as Record<string, unknown> | null)?.download_url as string | undefined
+)
+/**
+ * 密码保护 + 无服务端直链 = 无可用下载地址（2026-10-22）：
+ * 手工拼的 /share/download?code= 既无令牌也无法带密码请求头，必然 401/失败。
+ * 此种情形不渲染可点击下载按钮，改为提示走取件流程。
+ */
+const downloadBlocked = computed(() => shareHasPassword.value && !serverDownloadUrl.value)
+
 
 const fetchShare = async (pwd?: string) => {
   loading.value = true
@@ -280,7 +302,11 @@ const buildDownloadUrl = (fileId?: number): string => {
   // 优先使用取件接口下发的带令牌 download_url（security.download_token.enabled 时必需）；
   // 旧后端无此字段时回退到手工拼接
   const data = shareData.value as Record<string, unknown> | null
-  let url = (data?.download_url as string | undefined) || `/share/download?code=${encodeURIComponent(shareCode.value)}`
+  const serverUrl = (data?.download_url as string | undefined) || ''
+  // 密码保护分享拿不到服务端令牌化直链时，手工拼的 /share/download?code= 必然失败
+  // （既无令牌也无法带 X-Share-Password 请求头）——不生成可点击链接（2026-10-22）
+  if (!serverUrl && shareHasPassword.value) return ''
+  let url = serverUrl || `/share/download?code=${encodeURIComponent(shareCode.value)}`
   // 口令绝不入 URL：core v0.24.0 起取件端点停收 ?password=，取件密码走
   // X-Share-Password 请求头（见 shareApi.getShare），下载地址一律用服务端下发的
   // 令牌化 download_url；拼 query 会把明文口令泄进浏览器历史/Referer/代理日志
@@ -336,6 +362,12 @@ const fetchDecryptSave = async (url: string, name: string) => {
 
 const downloadFile = (fileId?: number, name?: string) => {
   if (!shareCode.value) return
+  const url = buildDownloadUrl(fileId)
+  if (!url) {
+    // 密码保护且无服务端直链：无可用下载地址（2026-10-22）
+    ElMessage.warning(t('share.passwordDownloadHint'))
+    return
+  }
   // 文件分享的原始名存 text 字段（E2E 文本分享的 text 是密文，但文本分支不走下载）
   const fallbackName = name || shareData.value?.file_name || shareData.value?.name
     || (shareData.value?.encrypted && shareFiles.value.length === 0 ? '' : shareData.value?.text)
@@ -345,16 +377,21 @@ const downloadFile = (fileId?: number, name?: string) => {
       e2eError.value = t('share.keyMissingParam')
       return
     }
-    void fetchDecryptSave(buildDownloadUrl(fileId), fallbackName)
+    void fetchDecryptSave(url, fallbackName)
     return
   }
-  window.open(buildDownloadUrl(fileId), '_blank')
+  window.open(url, '_blank')
 }
 
 // 打包下载（多文件分享；服务端流式 zip。E2E 分享服务端无法打包，按钮已隐藏）
 const downloadAll = () => {
   if (!shareCode.value) return
-  window.open(buildDownloadUrl(), '_blank')
+  const url = buildDownloadUrl()
+  if (!url) {
+    ElMessage.warning(t('share.passwordDownloadHint'))
+    return
+  }
+  window.open(url, '_blank')
 }
 
 onMounted(() => {

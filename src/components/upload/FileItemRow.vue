@@ -37,37 +37,52 @@
         class="file-progress"
       />
     </div>
-    <el-button
-      v-if="task.status === 'uploading' || task.status === 'encrypting' || task.status === 'binding'"
-      type="danger"
-      circle
-      size="small"
-      @click="emit('cancel', task.id)"
-    >
-      <el-icon><Close /></el-icon>
-    </el-button>
-    <el-button
-      v-else
-      type="info"
-      circle
-      size="small"
-      @click="emit('remove', task.id)"
-    >
-      <el-icon><Close /></el-icon>
-    </el-button>
+    <div class="row-actions">
+      <!-- 单文件重试（2026-10-22）：失败行可就地重试，不必整批重跑。
+           多文件批量语义下单文件重试不成立（批量分享需整批文件同时成享），
+           此种情形下不提供行内重试（批量重跑走底部主按钮）。 -->
+      <el-button
+        v-if="task.status === 'error' && !multiMode"
+        type="primary"
+        circle
+        size="small"
+        :title="t('upload.retry')"
+        @click="emit('retry', task.id)"
+      >
+        <el-icon><Refresh /></el-icon>
+      </el-button>
+      <el-button
+        v-if="isBusy"
+        type="danger"
+        circle
+        size="small"
+        @click="emit('cancel', task.id)"
+      >
+        <el-icon><Close /></el-icon>
+      </el-button>
+      <el-button
+        v-else
+        type="info"
+        circle
+        size="small"
+        @click="emit('remove', task.id)"
+      >
+        <el-icon><Close /></el-icon>
+      </el-button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Document, Close, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh } from '@element-plus/icons-vue'
 import { formatFileSize } from '@/utils/format'
 import type { UploadTask } from '@/composables/useUploadQueue'
 
 /** 上传队列单文件行（2026-10-06 W2 自 FileUpload.vue 列表块抽出） */
-const props = defineProps<{ task: UploadTask }>()
-const emit = defineEmits<{ remove: [id: string]; cancel: [id: string] }>()
+const props = defineProps<{ task: UploadTask; multiMode?: boolean }>()
+const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string] }>()
 
 const { t } = useI18n()
 
@@ -164,5 +179,12 @@ const getFileType = (filename: string): string => {
 
 .file-progress {
   margin-top: 8px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 </style>

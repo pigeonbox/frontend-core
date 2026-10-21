@@ -14,7 +14,10 @@
         @paste-code="onPasteCode"
         @expand="onExpand"
       />
-      <p class="pickup-hint">{{ hintText }}</p>
+      <p class="pickup-hint">
+        <span>{{ t('home.getShare.autoHint') }}</span>
+        <span v-if="caseHint" class="case-hint">{{ caseHint }}</span>
+      </p>
 
       <!-- 密码相位：就地输密码（分享要求取件密码时 Peek 预检展开） -->
       <div v-if="pickupPhase === 'needPassword'" class="pickup-password">
@@ -94,12 +97,12 @@ const codeBoxesRef = ref<InstanceType<typeof CodeBoxes>>()
 const passwordInputRef = ref<{ focus: () => void }>()
 const historyDialog = ref<InstanceType<typeof LocalHistoryDialog>>()
 
-// 大小写提示跟随后台配置；旧后端未下发时中性表述
-const hintText = computed(() => {
-  const base = t('home.getShare.autoHint')
+// 大小写提示跟随后台配置；旧后端未下发时中性表述。
+// 两段文案用 CSS 间距分隔——此前用硬编码中文分号拼接，英文界面漏中文标点（2026-10-22）。
+const caseHint = computed(() => {
   const fold = configStore.config?.codeCaseInsensitive
-  if (fold === undefined) return base
-  return `${base}；${t(fold ? 'home.getShare.caseInsensitive' : 'home.getShare.caseSensitive')}`
+  if (fold === undefined) return ''
+  return t(fold ? 'home.getShare.caseInsensitive' : 'home.getShare.caseSensitive')
 })
 
 const goShare = (c: string) => {
@@ -175,11 +178,16 @@ const onExpand = (full: string) => {
   })
 }
 
-// 粘贴整段：恰 6 位 → 立即取件；>6 位（旧 8 位码/自定义口令/联邦码）
-// → 显示前 6 位、整串静默走分享详情页兜底
+// 粘贴整段：归一化后恰 6 位 → 立即取件；恰 8 位 → 整串走分享详情页；
+// 其余长度 → 明确报错（不再静默截前 6 位当取件码用，2026-10-22）
 const onPasteCode = (text: string) => {
   cancelAutoSubmit()
   const plan = planPaste(text)
+  if (plan.invalid) {
+    // 长度不匹配：保持输入框现状，只提示合法长度（复用既有提示文案，不新增 i18n 键）
+    ElMessage.warning(t('home.getShare.codeLengthInvalid'))
+    return
+  }
   echoGuard = true
   code.value = plan.display
   nextTick(() => {
@@ -258,6 +266,10 @@ defineExpose({
   margin: 0;
   font-size: 13px;
   color: var(--color-text-tertiary);
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .pickup-password {

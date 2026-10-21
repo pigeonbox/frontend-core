@@ -133,7 +133,7 @@ describe('useUploadQueue', () => {
     expect(mocked.uploadFile.mock.calls[0]![1]!.encrypted).toBe(true)
   })
 
-  it('上传失败：任务标 error + ElMessage.error + start 返回 null', async () => {
+  it('上传失败：任务标 error + 不再弹全局 toast（行内已有逐条错误文本）+ start 返回 null', async () => {
     mocked.uploadFile.mockRejectedValue(new Error('boom'))
     const q = useUploadQueue({ settings: baseSettings(), t })
     q.addFiles([mkFile('a.txt', 1 * MB)])
@@ -141,7 +141,8 @@ describe('useUploadQueue', () => {
     expect(out).toBeNull()
     expect(q.tasks.value[0]!.status).toBe('error')
     expect(q.tasks.value[0]!.error).toBe('boom')
-    expect(mocked.ElMessageError).toHaveBeenCalledWith('boom')
+    // 2026-10-22：全局 toast 与行内错误文本重复 → 去掉全局 toast
+    expect(mocked.ElMessageError).not.toHaveBeenCalled()
   })
 
   it('cancel：uploading 任务标 error 并写入取消文案', () => {
@@ -171,6 +172,39 @@ describe('useUploadQueue', () => {
     expect(q.tasks.value[1]!.status).toBe('error')
     // 取消文案统一走 upload_view.presign.abort（不再裸抛英文 Cancelled）
     expect(q.tasks.value[1]!.error).toBe('upload_view.presign.abort')
+    // 2026-10-22：整批收敛——被点的与未到的都落终态，
+    // 否则其余停在 uploading/binding → isUploading 恒真、按钮永久 loading
+    expect(q.tasks.value[0]!.status).toBe('error')
+    expect(q.isUploading.value).toBe(false)
+    expect(q.canStart.value).toBe(true)
+  })
+
+  it('retry：失败任务复位并重跑该文件（单文件队列）', async () => {
+    mocked.uploadFile.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({
+      code: 'R1', url: 'http://x/share/R1',
+    })
+    const q = useUploadQueue({ settings: baseSettings(), t })
+    q.addFiles([mkFile('a.txt', 1 * MB)])
+    const first = await q.start()
+    expect(first).toBeNull()
+    expect(q.tasks.value[0]!.status).toBe('error')
+    const id = q.tasks.value[0]!.id
+    const out = await q.retry(id)
+    expect(out).toMatchObject({ code: 'R1' })
+    expect(q.tasks.value[0]!.status).toBe('success')
+    expect(q.tasks.value[0]!.error).toBe('')
+  })
+
+  it('retry：多文件批量语义下不自动发起（只复位，交主按钮整批重跑）', async () => {
+    mocked.multiDirect.mockRejectedValue(new Error('boom'))
+    const q = useUploadQueue({ settings: baseSettings(), t })
+    q.addFiles([mkFile('a.txt', 1 * MB), mkFile('b.txt', 2 * MB)])
+    await q.start()
+    expect(q.tasks.value.every((f) => f.status === 'error')).toBe(true)
+    const out = await q.retry(q.tasks.value[0]!.id)
+    expect(out).toBeNull()
+    expect(q.tasks.value[0]!.status).toBe('pending')
+    expect(q.tasks.value[1]!.status).toBe('error')
   })
 
   it('canStart/isUploading 计算正确', () => {

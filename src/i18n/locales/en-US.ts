@@ -113,10 +113,28 @@ export default {
     hostAppSettings: 'App Settings',
     needRetrieve: 'Picking something up?',
     goSend: 'Send something',
+    // Cabinet (home) revamp: one-line product explainer + peer send CTA
+    pickupIntro: 'This is a file locker. Send someone a 6-digit pickup code and they can collect the file right here.',
+    // Cross-site pickup hint (shown only when federation is enabled)
+    federationHint: 'This locker is linked to other sites: if the pickup code is not found here, we look it up on the linked sites automatically.',
+    ctaSend: 'Send something too',
     cardTitle: {
       get: 'Retrieve a File',
       file: 'Send Files',
       text: 'Share Text',
+      p2p: 'Direct Transfer',
+    },
+    // Send page: delivery path picker (store in locker / direct to device)
+    path: {
+      label: 'Delivery path',
+      box: 'To Locker (this server)',
+      p2p: 'Direct to Device',
+      p2pTitle: 'Direct to Device · PigeonBeam',
+      p2pDesc: 'Files are sent straight to the other device with end-to-end encryption, without passing through this server. The other device needs PigeonBeam installed as well.',
+      p2pOpen: 'Open PigeonBeam',
+      p2pReady: 'The direct-transfer component is ready — click to enter.',
+      p2pNeedLogin: 'Sign in to PigeonBox first to open this page.',
+      p2pNotReady: 'The direct-transfer component is not ready (p2pcweb is not installed or not running). Please contact the administrator.',
     },
     tabs: {
       file: 'File Share',
@@ -151,7 +169,8 @@ export default {
     },
     getShare: {
       pickupTitle: 'Enter pickup code / share code',
-      autoHint: '6-character pickup codes auto-retrieve; 8-character share codes can be pasted whole',
+      autoHint: '6-character pickup codes auto-retrieve; paste share codes / custom codes whole',
+      codeLengthInvalid: 'Invalid code length: pickup codes are 6 characters; share codes / custom codes are 3-64 characters',
       caseSensitive: 'Case-Sensitive',
       caseInsensitive: 'Case-Insensitive',
       emptyCode: 'Please enter a pickup code or share code',
@@ -161,6 +180,30 @@ export default {
       label: '6-digit pickup code (the recipient picks up with it on the home page)',
       copy: 'Copy',
       heroHint: 'The recipient can also just open the full link (see tabs below)',
+    },
+    // Delivery surface (share success): one drop = one thing you can forward
+    delivery: {
+      label: 'Delivery text',
+      hint: 'Send this straight to the recipient: they open the site and type the pickup code',
+      copy: 'Copy delivery text',
+      copied: 'Delivery text copied to clipboard',
+      share: 'Share',
+      shareUnavailable: 'System sharing is not available in this browser',
+      guideCard: 'Download pickup card',
+      guideCardDone: 'Pickup card downloaded',
+      guideCardFailed: 'Could not generate the pickup card',
+      text: 'Pickup code {code} · Site {site} · {action}',
+      action: 'Open the site and type the pickup code to pick it up',
+      textLink: 'Pickup link {url} (site {site})',
+      expireDays: 'Expires in {n} days',
+      expireHours: 'Expires in {n} hours',
+      expireMinutes: 'Expires in {n} minutes',
+      expireForever: 'Never expires',
+      expirePassed: 'Already expired',
+      cardSubtitle: 'Scan or type the pickup code to collect',
+      cardCodeLabel: 'Pickup code',
+      cardLinkLabel: 'Pickup link',
+      cardInstruction: 'Open {site} and type the pickup code to collect',
     },
     codeCopied: 'Pickup code copied',
     apiDocs: 'API Docs',
@@ -189,6 +232,8 @@ export default {
     empty: 'No records yet (kept on this device only; never uploaded to the server)',
     clear: 'Clear',
     cleared: 'Cleared',
+    expired: 'Expired',
+    expiredHint: 'This share has expired',
   },
   federation: {
     title: 'Federated Pickup',
@@ -198,6 +243,7 @@ export default {
     go: 'Go to Pickup',
   },
   anonymous: {
+    resultExpired: 'This link has expired, please pick up again',
     passwordPlaceholder: 'Enter the password if the sender set one',
     submit: 'Retrieve',
     resultTitle: 'Retrieved successfully',
@@ -244,6 +290,13 @@ export default {
     chunk_size: 'Chunk Size',
     expires: 'Expiry',
     expire: 'Expiry',
+    // Expiry capsule presets (1 / 7 / 30 days + forever)
+    expirePreset: {
+      day1: '1 day',
+      day7: '7 days',
+      day30: '30 days',
+      forever: 'Forever',
+    },
     expires_forever: 'Forever',
     expires_1h: '1 hour',
     expires_1d: '1 day',
@@ -292,6 +345,7 @@ export default {
   },
   share: {
     title: 'File Share',
+    passwordDownloadHint: 'This share is password-protected; get the download credential from the pickup page',
     expires_at: 'Expires At',
     size: 'Size',
     downloads: 'Downloads',
@@ -538,6 +592,11 @@ export default {
     },
   },
   admin: {
+    group: {
+      delivery: 'Delivery & Files',
+      operations: 'Users & Operations',
+      system: 'System',
+    },
     serverVersion: 'Server',
     frontendVersion: 'Frontend',
     health: {
@@ -679,7 +738,11 @@ export default {
       basic: {
         siteName: 'Site Name',
         siteDescription: 'Site Description',
-        port: 'Port'
+        port: 'Port',
+        publicUrl: 'Public Site URL',
+        publicUrlPlaceholder: 'https://box.example.com',
+        publicUrlHint: 'The address other people use to pick up. Leave empty to fall back to the address in the browser (shares from a LAN-only deployment may be unreachable outside).',
+        publicUrlWarn: 'Public site URL is not set: shares created over the LAN will carry the internal address, and recipients outside may not be able to open them'
       },
       transfer: {
         maxCount: 'Max Pickups Per Share',
@@ -1610,6 +1673,42 @@ export default {
   },
 
   setup: {
+    // Four-step wizard (2026-10-22): admin → site address → delivery policy → done
+    stepAdmin: 'Admin',
+    stepSite: 'Site address',
+    stepPolicy: 'Delivery policy',
+    stepDone: 'Done',
+    next: 'Next',
+    prev: 'Back',
+    finish: 'Finish setup',
+    publicUrlLabel: 'Public site address',
+    publicUrlHint: 'This is the address others use to pick up files. Leave it empty to use the address in the browser — shares sent from a LAN-only deployment may then be unreachable.',
+    publicUrlDetected: 'Current address',
+    publicUrlInvalid: 'The public address must start with http:// or https://',
+    doneTitle: 'Setup complete',
+    doneSummary: 'Your site is ready — start sharing and picking up files',
+    doneSiteAddress: 'Pickup address',
+    doneUrlNotSaved: 'The public address could not be saved automatically (set it later under System config → Basic)',
+    donePickupCode: 'Pickup code',
+    // End-to-end self-check (2026-10-22): upload a test file and retrieve it right
+    // away — catches the three failures the console cannot show (storage not
+    // writable / no pickup code minted / wrong public address).
+    selfCheckLabel: 'End-to-end self-check',
+    selfCheckRun: 'Try a delivery',
+    selfCheckRunning: 'Checking (uploading and retrieving a test file)…',
+    selfCheckPassed: 'Self-check passed: delivery and pickup work',
+    selfCheckFailed: 'Self-check failed',
+    selfCheckNoCode: 'Could not mint a pickup code',
+    selfCheckRetrieveFailed: 'Pickup failed (storage or the pickup path is unavailable)',
+    selfCheckUrlMismatch: 'The share link address differs from the configured public address — shares may be unreachable',
+    selfCheckLinkOrigin: 'Link address',
+    selfCheckCfgOrigin: 'Configured address',
+    selfCheckHint: 'The self-check uploads a test file and retrieves it immediately, verifying that storage and the pickup path work; the test file expires after an hour.',
+    goHome: 'Go to home',
+    tryShare: 'Try a delivery',
+    tokenLabel: 'Setup token',
+    tokenHint: 'This server requires a setup token: copy it from the server startup log, or open a link that includes ?token=',
+    tokenInvalid: 'The setup token is missing or invalid — paste the token from the server startup log',
     title: 'System Setup',
     description: 'Create the first admin account to finish setup',
     alreadyInitialized: 'The system is already set up; returning to the home page',

@@ -20,30 +20,42 @@
         <div class="function-card">
           <div class="card-head">
             <div class="card-head-icon">
-              <el-icon size="22"><Upload v-if="activeTab === 'file'" /><Document v-else /></el-icon>
+              <el-icon size="22">
+                <Connection v-if="deliveryPath === 'p2p'" />
+                <Upload v-else-if="activeTab === 'file'" />
+                <Document v-else />
+              </el-icon>
             </div>
-            <h2 class="card-head-title">{{ t('home.cardTitle.' + activeTab) }}</h2>
+            <h2 class="card-head-title">{{ t(cardTitleKey) }}</h2>
           </div>
-          <div class="seg" role="tablist">
-            <button
-              v-for="x in ([['file', t('home.tabs.file')], ['text', t('home.tabs.text')]] as const)"
-              :key="x[0]"
-              class="seg-item"
-              :class="{ active: activeTab === x[0] }"
-              role="tab"
-              :aria-selected="activeTab === x[0]"
-              @click="setTab(x[0])"
-            >
-              {{ x[1] }}
-            </button>
-          </div>
-          <!-- 双 tab 等高:grid 叠放,两 pane 恒占同一格,容器高度=两者最大值,切换零跳变 -->
-          <div class="card-panes">
-            <div class="card-pane" :class="{ inactive: activeTab !== 'file' }">
-              <FileUpload @success="handleShareSuccess" />
+
+          <!-- 投递路径选择器：到柜（默认）/ 直连设备（仅本机挂了 /beam 才出现） -->
+          <DeliveryPathSelector v-model="deliveryPath" />
+
+          <!-- 到柜：文件/文本 双 tab（外层 v-show 隐藏而非卸载 → 切换投递路径不丢
+               已选文件、已输入文本、已选有效期；到柜永远是默认路径） -->
+          <div v-show="deliveryPath === 'box'" class="box-pane">
+            <div class="seg" role="tablist">
+              <button
+                v-for="x in ([['file', t('home.tabs.file')], ['text', t('home.tabs.text')]] as const)"
+                :key="x[0]"
+                class="seg-item"
+                :class="{ active: activeTab === x[0] }"
+                role="tab"
+                :aria-selected="activeTab === x[0]"
+                @click="setTab(x[0])"
+              >
+                {{ x[1] }}
+              </button>
             </div>
-            <div class="card-pane" :class="{ inactive: activeTab !== 'text' }">
-              <TextShare @success="handleShareSuccess" />
+            <!-- 双 tab 等高:grid 叠放,两 pane 恒占同一格,容器高度=两者最大值,切换零跳变 -->
+            <div class="card-panes">
+              <div class="card-pane" :class="{ inactive: activeTab !== 'file' }">
+                <FileUpload @success="handleShareSuccess" />
+              </div>
+              <div class="card-pane" :class="{ inactive: activeTab !== 'text' }">
+                <TextShare @success="handleShareSuccess" />
+              </div>
             </div>
           </div>
 
@@ -84,12 +96,12 @@
 
 <script setup lang="ts">
 import { adminBasePath } from '@/utils/adminPath'
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   Upload, Document,
-  Download, Postcard
+  Download, Postcard, Connection
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
@@ -99,6 +111,8 @@ import FileUpload from '@/components/upload/FileUpload.vue'
 import TextShare from '@/components/upload/TextShare.vue'
 import TopNav from '@/components/layout/TopNav.vue'
 import ShareResultDialog from '@/components/share/ShareResultDialog.vue'
+import DeliveryPathSelector from '@/components/share/DeliveryPathSelector.vue'
+import type { DeliveryPath } from '@/components/share/deliveryPath'
 
 // vite define 注入的构建版本（package.json,对齐发布列车）
 const appVersion = __APP_VERSION__
@@ -123,6 +137,14 @@ const setTab = (tab: 'file' | 'text') => {
   activeTab.value = tab
   router.replace({ query: { tab: tab === 'text' ? 'text' : undefined } })
 }
+
+// 投递路径：到柜（本服务器，默认）/ 直连设备（前端只给入口，不做直传编排）
+const deliveryPath = ref<DeliveryPath>('box')
+
+// 卡头标题随投递路径走：直连设备时不还挂着「文件发送」
+const cardTitleKey = computed(() =>
+  deliveryPath.value === 'p2p' ? 'home.cardTitle.p2p' : 'home.cardTitle.' + activeTab.value
+)
 
 const shareResultDialog = ref<InstanceType<typeof ShareResultDialog> | null>(null)
 
@@ -155,9 +177,10 @@ onMounted(async () => {
 }
 
 .main-wrapper {
-  max-width: 1100px;
+  width: 100%;
+  max-width: 960px;
   margin: 0 auto;
-  padding: var(--spacing-xl) var(--spacing-xl) var(--spacing-2xl);
+  padding: var(--spacing-xl) clamp(16px, 4vw, 40px) var(--spacing-2xl);
   min-height: 100vh;
   display: flex;
   flex-direction: column;

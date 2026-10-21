@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { publicApi, type PublicConfig } from '@/api/public'
 
 export const useConfigStore = defineStore('config', () => {
@@ -46,6 +46,21 @@ export const useConfigStore = defineStore('config', () => {
     return config.value?.description || '安全、便捷的文件分享系统'
   }
 
+  // 站点公网地址（base.public_url）：管理台配置的对外可达地址；
+  // 空 = 未配置 → 调用方回退浏览器当前地址（内网部署会把内网地址发出去）
+  const publicUrl = computed(() => (config.value?.publicUrl || '').trim())
+
+  // 公网地址 → 浏览器当前地址 的回退链（分享链接/交付文本统一走这里）
+  const siteBaseUrl = computed(() => {
+    const configured = publicUrl.value.replace(/\/+$/, '')
+    if (configured) return configured
+    return typeof window !== 'undefined' ? window.location.origin : ''
+  })
+
+  // 联邦是否启用（生效值=后端 overlay 后的全局 conf，多副本模式下被强制降级为 false）：
+  // 取件台据此显式提示「本柜没有就去联网站点找」；缺省/未下发 = 单站 → 不提示
+  const federationEnabled = computed(() => config.value?.federationEnabled === true)
+
   return {
     config,
     loading,
@@ -54,5 +69,8 @@ export const useConfigStore = defineStore('config', () => {
     refreshConfig,
     siteName,
     siteDescription,
+    publicUrl,
+    siteBaseUrl,
+    federationEnabled,
   }
 })
