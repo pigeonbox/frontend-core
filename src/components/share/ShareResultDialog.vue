@@ -35,6 +35,19 @@
         <span>{{ expireHint }}</span>
       </div>
 
+      <!-- 站点公网地址未配 → 提醒分享者（2026-10-22 审计 S6）：
+           分享链接按浏览器 origin 生成，内网部署会把**内网地址**发给外网的人，
+           对方只看到"无法访问此网站"，完全不知道原因；且分享者自己毫无察觉。 -->
+      <el-alert
+        v-if="!publicUrlConfigured"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="public-url-warn"
+        :title="t('home.delivery.publicUrlMissingTitle')"
+        :description="t('home.delivery.publicUrlMissingDesc')"
+      />
+
       <!-- 交付文本（一次投递 = 一件可直接转发的交付物：码 + 站点 + 操作说明） -->
       <div class="delivery">
         <div class="delivery-head">

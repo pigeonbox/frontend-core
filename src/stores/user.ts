@@ -41,7 +41,9 @@ export const useUserStore = defineStore('user', () => {
       markSessionActive()
       return true
     }
-    throw new Error(res.message)
+    // 保留错误码：抛普通 Error 会丢掉 code，导致前端的 errcode→i18n 映射
+    // 失效（英文界面直接显示后端中文原文，2026-10-22 审计）。
+    throw Object.assign(new Error(res.message), { code: res.code })
   }
 
   const logout = () => {

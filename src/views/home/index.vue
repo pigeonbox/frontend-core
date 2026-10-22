@@ -28,6 +28,10 @@
 
           <!-- 跨站提示：仅联邦启用时出现（单站部署不该出现联邦词汇） -->
           <p v-if="federationEnabled" class="federation-hint">{{ t('home.federationHint') }}</p>
+          <!-- 未接入联邦时也说明（2026-10-22 审计 S3）：原先只在**开启时**显示，
+               导致用户拿别的站点的码来取、只得到一句「取件码不存在」，
+               完全不知道本站不做跨站路由。 -->
+          <p v-else class="federation-hint federation-hint--off">{{ t('home.federationOffHint') }}</p>
 
           <!-- 双动词同级：取件输入 + 主 CTA「我也要寄」（同卡片、同权重），本机记录降为次级入口 -->
           <div class="card-actions">
@@ -265,6 +269,11 @@ onMounted(async () => {
   font-size: var(--text-xs);
   line-height: 1.6;
   color: var(--color-text-tertiary);
+}
+
+/* 未接入联邦：这是「限制说明」而非「功能说明」，用警示色区分 */
+.federation-hint--off {
+  color: var(--color-warning, #e6a23c);
 }
 
 /* 卡内动作区：主 CTA「我也要寄」与取件输入同权重（同样尺寸的胶囊按钮），

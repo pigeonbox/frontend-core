@@ -42,7 +42,10 @@ export function useErrorHandler() {
     }
 
     if (e instanceof BizError) {
-      if (!title) title = t('notify.title') === 'notify.title' ? 'Error' : t('notify.title')
+      // 标题用 common.errorTitle，**不要复用 notify.title**（那是「系统公告」，
+      // 套件中心公告的标题；2026-10-22 审计：每个业务错误的 toast 标题
+      // 都是「系统公告」，用户会以为是站点公告、而不是自己的操作失败了）。
+      if (!title) title = t('common.errorTitle') === 'common.errorTitle' ? 'Error' : t('common.errorTitle')
     } else {
       if (!title) title = t('common.failed')
     }

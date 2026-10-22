@@ -100,6 +100,7 @@ import { onMounted, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { translateError } from '@/utils/api-interceptor'
 import { userApi } from '@/api/user'
 import { useConfigStore } from '@/stores/config'
 
@@ -111,7 +112,7 @@ const configStore = useConfigStore()
 onMounted(async () => {
   const cfg = await configStore.fetchConfig().catch(() => null)
   if (cfg && cfg.registerEnabled === false) {
-    ElMessage.warning('当前站点未开放用户注册')
+    ElMessage.warning(t('register.closed'))
     router.replace('/user/login')
   }
 })
@@ -177,11 +178,17 @@ const handleRegister = async () => {
       ElMessage.success(t('register.success'))
       router.push('/user/login')
     } else {
-      ElMessage.error(res.message || t('register.failed'))
+      const translated = translateError(res)
+      ElMessage.error(
+        translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback || t('register.failed')
+      )
     }
   } catch (error: unknown) {
-    const msg = error instanceof Error ? error.message : ''
-    ElMessage.error(msg || t('register.failed'))
+    // 走统一错误映射（英文界面否则直接显示后端中文原文，2026-10-22 审计）
+    const translated = translateError(error)
+    ElMessage.error(
+      translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback || t('register.failed')
+    )
   } finally {
     loading.value = false
   }

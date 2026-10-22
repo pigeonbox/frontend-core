@@ -387,6 +387,19 @@ onMounted(async () => {
   } catch {
     // 检查失败不阻断页面（后端不可达时用户可看到表单）
   }
+  // 「开放注册」开关的默认值**跟随站点实际配置**，不要硬编码 true：
+  // NAS 打包面刻意把注册关掉（PB_USER_ALLOW_REGISTRATION=false，管理员建号），
+  // 向导若默认 true 就会在用户走完向导时静默把注册打开（2026-10-22 审计 F6）。
+  // 注：/api/config 走 resp.Success → 返回信封 {code,message,data}，字段在 data 里。
+  try {
+    const cfg = await publicApi.getConfig()
+    const enabled = cfg?.data?.registerEnabled
+    if (typeof enabled === 'boolean') {
+      setupForm.allowRegistration = enabled
+    }
+  } catch {
+    // 拉不到就沿用默认值，不阻断首启
+  }
   // 服务端若要求首启令牌，页面应直接能看到令牌输入框而不是等提交后报错
   const fromQuery = new URLSearchParams(window.location.search).get('token')
   if (fromQuery) {
@@ -419,8 +432,11 @@ const persistPublicUrl = async (): Promise<boolean> => {
   if (!url) return true
   try {
     await userStore.login(setupForm.adminUsername, setupForm.adminPassword)
-    const cfg = (await adminApi.getConfig()) as { base?: Record<string, unknown> } | null
-    const base = { ...(cfg?.base ?? {}), public_url: url }
+    // getConfig() 返回的是信封 {code,message,data}，base 在 data 里。
+    // 此前误读 cfg.base（恒 undefined）⇒ 展开成空对象 ⇒ 只剩 {public_url}，
+    // 整段 base 被覆盖 ⇒ **用户刚填的站点名/描述/端口静默归零**（2026-10-22 审计 F1）。
+    const res = await adminApi.getConfig()
+    const base = { ...(res.data?.base ?? {}), public_url: url }
     await adminApi.updateConfig({ base })
     return true
   } catch {

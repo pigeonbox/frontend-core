@@ -74,6 +74,7 @@ import { computed, onMounted, ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { translateError } from '@/utils/api-interceptor'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import { withBase } from '@/utils/base'
@@ -143,7 +144,11 @@ const handleLogin = async () => {
     const redirect = router.currentRoute.value.query.redirect as string
     router.push(redirect || '/')
   } catch (error: any) {
-    ElMessage.error(error?.message || t('login.failed'))
+    // 走统一错误映射（英文界面否则直接显示后端中文原文，2026-10-22 审计）
+    const translated = translateError(error)
+    ElMessage.error(
+      translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback || t('login.failed')
+    )
   } finally {
     loading.value = false
   }

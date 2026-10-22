@@ -203,6 +203,7 @@ import {
 import { shareApi } from '@/api/share'
 import { decryptBytes, decryptText } from '@/utils/e2e'
 import { copyToClipboard } from '@/utils/clipboard'
+import { translateError } from '@/utils/api-interceptor'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -258,9 +259,9 @@ const fetchShare = async (pwd?: string) => {
     } else if (res.code === 403 || res.code === 10003 || res.data?.has_password) {
       needPassword.value = true
     } else if (res.code === 404 || res.code === 10004) {
-      error.value = res.message || t('share.not_found')
+      error.value = t('share.not_found')
     } else {
-      error.value = res.message || t('share.not_found')
+      error.value = t('share.not_found')
     }
   } catch (err: any) {
     // /share/select 的密码族错误（需要密码/密码错误）返回 HTTP 401，经响应
@@ -275,7 +276,10 @@ const fetchShare = async (pwd?: string) => {
       }
       return
     }
-    error.value = err.message || t('share.fetchFailed')
+    // 走统一错误映射：否则英文界面会直接显示后端中文原文
+    // （2026-10-22 审计：取件页是英文界面夹中文的重灾区）
+    const translated = translateError(err)
+    error.value = translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback
   } finally {
     loading.value = false
   }
