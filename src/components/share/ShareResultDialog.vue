@@ -190,6 +190,9 @@ const shareMethod = ref<'url' | 'qrcode' | 'terminal'>('url')
 // 过期时间（RFC3339；null=永久有效）；expireKnown=false 表示未取到 → 不展示
 const expiredAt = ref<string | null>(null)
 const expireKnown = ref(false)
+// 「按取件次数」过期：服务端只给时间（count 的过期条件是次数用尽）⇒ 记本地
+// 选择值，弹窗才能说清「对方最多可取 N 次」（2026-10-22）
+const expireCountValue = ref(0)
 
 // 站点公网地址：publicUrl（管理台配置）→ 未配置则回退浏览器当前地址
 const siteBase = computed(() => configStore.siteBaseUrl)
@@ -224,6 +227,11 @@ const deliveryText = computed(() => {
 
 // 有效期回显文案（服务端真相；取不到不显示，绝不显示错的）
 const expireHint = computed(() => {
+  // 「按取件次数」优先：过期条件是次数用尽，时间只是兜底 ⇒ 先说次数
+  // （2026-10-22：count 样式此前在界面上根本选不到，这条路径是新增的）
+  if (expireCountValue.value > 0) {
+    return t('home.delivery.expireCount', { n: expireCountValue.value })
+  }
   if (!expireKnown.value) return ''
   if (!expiredAt.value) return t('home.delivery.expireForever')
   const ms = new Date(expiredAt.value).getTime() - Date.now()
@@ -271,6 +279,8 @@ const open = async (result: ShareResult) => {
   sharePickupCode.value = result.pickup_code || ''
   shareFileName.value = result.file_name || ''
   shareHasPassword.value = !!result.has_password
+  expireCountValue.value =
+    result.expire_style === 'count' && (result.expire_value ?? 0) > 0 ? result.expire_value! : 0
 
   // 确保使用正确的 hash 路由格式
   let url = result.full_share_url || result.share_url

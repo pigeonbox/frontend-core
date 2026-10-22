@@ -12,6 +12,16 @@
           {{ t(p.labelKey) }}
         </el-radio-button>
       </el-radio-group>
+      <!-- 「按次数」的次数值：胶囊只能表达样式，取几次要另给输入（2026-10-22） -->
+      <div v-if="capsuleMode && settings.expire_style === 'count'" class="expire-count-input">
+        <el-input-number
+          v-model="settings.expire_value"
+          :min="1"
+          :max="999"
+          controls-position="right"
+        />
+        <span class="expire-count-unit">{{ t('upload.expirePreset.countUnit') }}</span>
+      </div>
       <div v-else class="expire-inputs">
         <el-input-number
           v-if="settings.expire_style !== 'forever'"
@@ -140,12 +150,15 @@ const userStore = useUserStore()
 const { t } = useI18n()
 
 // ==================== 有效期胶囊预设 ====================
-// 既有语义：expire_value（数值）+ expire_style（minute/hour/day/week/month/year/forever）。
-// 胶囊必须成对映射回这两个字段：7 天 = (7, 'day')，永久 = (0, 'forever')。
+// 既有语义：expire_value（数值）+ expire_style（minute/hour/day/week/month/year/forever/count）。
+// 胶囊必须成对映射回这两个字段：7 天 = (7, 'day')，永久 = (0, 'forever')，
+// 按次数 = (N, 'count')——N 由旁边的次数输入框给（胶囊只表达样式）。
 const EXPIRE_PRESETS = [
   { key: 'd1', value: 1, style: 'day', labelKey: 'upload.expirePreset.day1' },
   { key: 'd7', value: 7, style: 'day', labelKey: 'upload.expirePreset.day7' },
   { key: 'd30', value: 30, style: 'day', labelKey: 'upload.expirePreset.day30' },
+  // 「按取件次数」：对方最多只能取 N 次（2026-10-22 补进日常发件流）
+  { key: 'count', value: 1, style: 'count', labelKey: 'upload.expirePreset.count' },
   { key: 'forever', value: 0, style: 'forever', labelKey: 'upload.expirePreset.forever' },
 ] as const
 
@@ -157,7 +170,11 @@ const availablePresets = computed(() =>
 // 当前值命中的胶囊；未命中（自定义值/白名单裁剪掉了当前样式）→ 回落数字+单位表单
 const currentPresetKey = computed(() => {
   const hit = availablePresets.value.find(
-    (p) => p.style === props.settings.expire_style && p.value === props.settings.expire_value
+    (p) =>
+      p.style === props.settings.expire_style &&
+      // count 的次数值可由用户自由改 ⇒ 只按样式匹配；其余按（样式,值）精确匹配
+      // （否则改一次数就会弹回兜底表单，胶囊选择丢失）
+      (p.style === 'count' || p.value === props.settings.expire_value)
   )
   return hit ? hit.key : ''
 })
@@ -203,6 +220,8 @@ const UNIT_KEYS: Record<ShareExpireStyle, string> = {
   month: 'common.months',
   year: 'common.years',
   forever: 'common.forever',
+  // 「按取件次数」：兜底表单（数字+单位）里的单位是「次」
+  count: 'upload.expirePreset.countUnit',
 }
 const unitLabel = (u: ShareExpireStyle) => t(UNIT_KEYS[u])
 </script>
@@ -212,6 +231,17 @@ const unitLabel = (u: ShareExpireStyle) => t(UNIT_KEYS[u])
   display: inline-flex;
   align-items: center;
   min-width: 90px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+/* 「按次数」的次数输入（胶囊旁） */
+.expire-count-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+}
+.expire-count-unit {
   color: var(--color-text-secondary);
   font-size: 13px;
 }

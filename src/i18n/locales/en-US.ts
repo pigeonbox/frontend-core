@@ -205,6 +205,8 @@ export default {
       expireMinutes: 'Expires in {n} minutes',
       expireForever: 'Never expires',
       expirePassed: 'Already expired',
+      // 「按取件次数」expiry: expires once the pickup count runs out (2026-10-22)
+      expireCount: 'Recipient can pick up at most {n} time(s)',
       cardSubtitle: 'Scan or type the pickup code to collect',
       cardCodeLabel: 'Pickup code',
       cardLinkLabel: 'Pickup link',
@@ -300,6 +302,9 @@ export default {
       day1: '1 day',
       day7: '7 days',
       day30: '30 days',
+      // 「按取件次数」: recipient can pick up at most N times (added 2026-10-22)
+      count: 'By count',
+      countUnit: 'times',
       forever: 'Forever',
     },
     expires_forever: 'Forever',

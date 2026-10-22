@@ -205,6 +205,8 @@ export default {
       expireMinutes: '{n} 分钟后失效',
       expireForever: '永久有效',
       expirePassed: '已失效',
+      // 「按取件次数」过期：次数用尽即失效（2026-10-22）
+      expireCount: '对方最多可取 {n} 次',
       cardSubtitle: '扫码或输入取件码即可取件',
       cardCodeLabel: '取件码',
       cardLinkLabel: '取件链接',
@@ -295,11 +297,14 @@ export default {
     chunk_size: '分片大小',
     expires: '有效期',
     expire: '有效期',
-    // 有效期胶囊预设（1/7/30 天 + 永久）
+    // 有效期胶囊预设（1/7/30 天 + 按次数 + 永久）
     expirePreset: {
       day1: '1 天',
       day7: '7 天',
       day30: '30 天',
+      // 「按取件次数」：对方最多只能取 N 次（2026-10-22 补：日常发件流此前选不到）
+      count: '按次数',
+      countUnit: '次',
       forever: '永久',
     },
     expires_forever: '永久',

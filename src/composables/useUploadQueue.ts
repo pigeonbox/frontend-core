@@ -281,6 +281,8 @@ export function useUploadQueue(opts: {
           file_name: task.file.name,
           has_password: !!settings.password,
           pickup_code: res.pickup_code || undefined,
+          expire_style: settings.expire_style,
+          expire_value: settings.expire_value,
         }
       }
 
@@ -317,6 +319,8 @@ export function useUploadQueue(opts: {
             file_name: task.file.name,
             has_password: !!settings.password,
             pickup_code: r.pickup_code || undefined,
+            expire_style: settings.expire_style,
+            expire_value: settings.expire_value,
           }
         }
         // 回退：落入下方 multi 流程（r 未定义安全——TS 收窄由 plan 判定保证）
@@ -365,6 +369,8 @@ export function useUploadQueue(opts: {
           file_name: pending.length === 1 ? pending[0]!.file.name : undefined,
           has_password: !!settings.password,
           pickup_code: result.pickup_code || undefined,
+          expire_style: settings.expire_style,
+          expire_value: settings.expire_value,
         }
       }
 
@@ -409,6 +415,8 @@ export function useUploadQueue(opts: {
         file_name: pending.length === 1 ? pending[0]!.file.name : undefined,
         has_password: !!settings.password,
         pickup_code: result.pickup_code || undefined,
+        expire_style: settings.expire_style,
+        expire_value: settings.expire_value,
       }
     } catch (e: unknown) {
       // 错误统一走错误码翻译（errcode/网络/HTTP 兜底），不再裸抛英文原文
