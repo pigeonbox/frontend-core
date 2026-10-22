@@ -297,7 +297,10 @@ const selfCheck = ref<{ state: 'idle' | 'running' | 'pass' | 'warn' | 'fail'; me
 })
 
 // 过期样式多选：默认全选（=不限）；取消勾选即裁剪用户可选项
-const expireStyleOptions = ['minute', 'hour', 'day', 'week', 'month', 'year', 'forever']
+// 「按取件次数」(count) 后端支持（pkg/utils/expire.go），此前漏在选项外 ⇒
+// 用户想用「对方只能取 N 次」这道护栏，首启时根本选不到，只能事后去后台加
+// （2026-10-22 易用性审计）。
+const expireStyleOptions = ['minute', 'hour', 'day', 'week', 'month', 'year', 'forever', 'count']
 const expireStyleKey: Record<string, string> = {
   minute: 'common.minutes',
   hour: 'common.hours',
@@ -305,7 +308,8 @@ const expireStyleKey: Record<string, string> = {
   week: 'common.weeks',
   month: 'common.months',
   year: 'common.years',
-  forever: 'common.forever'
+  forever: 'common.forever',
+  count: 'common.times'
 }
 const expireStyleText = (s: string) => t(expireStyleKey[s] ?? 'common.forever')
 

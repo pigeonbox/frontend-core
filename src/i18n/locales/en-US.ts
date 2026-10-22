@@ -50,6 +50,7 @@ export default {
     months: 'months',
     years: 'years',
     forever: 'Forever',
+    times: 'By pickup count',
     status: 'Status',
     normal: 'Normal',
     disabled: 'Disabled',

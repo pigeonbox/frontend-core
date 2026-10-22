@@ -50,6 +50,7 @@ export default {
     months: '月',
     years: '年',
     forever: '永久',
+    times: '按取件次数',
     status: '状态',
     normal: '正常',
     disabled: '禁用',
