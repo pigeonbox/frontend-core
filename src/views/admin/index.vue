@@ -54,7 +54,7 @@
 
             <el-menu-item :index="adminBase + '/p2p'">
               <el-icon><Connection /></el-icon>
-              <span>{{ t('admin.p2pTitle') }}</span>
+              <span>{{ t('admin.federationTitle') }}</span>
             </el-menu-item>
           </el-sub-menu>
 

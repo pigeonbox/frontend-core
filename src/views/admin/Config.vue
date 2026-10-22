@@ -338,113 +338,54 @@
               style="margin-bottom: 16px"
               :title="t('admin.configPage.envPriorityHint')"
             />
-            <!-- 两功能白话导航卡：设备直传（人人可用）/ 跨站联邦（进阶） -->
+            <!-- 白话导航卡：跨站联邦（Wave B'：设备直传面已拆为 PigeonBeam，本区只留联邦） -->
             <div class="p2p-intro">
               <div class="p2p-feature-card">
-                <div class="p2p-feature-head">
-                  <span class="p2p-feature-title">{{ t('admin.configPage.p2p.introDtTitle') }}</span>
-                  <el-tag size="small" type="success">{{ t('admin.configPage.p2p.introDtBadge') }}</el-tag>
-                </div>
-                <p class="p2p-feature-desc">{{ t('admin.configPage.p2p.introDtDesc') }}</p>
-                <p class="p2p-feature-steps">{{ t('admin.configPage.p2p.introDtSteps') }}</p>
-                <el-link type="primary" @click="goP2pOps">{{ t('admin.configPage.p2p.openOpsPage') }} →</el-link>
-              </div>
-              <div class="p2p-feature-card is-muted">
                 <div class="p2p-feature-head">
                   <span class="p2p-feature-title">{{ t('admin.configPage.p2p.introFedTitle') }}</span>
                   <el-tag size="small" type="info">{{ t('admin.configPage.p2p.introFedBadge') }}</el-tag>
                 </div>
                 <p class="p2p-feature-desc">{{ t('admin.configPage.p2p.introFedDesc') }}</p>
+                <el-link type="primary" @click="goFederationOps">{{ t('admin.configPage.p2p.openOpsPage') }} →</el-link>
               </div>
             </div>
 
-            <!-- 区块一：设备直传（推荐先配）——字段绑定不变 -->
-            <el-divider content-position="left">{{ t('admin.configPage.sections.directTransfer') }}</el-divider>
-            <el-form-item :label="t('admin.configPage.p2p.dtEnabled')">
-              <el-switch v-model="exForm.p2p.direct.enabled" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.dtEnabledHint') }}</span>
+            <!-- 跨站联邦（Wave B'：设备直传面已拆为独立应用 PigeonBeam，p2p 分区只留联邦） -->
+            <el-divider content-position="left">{{ t('admin.configPage.sections.federation') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
+              <el-switch v-model="exForm.p2p.federation.enabled" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.fedEnabledHint') }}</span>
             </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.sendRoots')">
+            <el-form-item :label="t('admin.configPage.p2p.registryUrl')">
               <el-input
-                v-model="p2pSendRootsText"
-                type="textarea"
-                :rows="3"
-                :placeholder="t('admin.configPage.p2p.sendRootsPlaceholder')"
+                v-model="exForm.p2p.federation.registry_url"
+                :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                style="width: 360px"
               />
-              <span class="field-hint">{{ t('admin.configPage.p2p.sendRootsHint') }}</span>
+              <span class="field-hint">{{ t('admin.configPage.p2p.registryUrlHint') }}</span>
             </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.recvDir')">
-              <el-input v-model="exForm.p2p.direct.recv_dir" :placeholder="t('admin.configPage.p2p.recvDirPlaceholder')" style="width: 360px" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.recvDirHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.maxTaskMB')">
-              <el-input-number v-model="p2pMaxTaskMB" :min="0" :max="1048576" controls-position="right" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.maxTaskMBHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.inboxQuotaGB')">
-              <el-input-number v-model="p2pInboxQuotaGB" :min="0" :max="10240" controls-position="right" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.inboxQuotaGBHint') }}</span>
+            <el-form-item :label="t('admin.configPage.p2p.publicUrl')">
+              <el-input
+                v-model="exForm.p2p.federation.public_url"
+                :placeholder="t('admin.configPage.p2p.publicUrlPlaceholder')"
+                style="width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.p2p.publicUrlHint') }}</span>
             </el-form-item>
             <el-collapse class="p2p-advanced">
-              <el-collapse-item name="dt-advanced" :title="t('admin.configPage.p2p.dtAdvancedTitle')">
-                <el-form-item :label="t('admin.configPage.p2p.dtRegistry')">
+              <el-collapse-item name="fed-advanced" :title="t('admin.configPage.p2p.fedAdvancedTitle')">
+                <el-form-item :label="t('admin.configPage.p2p.minEntropy')">
+                  <el-input-number v-model="exForm.p2p.federation.announce_min_entropy_bits" :min="0" :max="256" />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.minEntropyHint') }}</span>
+                </el-form-item>
+                <el-form-item :label="t('admin.configPage.p2p.nodeKeyPath')">
                   <el-input
-                    v-model="exForm.p2p.direct.registry_url"
-                    :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                    v-model="exForm.p2p.federation.node_key_path"
+                    :placeholder="t('admin.configPage.p2p.nodeKeyPathPlaceholder')"
                     style="width: 360px"
                   />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.dtRegistryHint') }}</span>
+                  <span class="field-hint p2p-danger-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
                 </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.dtDiscoverable')">
-                  <el-switch v-model="exForm.p2p.direct.discoverable" />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.dtDiscoverableHint') }}</span>
-                </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.binaryPath')">
-                  <el-input v-model="exForm.p2p.direct.binary_path" :placeholder="t('admin.configPage.p2p.binaryPathPlaceholder')" style="width: 360px" />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.binaryPathHint') }}</span>
-                </el-form-item>
-              </el-collapse-item>
-            </el-collapse>
-
-            <!-- 区块二：跨站联邦（进阶，默认折叠）——字段绑定不变 -->
-            <el-collapse class="p2p-advanced">
-              <el-collapse-item name="fed" :title="t('admin.configPage.p2p.fedCollapseTitle')">
-                <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
-                  <el-switch v-model="exForm.p2p.federation.enabled" />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.fedEnabledHint') }}</span>
-                </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.registryUrl')">
-                  <el-input
-                    v-model="exForm.p2p.federation.registry_url"
-                    :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
-                    style="width: 360px"
-                  />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.registryUrlHint') }}</span>
-                </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.publicUrl')">
-                  <el-input
-                    v-model="exForm.p2p.federation.public_url"
-                    :placeholder="t('admin.configPage.p2p.publicUrlPlaceholder')"
-                    style="width: 360px"
-                  />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.publicUrlHint') }}</span>
-                </el-form-item>
-                <el-collapse class="p2p-advanced">
-                  <el-collapse-item name="fed-advanced" :title="t('admin.configPage.p2p.fedAdvancedTitle')">
-                    <el-form-item :label="t('admin.configPage.p2p.minEntropy')">
-                      <el-input-number v-model="exForm.p2p.federation.announce_min_entropy_bits" :min="0" :max="256" />
-                      <span class="field-hint">{{ t('admin.configPage.p2p.minEntropyHint') }}</span>
-                    </el-form-item>
-                    <el-form-item :label="t('admin.configPage.p2p.nodeKeyPath')">
-                      <el-input
-                        v-model="exForm.p2p.federation.node_key_path"
-                        :placeholder="t('admin.configPage.p2p.nodeKeyPathPlaceholder')"
-                        style="width: 360px"
-                      />
-                      <span class="field-hint p2p-danger-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
-                    </el-form-item>
-                  </el-collapse-item>
-                </el-collapse>
               </el-collapse-item>
             </el-collapse>
           </el-form>
@@ -608,8 +549,8 @@ const exForm = reactive({
   local_import: { enabled: false, roots: [] as string[] },
   api_token: { enabled: true, per_key_qps: 20, per_key_burst: 40 },
   p2p: {
+    // Wave B'：设备直传面（p2p.direct）已拆为独立应用 PigeonBox，Box 侧只留联邦
     federation: { enabled: false, registry_url: '', public_url: '', node_key_path: '', announce_min_entropy_bits: 40 },
-    direct: { enabled: false, registry_url: '', relay_addr: '', send_roots: [] as string[], recv_dir: '', max_task_bytes: 0, inbox_quota_bytes: 0, binary_path: '', discoverable: false },
   },
 })
 
@@ -628,23 +569,8 @@ const localImportRootsText = computed({
   },
 })
 
-// P2P 直传:send_roots 每行一个绝对路径(textarea ↔ 数组)
-const p2pSendRootsText = computed({
-  get: () => exForm.p2p.direct.send_roots.join('\n'),
-  set: (v: string) => {
-    exForm.p2p.direct.send_roots = v.split('\n').map((x) => x.trim()).filter(Boolean)
-  },
-})
-// 配额以友好单位展示(后端存字节;0 = 后端缺省)
-const p2pMaxTaskMB = computed({
-  get: () => Math.round(exForm.p2p.direct.max_task_bytes / 1024 / 1024),
-  set: (v: number) => { exForm.p2p.direct.max_task_bytes = v * 1024 * 1024 },
-})
-const p2pInboxQuotaGB = computed({
-  get: () => Math.round(exForm.p2p.direct.inbox_quota_bytes / 1024 / 1024 / 1024),
-  set: (v: number) => { exForm.p2p.direct.inbox_quota_bytes = v * 1024 * 1024 * 1024 },
-})
-const goP2pOps = () => {
+// 联邦管理台入口（Wave B'：直传操作页已退役，/admin/p2p 现指联邦页）
+const goFederationOps = () => {
   const m = router.currentRoute.value.path.match(/^(.*?\/admin)/)
   router.push(`${m ? m[1] : '/admin'}/p2p`)
 }
@@ -689,12 +615,6 @@ const fetchExSections = (data: Record<string, unknown>) => {
     if (exForm.p2p.federation.enabled == null) exForm.p2p.federation.enabled = false
     // 注意用 == null 而非 !x：合法 0（禁用熵门槛）不能被显示成默认 40
     if (exForm.p2p.federation.announce_min_entropy_bits == null) exForm.p2p.federation.announce_min_entropy_bits = 40
-  }
-  if (sec.p2p?.direct) {
-    Object.assign(exForm.p2p.direct, sec.p2p.direct)
-    if (exForm.p2p.direct.enabled == null) exForm.p2p.direct.enabled = false
-    if (exForm.p2p.direct.send_roots == null) exForm.p2p.direct.send_roots = []
-    if (exForm.p2p.direct.discoverable == null) exForm.p2p.direct.discoverable = false
   }
 }
 
@@ -775,7 +695,7 @@ const saveCurrent = async () => {
         })
         break
       case 'p2p':
-        await putConfig({ p2p: { federation: { ...exForm.p2p.federation }, direct: { ...exForm.p2p.direct } } })
+        await putConfig({ p2p: { federation: { ...exForm.p2p.federation } } })
         break
     }
     ElMessage.success(t('admin.configPage.saved'))

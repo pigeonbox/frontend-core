@@ -1,132 +1,59 @@
-// api/p2p.ts — 设备直传管理端 API（P2a；与 contracts idl/p2p.thrift 对齐）。
-// 复用 request 封装（自动带 CSRF 头/401 重放/错误信封）。
+// api/p2p.ts — 跨站联邦管理端 API（Wave B'：设备直传面整体退役，只剩联邦面）。
+//
+// 2026-10-22 两应用分拆：设备直传（p2pc / p2pcweb）拆为独立应用 PigeonBeam，
+// Box 侧不再编排直传，直传的 9 个管理端点与任务模型已从 contracts idl/p2p.thrift
+// 删除（contracts 4c3d188）。本文件因此**只保留联邦四端点**：
+// invites / invites-accept / invite-push / directory。
+//
+// 类型依赖纪律（关键）：前端消费的是**已发布**的 contracts tgz（package.json 钉
+// v0.17.0，发布包里直传类型还在）。所以这里只 import 新契约仍在的联邦类型；
+// 直传时代的状态/任务/发送/接收/取消/发布/日志/上传/配对那一族类型与任务模型
+// 一律不引用——等 contracts 发新版删掉旧 tgz 里的同名类型时，前端不会当场编译失败。
 import { request } from '@/utils/request'
-import { xhrSend } from '@/api/_xhr'
+import type { ApiResponse } from '@/types/common'
+import type { p2p as p2pContract } from '@pigeonbox/contracts'
 
-export interface P2pTask {
-  id: string
-  kind: 'send' | 'recv'
-  state: 'waiting' | 'running' | 'retrying' | 'done' | 'failed' | 'canceled' | 'expired'
-  code: string
-  paths: string[]
-  bytes_done: number
-  /** 传输总字节（0=未知；p2pc 进度行回填，前端画进度条） */
-  bytes_total: number
-  error: string
-  attempts: number
-  created_at: string
-  finished_at: string
-  /** 配对码（2026-10-18）：有待裁决敲门请求（接受门） */
-  pair_pending?: boolean
-  /** 配对码：敲门方 node_id */
-  pair_from?: string
-  /** 配对码：敲门方显示名（接受门展示） */
-  pair_name?: string
-}
+// 邀请信封（跨站推送的凭证与状态机）——v0.17.0 与新契约同形
+export type P2pInvite = p2pContract.InviteInfo
+// 在线名录对端（p2pd 名录透传，零敏感）——v0.17.0 与新契约同形
+export type P2pDirectoryPeer = p2pContract.P2pDirectoryPeer
 
-export interface P2pStatus {
-  available: boolean
-  binary_path: string
-  enabled: boolean
-  registry_url: string
-  recv_dir: string
-  inbox_used: number
-  inbox_quota: number
-  deploy_allowed: boolean
-}
-
-export interface P2pInvite {
-  id: string
-  code: string
-  from_name: string
-  note: string
-  received_at: string
-  expires_in: number
-}
-
-// 在线名录对端（2026-10-14 邀请信箱配套；p2pd 名录透传，零敏感）
-export interface P2pDirectoryPeer {
-  node_id: string
-  name: string
-  url: string
-  box_pub: string
-  online_since: number
-}
-
-export interface PublishOpts {
-  expire_value?: number
-  expire_style?: string
-  require_auth?: boolean
-  password?: string
-  custom_code?: string
-}
-
-export interface UploadSendOpts {
-  inviteTo?: string
-  inviteNote?: string
-  onProgress?: (loaded: number, total: number) => void
-  signal?: AbortSignal
-}
-
-interface ApiResponse<T> {
+/**
+ * accept 的响应类型：**就地手写**，不 import contracts 的 accept 响应类型。
+ *
+ * 原因：v0.17.0 发布包里 accept 的 data 仍是直传任务信封（随直传面一并从 IDL
+ * 删除），新契约（contracts 4c3d188）改为 { invite: InviteInfo }——接受邀请退化为
+ * 纯信封动作。引旧类型会绑死已删的任务模型，故按新契约就地声明。
+ * TODO(待 contracts 新版发布): 改成 import type { AdminP2pInviteAcceptResp } from '@pigeonbox/contracts'
+ */
+export interface P2pInviteAcceptResp {
   code: number
   message: string
-  data: T
+  data: { invite: p2pContract.InviteInfo }
 }
 
 export const p2pApi = {
-  status: () => request<ApiResponse<P2pStatus>>({ url: '/admin/p2p/status', method: 'GET' }),
-  tasks: () => request<ApiResponse<{ tasks: P2pTask[] }>>({ url: '/admin/p2p/tasks', method: 'GET' }),
-  // taskLog 任务日志（p2pc 行级环,时间正序;详情抽屉诊断用——失败免登服务器）
-  taskLog: (taskId: string) =>
-    request<ApiResponse<{ lines: string[] }>>({ url: `/admin/p2p/tasks/${encodeURIComponent(taskId)}/log`, method: 'GET' }),
-  send: (paths: string[], inviteTo?: string, inviteNote?: string, pair?: boolean) =>
-    request<ApiResponse<{ task: P2pTask }>>({
-      url: '/admin/p2p/send',
-      method: 'POST',
-      data: {
-        paths,
-        invite_to: inviteTo || undefined,
-        invite_note: inviteNote || undefined,
-        pair: pair || undefined,
-      },
-    }),
-  // pairApprove 配对接受门裁决（2026-10-18）：拒绝即烧码并自动重铸新配对码。
-  pairApprove: (taskId: string, accept: boolean) =>
-    request<ApiResponse<{ task: P2pTask }>>({
-      url: `/admin/p2p/tasks/${encodeURIComponent(taskId)}/approve`,
-      method: 'POST',
-      data: { accept },
-    }),
-  // uploadSend 浏览器文件直发（2026-10-15:p2pcweb 体验融入管理台）。
-  // multipart files[] → 服务器上传临时区 → p2pc send；invite 元数据走 query。
-  // 走 xhrSend 才有上传进度；timeout=0（大文件上传不限时，与访客投递同规）。
-  uploadSend: (files: File[], opts: UploadSendOpts = {}) => {
-    const fd = new FormData()
-    for (const f of files) fd.append('files', f)
-    const qs = new URLSearchParams()
-    if (opts.inviteTo) qs.set('invite_to', opts.inviteTo)
-    if (opts.inviteNote) qs.set('invite_note', opts.inviteNote)
-    const q = qs.toString()
-    return xhrSend<{ task: P2pTask }>({
-      url: '/admin/p2p/send/upload' + (q ? `?${q}` : ''),
-      form: fd,
-      timeout: 0,
-      signal: opts.signal,
-      onProgress: opts.onProgress,
-    })
-  },
-  recv: (code: string) => request<ApiResponse<{ task: P2pTask }>>({ url: '/admin/p2p/recv', method: 'POST', data: { code } }),
-  cancel: (taskId: string) =>
-    request<ApiResponse<{ task_id: string }>>({ url: '/admin/p2p/cancel', method: 'POST', data: { task_id: taskId } }),
-  publish: (taskId: string, opts: PublishOpts) =>
-    request<ApiResponse<{ share_codes: string[] }>>({ url: '/admin/p2p/publish', method: 'POST', data: { task_id: taskId, ...opts } }),
-  // P3 推送邀请
-  invites: () => request<ApiResponse<{ invites: P2pInvite[] }>>({ url: '/admin/p2p/invites', method: 'GET' }),
+  // 待收邀请箱（跨站推送进来的口令信封）
+  invites: () =>
+    request<ApiResponse<p2pContract.AdminP2pInvitesData>>({ url: '/admin/p2p/invites', method: 'GET' }),
+
+  // 认领邀请：出箱 + 留痕 + 返回信封（不再 spawn 直传运行时）
   acceptInvite: (inviteId: string) =>
-    request<ApiResponse<{ task: P2pTask }>>({ url: '/admin/p2p/invites/accept', method: 'POST', data: { invite_id: inviteId } }),
+    request<ApiResponse<{ invite: p2pContract.InviteInfo }>>({
+      url: '/admin/p2p/invites/accept',
+      method: 'POST',
+      data: { invite_id: inviteId },
+    }),
+
+  // 向对端实例投递邀请（免口令交接）
   invitePush: (code: string, targetUrl: string, fromName: string, note: string) =>
-    request<ApiResponse<{ target_url: string }>>({ url: '/admin/p2p/invite-push', method: 'POST', data: { code, target_url: targetUrl, from_name: fromName, note } }),
-  // 在线名录（发送卡对端选择器）
-  directory: () => request<ApiResponse<{ peers: P2pDirectoryPeer[] }>>({ url: '/admin/p2p/directory', method: 'GET' }),
+    request<ApiResponse<unknown>>({
+      url: '/admin/p2p/invite-push',
+      method: 'POST',
+      data: { code, target_url: targetUrl, from_name: fromName, note },
+    }),
+
+  // 在线名录（对端选择器数据源）
+  directory: () =>
+    request<ApiResponse<p2pContract.AdminP2pDirectoryData>>({ url: '/admin/p2p/directory', method: 'GET' }),
 }

@@ -200,10 +200,12 @@ function adminRoutes(base: string): RouteRecordRaw[] {
         meta: { title: 'route.adminModeration' },
       },
       {
+        // 跨站联邦管理台（Wave B'：设备直传控制台整体退役，本路径改指联邦页）。
+        // 路径保持 /admin/p2p 不变——既有书签/外链不失效；语义只体现在 name 与标题。
         path: 'p2p',
-        name: 'AdminP2pTransfer',
-        component: () => import('@/views/admin/P2pTransfer.vue'),
-        meta: { title: 'route.adminP2p' },
+        name: 'AdminFederation',
+        component: () => import('@/views/admin/Federation.vue'),
+        meta: { title: 'route.adminFederation' },
       },
       {
         path: 'activities',
