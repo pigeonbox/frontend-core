@@ -279,8 +279,14 @@ router.beforeEach(async (to, _from, next) => {
     }
     for (const r of adminRoutes(adminBase)) router.addRoute(r)
     if (to.path === adminBase || to.path.startsWith(adminBase + '/')) {
-      // 动态路由注册前本导航已按 404 兜底解析，重新解析以匹配新路由
-      next({ ...to, replace: true })
+      // 动态路由注册前本导航已按 404 兜底解析，重新解析以匹配新路由。
+      //
+      // ⚠️ 必须**按 path** 重新解析，不能 `next({ ...to })`（2026-10-22 真机实测）：
+      // `to` 是 RouteLocationNormalized，带 `name: 'NotFound'` 与 `matched`；
+      // vue-router 解析时 **name 优先于 path** ⇒ 展开 `...to` 等于拿着 NotFound
+      // 的名字去重新解析 ⇒ 仍落 404 ⇒ **直接打开/刷新管理台链接恒 404**
+      // （从首页点进去是好的——那时路由已注册，掩盖了这个坑）。
+      next({ path: to.path, query: to.query, hash: to.hash, replace: true })
       return
     }
   }

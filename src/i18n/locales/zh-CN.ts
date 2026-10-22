@@ -773,6 +773,9 @@ export default {
       upload: {
         openUpload: '允许访客（未登录）上传',
         openUploadHint: '关闭后仅登录用户可上传，访客上传入口同步隐藏',
+        allowedExpireStyles: '允许用户选择的过期样式',
+        allowedExpireStylesPlaceholder: '留空 = 全部允许',
+        allowedExpireStylesHint: '裁剪用户发件时能选的过期方式；「按取件次数」= 对方最多只能取 N 次',
         requireLogin: '上传需登录',
         requireLoginHint: '开启后所有上传（含直传）都必须登录，访客完全不可上传',
         anonymousDailyCount: '访客日配额（次/IP）',

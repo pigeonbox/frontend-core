@@ -262,6 +262,7 @@ import { adminApi } from '@/api/admin'
 import { uploadFile } from '@/api/share'
 import { anonymousApi } from '@/api/anonymous'
 import { useUserStore } from '@/stores/user'
+import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS, type ExpireStyleKey } from '@/config/expireStyles'
 
 /**
  * 首启向导（2026-10-22 重做）：一张长表单 → 四步。
@@ -296,22 +297,15 @@ const selfCheck = ref<{ state: 'idle' | 'running' | 'pass' | 'warn' | 'fail'; me
   detail: ''
 })
 
-// 过期样式多选：默认全选（=不限）；取消勾选即裁剪用户可选项
+// 过期样式多选：默认全选（=不限）；取消勾选即裁剪用户可选项。
 // 「按取件次数」(count) 后端支持（pkg/utils/expire.go），此前漏在选项外 ⇒
 // 用户想用「对方只能取 N 次」这道护栏，首启时根本选不到，只能事后去后台加
 // （2026-10-22 易用性审计）。
-const expireStyleOptions = ['minute', 'hour', 'day', 'week', 'month', 'year', 'forever', 'count']
-const expireStyleKey: Record<string, string> = {
-  minute: 'common.minutes',
-  hour: 'common.hours',
-  day: 'common.days',
-  week: 'common.weeks',
-  month: 'common.months',
-  year: 'common.years',
-  forever: 'common.forever',
-  count: 'common.times'
-}
-const expireStyleText = (s: string) => t(expireStyleKey[s] ?? 'common.forever')
+// 2026-10-22：样式全集与文案键改用**共享常量**（config/expireStyles.ts），
+// 管理台的过期样式编辑器共用同一份 ⇒ 不再是"向导一份、管理台没有"。
+const expireStyleOptions = [...EXPIRE_STYLE_KEYS]
+const expireStyleText = (s: string) =>
+  t(EXPIRE_STYLE_I18N_KEYS[s as ExpireStyleKey] ?? 'common.forever')
 
 /** 探测到的当前地址（留空时的回退值，也是提示里给用户看的"本机地址"） */
 const detectedOrigin = computed(() => window.location.origin)

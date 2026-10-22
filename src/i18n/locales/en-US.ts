@@ -773,6 +773,9 @@ export default {
       upload: {
         openUpload: 'Allow Guest Uploads',
         openUploadHint: 'When off, only signed-in users can upload and the guest upload entry is hidden',
+        allowedExpireStyles: 'Allowed expiry styles',
+        allowedExpireStylesPlaceholder: 'Empty = allow all',
+        allowedExpireStylesHint: 'Trim the expiry options offered when sending; "By count" limits the recipient to N pickups',
         requireLogin: 'Require Login for Uploads',
         requireLoginHint: 'When on, all uploads (including direct uploads) require login; guests cannot upload at all',
         anonymousDailyCount: 'Guest Daily Quota (Uploads/IP)',

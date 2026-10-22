@@ -117,6 +117,25 @@
               <el-input-number v-model="exForm.upload_ex.anonymous_daily_bytes" :min="0" :max="107374182400" />
               <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyBytesHint') }}</span>
             </el-form-item>
+            <el-form-item :label="t('admin.configPage.upload.allowedExpireStyles')">
+              <el-select
+                v-model="exForm.upload_ex.allowed_expire_styles"
+                multiple
+                clearable
+                collapse-tags
+                collapse-tags-tooltip
+                :placeholder="t('admin.configPage.upload.allowedExpireStylesPlaceholder')"
+                class="expire-style-select"
+              >
+                <el-option
+                  v-for="s in EXPIRE_STYLE_KEYS"
+                  :key="s"
+                  :label="t(EXPIRE_STYLE_I18N_KEYS[s])"
+                  :value="s"
+                />
+              </el-select>
+              <span class="field-hint">{{ t('admin.configPage.upload.allowedExpireStylesHint') }}</span>
+            </el-form-item>
             <el-form-item :label="t('admin.configPage.transfer.uploadGates')">
               <span class="field-hint">
                 {{ t('admin.configPage.transfer.uploadGatesHint') }}
@@ -408,6 +427,7 @@ import { ElMessage } from 'element-plus'
 import { Picture, Upload, Download, User, Lock, Message, Connection } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { THEMES, matchThemePreset, type ThemePreset } from '@/config/themes'
+import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS } from '@/config/expireStyles'
 import { adminApi } from '@/api/admin'
 import { useConfigStore } from '@/stores/config'
 import { useErrorHandler } from '@/composables/useErrorHandler'
@@ -534,6 +554,10 @@ const exForm = reactive({
     require_login: false,
     anonymous_daily_count: 0,
     anonymous_daily_bytes: 0,
+    // 允许用户选择的过期样式；**空 = 全部允许**（服务端 effectiveExpireStyles 语义）。
+    // 此前管理台没有这个字段的编辑器（后端接受、界面不暴露）⇒ 管理员改不动，
+    // 老实例若白名单不含 count（「按取件次数」）就永远加不回来（2026-10-22）。
+    allowed_expire_styles: [] as string[],
   },
   download: {
     s3_direct_download: false,
@@ -588,6 +612,10 @@ const fetchExSections = (data: Record<string, unknown>) => {
     if (exForm.upload_ex.require_login == null) exForm.upload_ex.require_login = false
     if (!exForm.upload_ex.anonymous_daily_count) exForm.upload_ex.anonymous_daily_count = 0
     if (!exForm.upload_ex.anonymous_daily_bytes) exForm.upload_ex.anonymous_daily_bytes = 0
+    // 旧库/空值归一为空数组（=全部允许）；否则多选框拿到 null 会渲染异常
+    if (!Array.isArray(exForm.upload_ex.allowed_expire_styles)) {
+      exForm.upload_ex.allowed_expire_styles = []
+    }
   }
   if (sec.download) {
     Object.assign(exForm.download, sec.download)
@@ -859,6 +887,11 @@ onMounted(() => {
   margin-left: 10px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+/* 过期样式多选：8 个标签一行放不下，给个宽度让标签换行 */
+.expire-style-select {
+  width: 420px;
+  max-width: 100%;
 }
 .ml8 {
   margin-left: 8px;
