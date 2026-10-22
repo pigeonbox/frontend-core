@@ -204,6 +204,7 @@ import { shareApi } from '@/api/share'
 import { decryptBytes, decryptText } from '@/utils/e2e'
 import { copyToClipboard } from '@/utils/clipboard'
 import { translateError } from '@/utils/api-interceptor'
+import { isPasswordFamilyError, isPasswordMissingOnly } from '@/utils/password-error'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -268,10 +269,13 @@ const fetchShare = async (pwd?: string) => {
     // 拦截器包装后 reject 到这里——一律回到密码输入分支并提示，而非错误页
     // （2026-10-05 浏览器 E2E 发现的历史 bug：此前密码框永远不出现，输错密码
     // 还会困死在错误页无法重试）
-    const status = err?.response?.status
-    if (err?.code === 403 || status === 401) {
+    if (isPasswordFamilyError(err)) {
       needPassword.value = true
-      if (err?.message && err.message !== '需要密码') {
+      // 「只是缺密码」与「密码填错了」是两种语义，后端用 data.has_password 区分
+      // （20003 + {has_password:true} = 需要密码；20003 无 data = 密码错误）。
+      // 此前靠硬编码中文串 '需要密码' 比较——后端措辞一变就会在"只缺密码"时
+      // 误弹一个错误提示（2026-10-22 改为结构化判据，见 utils/password-error.ts）。
+      if (!isPasswordMissingOnly(err) && err?.message) {
         ElMessage.error(err.message)
       }
       return

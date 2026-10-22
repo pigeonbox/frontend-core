@@ -121,7 +121,7 @@ instance.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 归一化错误对象 — 把 axios 错误包装成 {code, message, trace_id, response}
+    // 归一化错误对象 — 把 axios 错误包装成 {code, message, trace_id, response, data}
     if (error.response) {
       const data = error.response.data || {}
       const traceId = error.response.headers?.['x-trace-id'] || data.trace_id
@@ -130,6 +130,11 @@ instance.interceptors.response.use(
         message: data.message || error.message,
         trace_id: traceId,
         response: error.response,
+        // 业务载荷：保留后端响应体里的 data 字段（如密码分享的
+        // data.has_password——后端用它区分「需要密码」与「密码错误」两个同码
+        // 语义）。此前此处丢弃了它，调用方只能去比较 message 文本（取件页曾
+        // 硬编码中文串 '需要密码'，后端措辞一变就误弹提示，2026-10-22 修）。
+        data: (data as Record<string, unknown>).data,
       }
       return Promise.reject(wrapped)
     }
