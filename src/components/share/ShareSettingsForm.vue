@@ -121,6 +121,7 @@ import { Clock, Lock, EditPen, Key, Memo } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import type { ShareSettings, ShareExpireStyle } from '@/composables/useShareSettings'
+import { EXPIRE_STYLE_KEYS } from '@/config/expireStyles'
 
 /**
  * 分享设置表单（过期/密码/自定义码/E2E）——收敛自 FileUpload 与 TextShare 的同构模板块。
@@ -147,7 +148,9 @@ const props = withDefaults(defineProps<{
   units: () => {
     const allowed = useConfigStore().config?.expireStyle
     if (allowed && allowed.length) return allowed as ShareExpireStyle[]
-    return ['minute', 'hour', 'day', 'week', 'month', 'year', 'forever']
+    // 配置未就绪时的兜底：用共享常量（此前硬编码 7 个 ⇒ 漏了 count，
+    // 兜底期间「按取件次数」选不到——2026-10-22 审计）
+    return [...EXPIRE_STYLE_KEYS]
   },
 })
 
