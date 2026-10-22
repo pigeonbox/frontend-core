@@ -4,3 +4,6 @@ dist/
 .DS_Store
 /data/
 *.tgz
+
+# 工具运行时目录(外部插件落点,勿提交)
+.video_agent/
