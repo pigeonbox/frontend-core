@@ -5,23 +5,28 @@
         <el-icon><Clock /></el-icon>
         {{ t('upload.expire') }}
       </label>
-      <!-- 有效期胶囊预设（1/7/30 天 + 永久）；管理台白名单裁剪掉 day/forever
-           或当前值不在预设内时，回落数字+单位表单（保底可编辑） -->
-      <el-radio-group v-if="capsuleMode" v-model="activePreset" class="expire-capsules">
-        <el-radio-button v-for="p in availablePresets" :key="p.key" :value="p.key">
-          {{ t(p.labelKey) }}
-        </el-radio-button>
-      </el-radio-group>
-      <!-- 「按次数」的次数值：胶囊只能表达样式，取几次要另给输入（2026-10-22） -->
-      <div v-if="capsuleMode && settings.expire_style === 'count'" class="expire-count-input">
-        <el-input-number
-          v-model="settings.expire_value"
-          :min="1"
-          :max="999"
-          controls-position="right"
-        />
-        <span class="expire-count-unit">{{ t('upload.expirePreset.countUnit') }}</span>
-      </div>
+      <!-- 有效期胶囊预设（1/7/30 天 + 按次数 + 永久）；管理台白名单裁剪掉 day/forever
+           或当前值不在预设内时，回落数字+单位表单（保底可编辑）。
+           ⚠️ 胶囊分支与兜底分支必须包在 <template v-if>/<template v-else> 里：
+           直接在中间插一个 v-if 元素会**抢走 v-else 的配对**，导致兜底表单与
+           胶囊同时渲染（2026-10-22 浏览器实测抓到：发件页出现两套重复控件）。 -->
+      <template v-if="capsuleMode">
+        <el-radio-group v-model="activePreset" class="expire-capsules">
+          <el-radio-button v-for="p in availablePresets" :key="p.key" :value="p.key">
+            {{ t(p.labelKey) }}
+          </el-radio-button>
+        </el-radio-group>
+        <!-- 「按次数」的次数值：胶囊只能表达样式，取几次要另给输入（2026-10-22） -->
+        <div v-if="settings.expire_style === 'count'" class="expire-count-input">
+          <el-input-number
+            v-model="settings.expire_value"
+            :min="1"
+            :max="999"
+            controls-position="right"
+          />
+          <span class="expire-count-unit">{{ t('upload.expirePreset.countUnit') }}</span>
+        </div>
+      </template>
       <div v-else class="expire-inputs">
         <el-input-number
           v-if="settings.expire_style !== 'forever'"

@@ -82,6 +82,9 @@ const emit = defineEmits<{
     file_name?: string
     has_password?: boolean
     pickup_code?: string
+    /** 过期样式与数值：成功弹窗据此回显「对方最多可取 N 次」（count 样式） */
+    expire_style?: string
+    expire_value?: number
   }]
 }>()
 
@@ -142,6 +145,10 @@ const handleShare = async () => {
         has_password: !!settings.password,
         // 文本/文件分享同权铸造 6 位取件码（E2E 密文分享为空），成功弹窗展示快捷卡
         pickup_code: res.data.pickup_code || undefined,
+        // 过期样式与数值：成功弹窗据此回显「对方最多可取 N 次」（count 样式）
+        // ——服务端只给时间，次数语义必须由本地选择值带过去（2026-10-22）
+        expire_style: settings.expire_style,
+        expire_value: settings.expire_value,
       })
 
       // 重置
