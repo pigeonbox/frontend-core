@@ -61,12 +61,12 @@ beforeEach(() => {
 describe('useUploadQueue', () => {
   it('单文件直传：uploadFile 收到 payload/settings，结果映射正确', async () => {
     mocked.uploadFile.mockResolvedValue({
-      code: 'A1', url: 'http://x/share/A1',
+      code: 'A1', url: 'http://x/#/share/A1',
     })
     const q = useUploadQueue({ settings: baseSettings(), t })
     q.addFiles([mkFile('a.txt', 5 * MB)])
     const out = await q.start()
-    expect(out).toMatchObject({ code: 'A1', full_share_url: 'http://x/share/A1', e2e_key: undefined })
+    expect(out).toMatchObject({ code: 'A1', full_share_url: 'http://x/#/share/A1', e2e_key: undefined })
     expect(mocked.uploadFile).toHaveBeenCalledOnce()
     const [file, callOpts] = mocked.uploadFile.mock.calls[0]!
     expect(file.name).toBe('a.txt')
@@ -77,28 +77,28 @@ describe('useUploadQueue', () => {
   })
 
   it('presign 分支：走 opts.presign 且结果取 url', async () => {
-    const presign = vi.fn().mockResolvedValue({ code: 'P1', url: 'http://x/share/P1', file_name: 'big.bin', file_size: 200 * MB, download_url: '' })
+    const presign = vi.fn().mockResolvedValue({ code: 'P1', url: 'http://x/#/share/P1', file_name: 'big.bin', file_size: 200 * MB, download_url: '' })
     const q = useUploadQueue({ settings: baseSettings(), t, presignThreshold: 1 * MB, presign })
     q.addFiles([mkFile('big.bin', 200 * MB)])
     const out = await q.start()
     expect(presign).toHaveBeenCalledOnce()
-    expect(out).toMatchObject({ code: 'P1', share_url: 'http://x/share/P1', full_share_url: 'http://x/share/P1' })
+    expect(out).toMatchObject({ code: 'P1', share_url: 'http://x/#/share/P1', full_share_url: 'http://x/#/share/P1' })
     expect(mocked.uploadFile).not.toHaveBeenCalled()
   })
 
   it('多文件小体积 → multi-direct 一次调用，全部 success', async () => {
-    mocked.multiDirect.mockResolvedValue({ code: 'M1', url: 'http://x/share/M1', share_url: '', file_count: 2 })
+    mocked.multiDirect.mockResolvedValue({ code: 'M1', url: 'http://x/#/share/M1', share_url: '', file_count: 2 })
     const q = useUploadQueue({ settings: baseSettings(), t })
     q.addFiles([mkFile('a.txt', 1 * MB), mkFile('b.txt', 2 * MB)])
     const out = await q.start()
     expect(mocked.multiDirect).toHaveBeenCalledOnce()
-    expect(out).toMatchObject({ code: 'M1', full_share_url: 'http://x/share/M1' })
+    expect(out).toMatchObject({ code: 'M1', full_share_url: 'http://x/#/share/M1' })
     expect(q.tasks.value.every((f) => f.status === 'success')).toBe(true)
   })
 
   it('多文件超 bodyCap → 逐文件 chunk + multiBind 一次', async () => {
     mocked.chunkUploadFile.mockResolvedValue('uid')
-    mocked.multiBind.mockResolvedValue({ code: 'C1', url: 'http://x/share/C1', share_url: '', file_count: 2 })
+    mocked.multiBind.mockResolvedValue({ code: 'C1', url: 'http://x/#/share/C1', share_url: '', file_count: 2 })
     const q = useUploadQueue({ settings: baseSettings(), t, bodyCap: () => 6 * MB })
     q.addFiles([mkFile('a.txt', 5 * MB), mkFile('b.txt', 5 * MB)])
     const out = await q.start()
@@ -122,7 +122,7 @@ describe('useUploadQueue', () => {
     mocked.generateKeyB64.mockResolvedValue('k-e2e')
     const cipher = mkFile('a.txt.enc', 5 * MB)
     mocked.encryptFile.mockResolvedValue(cipher)
-    mocked.uploadFile.mockResolvedValue({ code: 'E1', url: 'http://x/share/E1' })
+    mocked.uploadFile.mockResolvedValue({ code: 'E1', url: 'http://x/#/share/E1' })
     const q = useUploadQueue({ settings: { ...baseSettings(), e2e: true }, t })
     q.addFiles([mkFile('a.txt', 5 * MB)])
     const out = await q.start()
@@ -181,7 +181,7 @@ describe('useUploadQueue', () => {
 
   it('retry：失败任务复位并重跑该文件（单文件队列）', async () => {
     mocked.uploadFile.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({
-      code: 'R1', url: 'http://x/share/R1',
+      code: 'R1', url: 'http://x/#/share/R1',
     })
     const q = useUploadQueue({ settings: baseSettings(), t })
     q.addFiles([mkFile('a.txt', 1 * MB)])
