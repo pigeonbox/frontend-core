@@ -2,7 +2,7 @@
   <div class="admin-layout">
     <el-container>
       <!-- 侧边栏 -->
-      <el-aside width="240px" class="admin-aside">
+      <el-aside width="240px" class="admin-aside" :class="{ open: navOpen }">
         <div class="admin-logo">
           <div class="logo-icon">
             <BrandLogo class="logo-img" />
@@ -118,6 +118,17 @@
         <!-- 顶部导航 -->
         <el-header class="admin-header">
           <div class="header-left">
+            <!-- 汉堡：仅窄屏出现（宽屏侧栏常驻，见窄屏媒体查询）。
+                 用内联三线 SVG 而非 EP 的 Menu 图标——后者是 2×2 方格，读起来像
+                 「应用宫格」，不如下划线汉堡像「导航」。 -->
+            <button class="nav-toggle" type="button" :aria-label="t('admin.title')" @click="navOpen = !navOpen">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
             <h3>{{ pageTitle }}</h3>
           </div>
 
@@ -155,13 +166,16 @@
         </el-main>
       </el-container>
     </el-container>
+
+    <!-- 窄屏遮罩：点它收起抽屉式侧栏 -->
+    <div v-if="navOpen" class="nav-backdrop" @click="navOpen = false" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { getAdminBase } from '@/router'
 const adminBase = getAdminBase()
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
@@ -185,6 +199,14 @@ const pageTitle = computed(() => {
   const key = route.meta.title as string | undefined
   return key ? t(key) : t('admin.title')
 })
+
+// 窄屏抽屉式侧栏（2026-10-24）：宽屏侧栏常驻；窄屏（≤768px）侧栏改为
+// 汉堡唤出的浮层——此前侧栏 240px 固定占位，窄屏下内容区被压到 ~150px，
+// 配置表单的输入框**宽度为 0**（真机 390px 实测）⇒ 手机上进管理台基本没法用。
+const navOpen = ref(false)
+
+// 路由切换即收起抽屉（否则点了菜单项抽屉仍盖着内容）
+watch(() => route.fullPath, () => { navOpen.value = false })
 
 const goToUser = () => {
   window.open(withBase('/'), '_blank')
@@ -227,6 +249,29 @@ const handleCommand = async (command: string) => {
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
+}
+
+/* 汉堡：宽屏隐藏（侧栏常驻），窄屏由媒体查询点亮 */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+/* 窄屏抽屉遮罩 */
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1999;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .admin-logo {
@@ -390,6 +435,29 @@ const handleCommand = async (command: string) => {
 
   .admin-main {
     padding: var(--spacing-lg);
+  }
+
+  /* 窄屏：侧栏改为汉堡唤出的浮层抽屉，不再占位。
+     此前侧栏 240px 固定占位 ⇒ 内容区被压到 ~150px（390px 视口实测），
+     配置表单输入框宽度为 0 ⇒ 手机上进管理台基本没法用。 */
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .admin-aside {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2000;
+    width: 240px;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.28));
+  }
+
+  .admin-aside.open {
+    transform: translateX(0);
   }
 }
 </style>

@@ -1073,6 +1073,26 @@ onMounted(() => {
   }
 }
 
+/* 窄屏：表单标签**移到输入框上方**——label-width="180px" 是写死在 el-form 上的
+   属性，媒体查询改不了 ⇒ 窄屏下标签占掉大半宽度、输入框被挤到视口外
+   （390px 真机实测：配置表单输入框宽度为 0，手机上一个设置项都改不了）。
+   这里用 display:block 让 label 与 content 上下排列，并解除固定标签宽。 */
+@media (max-width: 768px) {
+  .config-form :deep(.el-form-item) {
+    display: block;
+  }
+
+  .config-form :deep(.el-form-item__label) {
+    display: flex;
+    width: auto !important;
+    height: auto;
+    line-height: 1.5;
+    text-align: left;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+  }
+}
+
 .rl-status {
   background: var(--color-muted);
   border-radius: 8px;
