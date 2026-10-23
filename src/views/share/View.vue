@@ -68,7 +68,7 @@
               </div>
               <div class="logo-text">
                 <h1>{{ t('share.contentTitle') }}</h1>
-                <p>{{ t('share.codeWithLabel', { code: shareCode }) }}</p>
+                <p>{{ t(codeIdentity.labelWithCodeKey, { code: codeIdentity.display }) }}</p>
               </div>
             </div>
             <el-button class="home-btn" @click="$router.push('/')">
@@ -175,8 +175,8 @@
           <!-- 分享信息 -->
           <div class="share-info">
             <el-descriptions :column="2" border>
-              <el-descriptions-item :label="t('share.codeLabel')">
-                <el-tag>{{ shareCode }}</el-tag>
+              <el-descriptions-item :label="t(codeIdentity.labelKey)">
+                <el-tag>{{ codeIdentity.display }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item :label="t('share.typeLabel')">
                 <el-tag :type="hasFileContent ? 'primary' : 'success'">
@@ -193,7 +193,7 @@
 
 <script setup lang="ts">
 import { formatFileSize } from '@/utils/format'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -205,6 +205,8 @@ import { decryptBytes, decryptText } from '@/utils/e2e'
 import { copyToClipboard } from '@/utils/clipboard'
 import { translateError } from '@/utils/api-interceptor'
 import { isPasswordFamilyError, isPasswordMissingOnly } from '@/utils/password-error'
+import { useRouteParam } from '@/composables/useRouteParam'
+import { identifyShareCode } from './codeIdentity'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -215,6 +217,24 @@ const error = ref('')
 const needPassword = ref(false)
 const password = ref('')
 const shareData = ref<any>(null)
+
+/**
+ * 页面上的「码」是什么身份（分享码 / 取件码）。
+ *
+ * 分享域认两种码（后端 pkg/codex）：分享码在 code 列，取件码在 pickup_code 列
+ * 是别名 ⇒ 用取件码打开的链接，此前界面一律标「分享码」= 标签错位（用户照抄的
+ * 其实是取件口令）。判定见 ./codeIdentity（不靠长度，靠与后端规范码比对）。
+ */
+const codeIdentity = computed(() =>
+  identifyShareCode(shareCode.value, shareData.value?.code as string | undefined)
+)
+
+/**
+ * 规范分享码（后端下发）。下载直链的令牌是**按规范码**签发的
+ * （core: GenerateDownloadToken(fileCode.Code)）⇒ 手工拼兜底直链时必须用规范码，
+ * 用取件码拼出来的直链即便带上令牌也验不过（令牌主体对不上）。
+ */
+const canonicalCode = computed(() => ((shareData.value?.code as string) || '').trim())
 
 // 多文件列表（后端 /share/select 的 files 数组；旧单文件分享为空 → 走单文件卡片）
 const shareFiles = computed<any[]>(() =>
@@ -242,6 +262,9 @@ const fetchShare = async (pwd?: string) => {
   loading.value = true
   error.value = ''
   needPassword.value = false
+  // 切分享时先清掉上一份内容：否则 A 的内容会挂在 B 的地址/加载态里残留
+  // （2026-10-23 浏览器实测：A→B 切换时页面一直显示 A）。
+  shareData.value = null
 
   try {
     const res = await shareApi.getShare(shareCode.value, pwd)
@@ -314,7 +337,10 @@ const buildDownloadUrl = (fileId?: number): string => {
   // 密码保护分享拿不到服务端令牌化直链时，手工拼的 /share/download?code= 必然失败
   // （既无令牌也无法带 X-Share-Password 请求头）——不生成可点击链接（2026-10-22）
   if (!serverUrl && shareHasPassword.value) return ''
-  let url = serverUrl || `/share/download?code=${encodeURIComponent(shareCode.value)}`
+  // 兜底直链用**规范分享码**：下载令牌是按规范码签发的（core:
+  // GenerateDownloadToken(fileCode.Code)）⇒ 用 URL 里的取件码拼出来的直链
+  // 即便带令牌也验不过（令牌主体对不上）。
+  let url = serverUrl || `/share/download?code=${encodeURIComponent(canonicalCode.value || shareCode.value)}`
   // 口令绝不入 URL：core v0.24.0 起取件端点停收 ?password=，取件密码走
   // X-Share-Password 请求头（见 shareApi.getShare），下载地址一律用服务端下发的
   // 令牌化 download_url；拼 query 会把明文口令泄进浏览器历史/Referer/代理日志
@@ -402,15 +428,25 @@ const downloadAll = () => {
   window.open(url, '_blank')
 }
 
-onMounted(() => {
-  const code = route.params.code as string
-  if (code) {
+// 路由参数（分享码）驱动取数：**参数变化即重取**。
+//
+// 此前只在 onMounted 读一次 route.params.code ⇒ hash 路由下同一路由记录
+// （/share/:code）参数变化时组件被复用、onMounted 不再触发 ⇒ 页面一直显示上一个
+// 分享的内容（A 的正文/下载按钮挂在 B 的地址下，B 的 20001 错误态不出现）。
+// 2026-10-23 浏览器实测实录；本仓同类坑第三处复发（useSendTab / admin-Config）。
+useRouteParam(
+  () => route.params.code as string | undefined,
+  (code) => {
+    if (!code) {
+      shareData.value = null
+      needPassword.value = false
+      error.value = t('share.codeRequired')
+      return
+    }
     shareCode.value = code
-    fetchShare()
-  } else {
-    error.value = t('share.codeRequired')
+    void fetchShare()
   }
-})
+)
 </script>
 
 <style scoped>

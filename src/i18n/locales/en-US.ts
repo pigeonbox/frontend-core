@@ -379,6 +379,10 @@ export default {
     e2eKeyMissing: 'This share is end-to-end encrypted, but the link is missing the decryption key (key parameter), so the content cannot be decrypted',
     contentTitle: 'Shared Content',
     codeWithLabel: 'Share code: {code}',
+    // Opened via the 6-digit pickup code (an alias): must not be labelled
+    // "Share code" — a pickup code is a passcode (possession = access) and
+    // differs in strength from the 8-char share code (2026-10-23).
+    pickupCodeWithLabel: 'Pickup code: {code}',
     filesCount: '{n} files',
     e2eTag: 'End-to-End Encrypted',
     zipDownload: 'Download ZIP',
@@ -389,6 +393,7 @@ export default {
     noteLabel: 'Note',
     copyText: 'Copy Text',
     codeLabel: 'Share Code',
+    pickupCodeLabel: 'Pickup Code',
     typeLabel: 'Share Type',
     typeFile: 'File',
     typeText: 'Text',

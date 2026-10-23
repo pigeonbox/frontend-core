@@ -379,6 +379,9 @@ export default {
     e2eKeyMissing: '此分享已端到端加密，但当前链接缺少解密密钥（key 参数），无法解密内容',
     contentTitle: '分享内容',
     codeWithLabel: '分享码: {code}',
+    // 用 6 位取件码（别名）打开分享页时的标签：不能一律标「分享码」——
+    // 取件码是口令语义（凭码即可取件），与 8 位分享码强度不同（2026-10-23）。
+    pickupCodeWithLabel: '取件码: {code}',
     filesCount: '{n} 个文件',
     e2eTag: '端到端加密',
     zipDownload: '打包下载 ZIP',
@@ -389,6 +392,7 @@ export default {
     noteLabel: '备注',
     copyText: '复制文本',
     codeLabel: '分享码',
+    pickupCodeLabel: '取件码',
     typeLabel: '分享类型',
     typeFile: '文件',
     typeText: '文本',

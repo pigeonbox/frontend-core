@@ -64,13 +64,14 @@
 
 <script setup lang="ts">
 import { formatFileSize as formatSize } from '@/utils/format'
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage, type UploadFile } from 'element-plus'
 import { Loading, UploadFilled } from '@element-plus/icons-vue'
 import { requestApi, guestSubmit, type RequestPublicView } from '@/api/request'
 import { translateError } from '@/utils/api-interceptor'
+import { useRouteParam } from '@/composables/useRouteParam'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -123,10 +124,12 @@ const submit = async () => {
   }
 }
 
-onMounted(async () => {
-  token.value = (route.params.token as string) || ''
+const loadRequest = async (tok: string) => {
+  loading.value = true
+  error.value = ''
+  view.value = null
   try {
-    const res = await requestApi.getPublic(token.value)
+    const res = await requestApi.getPublic(tok)
     if (res.code === 200 || res.code === 0) view.value = res.data
     else error.value = res.message || t('request.invalid')
   } catch (e: unknown) {
@@ -135,7 +138,19 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+// 路由参数（寄件 token）驱动取数：**参数变化即重取**。
+// 此前只在 onMounted 读一次 route.params.token ⇒ 同一路由记录（/request/:token）
+// 参数变化时组件被复用、onMounted 不再触发 ⇒ 页面停留在上一份寄件视图上
+// （2026-10-23 浏览器实测；与分享页同一坑，本仓第三处复发）。
+useRouteParam(
+  () => route.params.token as string | undefined,
+  (tok) => {
+    token.value = tok || ''
+    void loadRequest(token.value)
+  }
+)
 </script>
 
 <style scoped>

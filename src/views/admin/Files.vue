@@ -312,9 +312,10 @@
 
 <script setup lang="ts">
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import {
   Refresh, Document, Picture, Download, Delete,
   VideoPlay, Headset, Reading
@@ -323,9 +324,11 @@ import { adminApi } from '@/api/admin'
 import { loadViews, saveView, deleteView } from '@/utils/savedViews'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { useRouteParam } from '@/composables/useRouteParam'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
+const route = useRoute()
 
 type FileStatus = 'normal' | 'blocked' | 'pending_review'
 
@@ -728,14 +731,23 @@ const downloadFile = async (row: any) => {
   }
 }
 
-onMounted(() => {
-  // 仪表盘健康洞察卡跳转入口：?health=expiring_soon 等直达过滤视图
-  const h = new URLSearchParams(window.location.hash.split('?')[1] || '').get('health')
-  if (h && ['active', 'expired', 'expiring_soon', 'never_picked', 'forever'].includes(h)) {
-    filters.health = h
+// 仪表盘健康洞察卡跳转入口：?health=expiring_soon 等直达过滤视图。
+//
+// 两点修正（2026-10-23）：
+//   ① 取 route.query 而非手搓 window.location.hash 解析（vue-router hash 模式
+//      已经把 '#' 后的 query 解析进 route.query）。
+//   ② **参数变化即跟随**：仪表盘 5 张健康卡是 router.push 同一 path、只有 query
+//      不同 ⇒ 同一路由记录组件被复用，只在挂载时读一次的话，**连点第二张卡
+//      过滤不生效**（与分享页/寄件页同一坑，本仓第三处复发）。
+const HEALTH_QUERY_KEYS = ['active', 'expired', 'expiring_soon', 'never_picked', 'forever']
+useRouteParam(
+  () => route.query.health as string | undefined,
+  (h) => {
+    if (h && HEALTH_QUERY_KEYS.includes(h)) filters.health = h
+    else if (!h) filters.health = ''
+    reload()
   }
-  reload()
-})
+)
 </script>
 
 <style scoped>
