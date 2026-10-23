@@ -31,7 +31,7 @@
         <el-table-column prop="start_at" :label="t('admin.announcementsPage.colStartAt')" width="170">
           <template #default="{ row }">{{ row.start_at || '—' }}</template>
         </el-table-column>
-        <el-table-column :label="t('admin.announcementsPage.colActions')" width="220" fixed="right" class-name="nowrap-actions">
+        <el-table-column :label="t('admin.announcementsPage.colActions')" width="260" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <el-button size="small" @click="openEdit(row)">{{ t('admin.announcementsPage.edit') }}</el-button>
             <el-button v-if="row.status === 1" size="small" type="warning" plain @click="setStatus(row, 2)">{{ t('admin.announcementsPage.offline') }}</el-button>

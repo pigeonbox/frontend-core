@@ -143,7 +143,7 @@
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="280" fixed="right">
+      <el-table-column :label="t('common.actions')" width="380" fixed="right" class-name="nowrap-actions">
         <template #default="{ row }">
           <template v-if="row.deleted_at">
             <el-button size="small" type="success" link @click="confirmRestore(row)">

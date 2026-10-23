@@ -172,7 +172,7 @@
               <el-tag type="info" size="small">{{ row.used_count }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column :label="t('common.actions')" width="240" fixed="right">
+          <el-table-column :label="t('common.actions')" width="280" fixed="right" class-name="nowrap-actions">
             <template #default="{ row }">
               <div class="action-buttons">
                 <el-button @click="viewShare(row.code)" type="primary" size="small" plain>

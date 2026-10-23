@@ -66,7 +66,7 @@
         <el-table-column :label="t('request.expireCol')" width="170">
           <template #default="{ row }">{{ row.expired_at ? new Date(row.expired_at).toLocaleString() : t('request.forever') }}</template>
         </el-table-column>
-        <el-table-column :label="t('request.actionsCol')" width="220" fixed="right">
+        <el-table-column :label="t('request.actionsCol')" width="220" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <el-button size="small" type="primary" text @click="copyLink(row.token)">
               <el-icon><CopyDocument /></el-icon> {{ t('request.copyLink') }}

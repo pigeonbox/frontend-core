@@ -204,7 +204,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('admin.filesPage.colActions')" width="300" align="center" fixed="right" class-name="nowrap-actions">
+        <el-table-column :label="t('admin.filesPage.colActions')" width="320" align="center" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <template v-if="row.deleted">
               <el-button type="success" size="small" round @click="restoreDeleted(row)">{{ t('admin.filesPage.restore') }}</el-button>

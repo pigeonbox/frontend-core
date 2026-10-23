@@ -64,7 +64,7 @@
         <el-table-column :label="t('admin.localFilesPage.colModified')" width="180">
           <template #default="{ row }">{{ formatTime(row.mod_time) }}</template>
         </el-table-column>
-        <el-table-column :label="t('admin.localFilesPage.colActions')" :width="hostAvailable ? 330 : 240" fixed="right" class-name="nowrap-actions">
+        <el-table-column :label="t('admin.localFilesPage.colActions')" :width="hostAvailable ? 360 : 240" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <template v-if="!row.is_dir">
               <el-button size="small" type="primary" @click="openImport(row)">{{ t('admin.localFilesPage.genCode') }}</el-button>
