@@ -106,6 +106,18 @@
               size="large"
               style="width: 100%"
             />
+            <div class="field-hint">{{ t('setup.uploadSizeHint') }}</div>
+          </el-form-item>
+
+          <el-form-item :label="t('setup.maxFileSizeLabel')">
+            <el-input-number
+              v-model="setupForm.maxFileSizeMb"
+              :min="0"
+              :max="1048576"
+              size="large"
+              style="width: 100%"
+            />
+            <div class="field-hint">{{ t('setup.maxFileSizeHint') }}</div>
           </el-form-item>
 
           <el-form-item :label="t('setup.openUploadLabel')">
@@ -322,6 +334,11 @@ const setupForm = reactive({
   setupToken: '',
   // 站点预配置（可选段）
   uploadSizeMb: 100,
+  // 单文件上限（MB，0=不限）——对应服务端 upload.max_file_size。
+  // 与 uploadSizeMb（单次请求体上限）是**两个不同的上限**，2026-10-23 之前
+  // 向导只暴露后者且标成「单文件上限」，语义混淆导致管理员以为限住了单文件
+  // 大小、实际大文件照传（413 事故之源）。
+  maxFileSizeMb: 0,
   openUpload: true,
   // 政策段（2026-10-12）
   expireStyles: [...expireStyleOptions] as string[],
@@ -540,6 +557,8 @@ const handleSubmit = async () => {
         : {}),
       site_config: {
         upload_size_mb: setupForm.uploadSizeMb,
+        // 单文件上限（0=不限）——服务端权威业务上限，超限在 init 阶段即拒
+        max_file_size_mb: setupForm.maxFileSizeMb,
         open_upload: setupForm.openUpload,
         // 政策段（可选；不传 = 保持默认）：全选过期=不限、0 天=不限、空扩展名=不限类型
         allowed_expire_styles: setupForm.expireStyles,

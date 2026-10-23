@@ -67,7 +67,10 @@ export interface InitializeSystemReq {
   // 站点预配置（2026-10-07 首启向导；可选，缺省走 yaml 默认）
   base_config?: { name: string; description: string; port?: number; host?: string }
   site_config?: {
+    /** 单次请求体上限（MB）——对应 upload.upload_size，仅普通直传通道 */
     upload_size_mb: number
+    /** 单文件上限（MB，0=不限）——对应 upload.max_file_size（直传/分片等整文件通道） */
+    max_file_size_mb?: number
     open_upload: boolean
     // 政策段（2026-10-12 扩容；全部可选，缺省保持默认）
     allowed_expire_styles?: string[]
