@@ -480,3 +480,24 @@ html.dark {
 .el-table .nowrap-actions .cell {
   white-space: nowrap;
 }
+
+// =============================================================================
+// 表格固定列（fixed="right"）的底色与分隔 —— 2026-10-23
+// 症状：右侧固定列**背景透明** ⇒ 横向滚动时，被它「盖住」的底层列内容直接透视
+// 出来（实测「上传 IP」列的数字从按钮缝里露出半个字，观感像渲染错乱）。
+// 根因：el-table 的 fixed 列是独立副本，底色不会自动跟随行/表的背景。
+// 处置：固定列补不透明底色 + 行 hover 时同步 + 左侧一道阴影当分隔。
+// 说明：这是「浮层压住内容」的正常观感修正（滚动到底即可露出被盖的列），
+//       不改变 fixed 列本身的定位行为。
+// =============================================================================
+.el-table td.el-table-fixed-column--right,
+.el-table .el-table__fixed-right td {
+  background-color: var(--el-bg-color, #141414) !important;
+  box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.35);
+}
+
+// 行 hover 时底色随行变浅；固定列不跟随 ⇒ hover 时同样会透视 ⇒ 一并同步
+.el-table tr:hover td.el-table-fixed-column--right,
+.el-table tr:hover .el-table__fixed-right td {
+  background-color: var(--el-fill-color-light, #262727) !important;
+}
