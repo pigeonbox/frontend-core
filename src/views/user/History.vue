@@ -40,7 +40,7 @@
           <code class="mono">{{ row.viewer_ip || '—' }}</code>
         </template>
       </el-table-column>
-      <el-table-column :label="t('user.history.codeLabel')" width="150">
+      <el-table-column :label="t('user.history.codeLabel')" width="180">
         <template #default="{ row }">
           <div class="code-stack">
             <code v-if="row.pickup_code" class="mono code-cell code-primary">{{ row.pickup_code }}</code>

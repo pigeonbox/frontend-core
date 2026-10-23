@@ -181,7 +181,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="used_count" :label="t('admin.filesPage.colDownloads')" width="96" align="center">
+        <el-table-column prop="used_count" :label="t('admin.filesPage.colDownloads')" width="120" align="center">
           <template #default="{ row }">
             <div class="download-count">
               <el-icon><Download /></el-icon>
