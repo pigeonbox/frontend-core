@@ -351,6 +351,7 @@ export default {
       off: 'Not Encrypted',
       hint: 'The key is generated in this browser and embedded in the share link; the server only stores ciphertext and cannot decrypt it. Files up to 100MB only; do not lose the key parameter in the link.',
       hintText: 'The key is generated in this browser and embedded in the share link; the server only stores ciphertext and cannot decrypt it. Do not lose the key parameter in the link.',
+      needSecureContext: 'End-to-end encryption is unavailable on the current access method (HTTPS or localhost required) — the switch is disabled because browsers only expose WebCrypto in a secure context.',
       encrypting: 'Encrypting...',
       tooLarge: 'End-to-end encryption only supports files up to 100MB',
       failed: 'Encryption failed (requires HTTPS)',

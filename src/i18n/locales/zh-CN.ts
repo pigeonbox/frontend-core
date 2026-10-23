@@ -351,6 +351,7 @@ export default {
       off: '不加密',
       hint: '密钥生成于本浏览器并嵌入分享链接，服务器只存密文无法解密。仅支持 ≤100MB 文件；请勿丢失链接中的 key 参数。',
       hintText: '密钥生成于本浏览器并嵌入分享链接，服务器只存密文无法解密。请勿丢失链接中的 key 参数。',
+      needSecureContext: '当前访问方式不支持端到端加密（需通过 HTTPS 或 localhost 访问）——该开关已停用；浏览器仅在安全上下文中提供 WebCrypto。',
       encrypting: '加密中...',
       tooLarge: '端到端加密仅支持 100MB 以内的文件',
       failed: '加密失败（需 HTTPS 环境）',

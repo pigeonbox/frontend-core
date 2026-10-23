@@ -36,6 +36,26 @@ function getCrypto(): SubtleCrypto {
   return c.subtle
 }
 
+/**
+ * 当前环境**能不能**做端到端加密（供 UI 在开关处就拦住，而不是等发送时炸）。
+ *
+ * 为什么需要（2026-10-24 真机实测）：`crypto.subtle` 只在**安全上下文**可用
+ * （HTTPS 或 localhost）。自托管/NAS 的典型访问方式是 `http://192.168.x.x:12345`
+ * ⇒ 明文 HTTP 的局域网访问下 `crypto.subtle` **不存在** ⇒ 端到端加密根本用不了。
+ * 而设置面板此前**照常提供这个开关**（能点、能亮）⇒ 用户填完表点「安全寄送」才吃
+ * 一个 3 秒 toast（"WebCrypto 不可用"），**分享根本没建** ⇒ 一个走不通的死胡同。
+ *
+ * 判据用「能力」而非「协议」：既看 `isSecureContext`，也看 `crypto.subtle` 是否真的在
+ * （某些浏览器/隐私模式即便标了 secure context 也可能不给 subtle）。
+ */
+export function e2eSupported(scope?: { isSecureContext?: boolean; crypto?: Crypto }): boolean {
+  const s = scope ?? (typeof window !== 'undefined' ? window : undefined)
+  if (!s) return false
+  if (s.isSecureContext !== true) return false
+  const c = s.crypto ?? (typeof crypto !== 'undefined' ? crypto : undefined)
+  return !!c?.subtle
+}
+
 /** 生成新密钥（base64url，32 字节） */
 export async function generateKeyB64(): Promise<string> {
   const raw = new Uint8Array(32)

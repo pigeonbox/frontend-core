@@ -105,9 +105,15 @@
               v-model="settings.e2e"
               :active-text="t('upload.e2e.on')"
               :inactive-text="t('upload.e2e.off')"
+              :disabled="!e2eAvailable"
             />
           </div>
-          <div class="e2e-hint">{{ t(e2eHintKey) }}</div>
+          <!-- 不可用时（明文 HTTP 的局域网访问 ⇒ 无 WebCrypto）：明说原因，
+               别让用户填完表点发送才吃一个 toast（且分享根本没建）。 -->
+          <div v-if="!e2eAvailable" class="e2e-hint e2e-hint--warn">
+            {{ t('upload.e2e.needSecureContext') }}
+          </div>
+          <div v-else class="e2e-hint">{{ t(e2eHintKey) }}</div>
         </div>
       </el-collapse-item>
     </el-collapse>
@@ -122,6 +128,7 @@ import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import type { ShareSettings, ShareExpireStyle } from '@/composables/useShareSettings'
 import { EXPIRE_STYLE_KEYS } from '@/config/expireStyles'
+import { e2eSupported } from '@/utils/e2e'
 
 /**
  * 分享设置表单（过期/密码/自定义码/E2E）——收敛自 FileUpload 与 TextShare 的同构模板块。
@@ -215,6 +222,11 @@ onMounted(() => {
 const e2eHintKey = computed(() =>
   props.context === 'text' ? 'upload.e2e.hintText' : 'upload.e2e.hint'
 )
+
+// 端到端加密在当前访问方式下**能不能用**（WebCrypto 只在安全上下文可用：
+// HTTPS 或 localhost ⇒ 明文 HTTP 的局域网访问用不了）。
+// 不可用时开关直接禁用并说明原因，而不是让用户填完表点发送才失败（2026-10-24 实测）。
+const e2eAvailable = computed(() => e2eSupported())
 
 const showCustom = computed(() =>
   props.showCustomCode === 'auto' ? userStore.isLoggedIn : props.showCustomCode

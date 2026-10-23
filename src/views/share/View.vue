@@ -207,6 +207,7 @@ import { translateError } from '@/utils/api-interceptor'
 import { isPasswordFamilyError, isPasswordMissingOnly } from '@/utils/password-error'
 import { useRouteParam } from '@/composables/useRouteParam'
 import { identifyShareCode } from './codeIdentity'
+import { shareRouteKey } from './shareRouteKey'
 
 const route = useRoute()
 const { t } = useI18n()
@@ -262,6 +263,10 @@ const fetchShare = async (pwd?: string) => {
   loading.value = true
   error.value = ''
   needPassword.value = false
+  // 旧的解密结果必须清掉：key 变了（或分享换了）时留着上一次的明文 ⇒
+  // 页面会一边提示「缺少密钥」一边仍显示旧明文（2026-10-24 实测）。
+  decryptedText.value = ''
+  e2eError.value = ''
   // 切分享时先清掉上一份内容：否则 A 的内容会挂在 B 的地址/加载态里残留
   // （2026-10-23 浏览器实测：A→B 切换时页面一直显示 A）。
   shareData.value = null
@@ -435,8 +440,15 @@ const downloadAll = () => {
 // 分享的内容（A 的正文/下载按钮挂在 B 的地址下，B 的 20001 错误态不出现）。
 // 2026-10-23 浏览器实测实录；本仓同类坑第三处复发（useSendTab / admin-Config）。
 useRouteParam(
-  () => route.params.code as string | undefined,
-  (code) => {
+  () =>
+    shareRouteKey(
+      route.params.code as string | undefined,
+      route.query.key as string | undefined
+    ),
+  () => {
+    // 触发键含解密密钥（?key=）⇒ 只改 key 也会重新取数（否则旧明文滞留，
+    // 页面一边警告「缺少密钥」一边仍显示明文——2026-10-24 实测）。
+    const code = route.params.code as string | undefined
     if (!code) {
       shareData.value = null
       needPassword.value = false
