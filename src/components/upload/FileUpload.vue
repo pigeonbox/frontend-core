@@ -72,6 +72,13 @@
       {{ isUploading ? t('upload.uploading') : t('upload.secureSend') }}
     </el-button>
 
+    <!-- 被单文件上限拦下的文件（blocked）：说明「为什么按钮是灰的 / 哪些会被跳过」，
+         避免用户面对一个无原因的禁用按钮（2026-10-23 实测盲区）。 -->
+    <div v-if="blockedCount > 0" class="blocked-hint">
+      <el-icon><WarningFilled /></el-icon>
+      <span>{{ t('upload.blockedFilesHint', { count: blockedCount }) }}</span>
+    </div>
+
     <!-- 预签名直传对话框（单文件 >100MB；Promise 化，由队列经 presign 回调驱动） -->
     <PresignUploadDialog ref="presignDialog" />
   </div>
@@ -81,7 +88,7 @@
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { ElMessage, type UploadFile } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { UploadFilled, Promotion } from '@element-plus/icons-vue'
+import { UploadFilled, Promotion, WarningFilled } from '@element-plus/icons-vue'
 import { useConfigStore } from '@/stores/config'
 import { formatFileSize } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
@@ -148,7 +155,7 @@ const queue = useUploadQueue({
       e2e: s.e2e,
     }),
 })
-const { tasks, isUploading, canStart, addFiles, remove, cancel, retry, start, dispose } = queue
+const { tasks, isUploading, canStart, blockedCount, addFiles, remove, cancel, retry, start, dispose } = queue
 
 const { isDragging } = useFileDrop({ onFiles: addFiles })
 
@@ -181,6 +188,15 @@ onBeforeUnmount(() => dispose())
 </script>
 
 <style scoped>
+/* blocked 提示条：被单文件上限拦下的文件说明（禁用按钮的原因可见化） */
+.blocked-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--el-color-warning);
+}
 .file-upload-container {
   flex: 1;
   display: flex;

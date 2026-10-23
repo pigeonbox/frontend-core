@@ -274,6 +274,8 @@ export default {
     maxFileLimited: '单文件最大 {size}',
     maxFileUnlimited: '单文件大小不限',
     maxFileExceeded: '文件 {size} 超出单文件上限 {limit}',
+    maxFileExceededShort: '超出单文件上限',
+    blockedFilesHint: '{count} 个文件超出单文件上限，未随本次发送；管理员调大上限后可点行内重试重新判定',
     formatHint: '支持任意格式文件，可直接 Ctrl/Cmd + V 粘贴',
     largeFileHint: '大文件将走对象存储直传通道，更快更稳',
     presignFallback: '匿名直传未开放，已切换为普通上传通道',

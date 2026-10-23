@@ -225,12 +225,19 @@ describe('useUploadQueue', () => {
  * 拒成 413。改成「服务端为权威 + 前端上传前本地拦截」，本组用例钉死前端行为。
  */
 describe('useUploadQueue — 单文件上限预检', () => {
-  it('超限文件在 addFiles 即落 error 态（选完文件就能看见）', () => {
+  it('超限文件在 addFiles 即落 blocked 态（选完文件就能看见）', () => {
     const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => 10 * MB })
     q.addFiles([mkFile('big.bin', 20 * MB)])
-    expect(q.tasks.value[0]!.status).toBe('error')
+    expect(q.tasks.value[0]!.status).toBe('blocked')
     expect(q.tasks.value[0]!.error).toContain('upload.maxFileExceeded')
     expect(mocked.ElMessageError).toHaveBeenCalled()
+  })
+
+  it('全部文件超限 ⇒ canStart=false（发送按钮禁用）且 blockedCount 可告知原因', () => {
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => 10 * MB })
+    q.addFiles([mkFile('a.bin', 20 * MB), mkFile('b.bin', 30 * MB)])
+    expect(q.canStart.value).toBe(false)
+    expect(q.blockedCount.value).toBe(2)
   })
 
   it('超限文件 start 时被剔除：不发任何请求', async () => {
@@ -241,7 +248,7 @@ describe('useUploadQueue — 单文件上限预检', () => {
     expect(mocked.uploadFile).not.toHaveBeenCalled()
     expect(mocked.multiDirect).not.toHaveBeenCalled()
     expect(mocked.chunkUploadFile).not.toHaveBeenCalled()
-    expect(q.tasks.value[0]!.status).toBe('error')
+    expect(q.tasks.value[0]!.status).toBe('blocked')
   })
 
   it('上限为 0（不限）时大文件照常走普通通道，不被预检拦下', async () => {
@@ -265,7 +272,51 @@ describe('useUploadQueue — 单文件上限预检', () => {
     expect(out).not.toBeNull()
     expect(mocked.uploadFile).toHaveBeenCalledOnce()
     const over = q.tasks.value.find((f) => f.file.name === 'big.bin')!
-    expect(over.status).toBe('error')
+    expect(over.status).toBe('blocked')
+  })
+
+  it('上限被调大后：此前 blocked 的任务在 start 时可发（start 的待发集合须含 blocked）', async () => {
+    mocked.uploadFile.mockResolvedValue({ code: 'R1', url: 'http://x/#/share/R1' })
+    let limit = 10 * MB
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => limit })
+    q.addFiles([mkFile('big.bin', 20 * MB)])
+    expect(q.tasks.value[0]!.status).toBe('blocked')
+    expect(q.blockedCount.value).toBe(1)
+    limit = 50 * MB // 管理员把上限调大了
+    const out = await q.start()
+    expect(out).not.toBeNull()
+    expect(mocked.uploadFile).toHaveBeenCalledOnce()
+    expect(q.tasks.value[0]!.status).toBe('success')
+  })
+
+  it('blocked 的行内重试：仍超限则保持 blocked 且不发请求', async () => {
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => 10 * MB })
+    // ⚠️ 必须**多文件**：多文件语义下 retry 只复位不自动发（单文件会走 start()，
+    // 被 start 的预检兜回 ⇒ retry 自身的判定在单文件场景不可观测）
+    q.addFiles([mkFile('ok.txt', 1 * MB), mkFile('big.bin', 20 * MB)])
+    const id = q.tasks.value.find((f) => f.file.name === 'big.bin')!.id
+    const out = await q.retry(id)
+    expect(out).toBeNull()
+    expect(mocked.uploadFile).not.toHaveBeenCalled()
+    const over = q.tasks.value.find((f) => f.file.name === 'big.bin')!
+    expect(over.status).toBe('blocked')
+    expect(over.error).toContain('upload.maxFileExceeded')
+    // 仍超限时必须**立即**保持 blocked：若被重置成 pending，UI 的「N 个文件超限」
+    // 提示条会先消失、用户以为该文件已就绪（整批重跑时才被拦回）
+    expect(q.blockedCount.value).toBe(1)
+  })
+
+  it('blocked 的行内重试：上限已调大则恢复发送', async () => {
+    mocked.uploadFile.mockResolvedValue({ code: 'R2', url: 'http://x/#/share/R2' })
+    let limit = 10 * MB
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => limit })
+    q.addFiles([mkFile('big.bin', 20 * MB)])
+    const id = q.tasks.value[0]!.id
+    limit = 50 * MB
+    const out = await q.retry(id)
+    expect(out).not.toBeNull()
+    expect(mocked.uploadFile).toHaveBeenCalledOnce()
+    expect(q.tasks.value[0]!.status).toBe('success')
   })
 
   it('排队期间上限被调低：start 时重新判定（防绕过）', async () => {
@@ -276,6 +327,6 @@ describe('useUploadQueue — 单文件上限预检', () => {
     const out = await q.start()
     expect(out).toBeNull()
     expect(mocked.uploadFile).not.toHaveBeenCalled()
-    expect(q.tasks.value[0]!.status).toBe('error')
+    expect(q.tasks.value[0]!.status).toBe('blocked')
   })
 })

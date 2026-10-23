@@ -274,6 +274,8 @@ export default {
     maxFileLimited: 'up to {size} per file',
     maxFileUnlimited: 'no per-file size limit',
     maxFileExceeded: 'File {size} exceeds the per-file limit of {limit}',
+    maxFileExceededShort: 'Exceeds the per-file limit',
+    blockedFilesHint: '{count} file(s) exceed the per-file limit and were not sent; after the limit is raised, use the row retry to re-check',
     formatHint: 'Any file type; you can also paste with Ctrl/Cmd + V',
     largeFileHint: 'Large files go through direct object-storage upload — faster and more reliable',
     presignFallback: 'Anonymous direct upload is disabled; switched to the standard channel',

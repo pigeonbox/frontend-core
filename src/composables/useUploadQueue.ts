@@ -16,7 +16,18 @@ import type { ShareResult } from '@/types/share'
  * UI 提示直接用 ElMessage（现状即如此）；i18n 文案经 opts.t 注入（composable 可脱离组件单测）。
  */
 
-export type UploadTaskStatus = 'pending' | 'encrypting' | 'uploading' | 'binding' | 'success' | 'error'
+/**
+ * blocked = 因**单文件上限**被本地拦下（2026-10-23）。
+ *
+ * 与 error 语义分离：error 是「上传失败，可重试」；blocked 是「压根不该发」。
+ * 混在一起有两个实测可见的问题：①`canStart` 统计 error ⇒ 全部文件超限时
+ * 「安全寄送」仍可点，用户点了才被告知；②行内「重试」把超限文件重置成
+ * pending，用户以为能重试、实际每次都被同一道闸拦回。
+ *
+ * blocked 不计入 canStart、不参与整批发送；但**上限被调大后可以恢复**
+ * （start()/retry() 时按当前上限重新判定），管理员调整上限后用户不必移除重加。
+ */
+export type UploadTaskStatus = 'pending' | 'encrypting' | 'uploading' | 'binding' | 'success' | 'error' | 'blocked'
 
 export interface UploadTask {
   id: string
@@ -72,11 +83,16 @@ export function useUploadQueue(opts: {
   const canStart = computed(
     () => tasks.value.length > 0 && tasks.value.some((f) => f.status === 'pending' || f.status === 'error')
   )
+  /**
+   * 被单文件上限拦下的任务数（blocked）。UI 用它说明「为什么按钮是灰的」——
+   * 全部任务都超限时 canStart=false，按钮禁用但**没有原因**（2026-10-23 实测盲区）。
+   */
+  const blockedCount = computed(() => tasks.value.filter((f) => f.status === 'blocked').length)
 
   /** 批次内未到终态的任务统一落到终态（error）——取消/中断后必须收敛，否则按钮卡 loading */
   const settleBatch = (msg: string) => {
     for (const task of currentBatch) {
-      if (task.status === 'success' || task.status === 'error') continue
+      if (task.status === 'success' || task.status === 'error' || task.status === 'blocked') continue
       task.status = 'error'
       task.error = msg
       task.statusText = ''
@@ -95,13 +111,13 @@ export function useUploadQueue(opts: {
   const addFiles = (files: File[] | FileList) => {
     const limit = maxFileSizeLimit()
     for (const f of Array.from(files)) {
-      // 超限文件直接落 error 态：选完文件即刻可见，不等到点上传才被服务端拒
+      // 超限文件直接落 blocked 终态：选完文件即刻可见，且不计入 canStart
       const over = limit > 0 && f.size > limit
       tasks.value.push({
         id: newId(),
         file: f,
         payload: f,
-        status: over ? 'error' : 'pending',
+        status: over ? 'blocked' : 'pending',
         progress: 0,
         statusText: '',
         error: over ? overLimitMsg(f.size, limit) : '',
@@ -156,7 +172,17 @@ export function useUploadQueue(opts: {
    */
   const retry = async (id: string): Promise<ShareResult | null> => {
     const task = tasks.value.find((f) => f.id === id)
-    if (!task || task.status !== 'error') return null
+    if (!task || (task.status !== 'error' && task.status !== 'blocked')) return null
+    // blocked 的重试 = 按**当前**上限重新判定（管理员可能已把上限调大）；
+    // 仍超限则保持 blocked 并给出原因，不做任何请求。
+    if (task.status === 'blocked') {
+      const limit = maxFileSizeLimit()
+      if (limit > 0 && task.file.size > limit) {
+        task.error = overLimitMsg(task.file.size, limit)
+        ElMessage.error(task.error)
+        return null
+      }
+    }
     task.status = 'pending'
     task.error = ''
     task.statusText = ''
@@ -194,17 +220,21 @@ export function useUploadQueue(opts: {
   }
 
   const start = async (): Promise<ShareResult | null> => {
-    let pending = tasks.value.filter((f) => f.status === 'pending' || f.status === 'error')
+    // blocked 也纳入判定：上限可能已被管理员调大/调小，须按**当前**上限重新判定
+    let pending = tasks.value.filter(
+      (f) => f.status === 'pending' || f.status === 'error' || f.status === 'blocked'
+    )
     if (pending.length === 0) return null
-    // 单文件上限兜底（addFiles 已拦一道）。此处补两条漏网路径：
-    // ① 上限在排队期间被管理员调低；② error 态任务被重试重置为 pending。
-    // 超限任务落 error 终态并剔出本批——不发出任何请求。
+    // 单文件上限兜底（addFiles 已拦一道）。此处补三条漏网路径：
+    // ① 上限在排队期间被管理员调低；② error 态任务被重试重置为 pending；
+    // ③ 上限在排队期间被调大 ⇒ 此前 blocked 的应恢复为可发。
+    // 超限任务落 blocked 终态并剔出本批——不发出任何请求。
     const limit = maxFileSizeLimit()
     if (limit > 0) {
       const over = pending.filter((f) => f.file.size > limit)
       if (over.length > 0) {
         for (const task of over) {
-          task.status = 'error'
+          task.status = 'blocked'
           task.error = overLimitMsg(task.file.size, limit)
           task.statusText = ''
         }
@@ -468,7 +498,7 @@ export function useUploadQueue(opts: {
       for (const task of pending) {
         if (task.status === 'success') continue
         // 已有终态错误（如用户取消）不覆盖——保留「已取消」与真实失败原因的区分
-        if (task.status === 'error' && task.error) continue
+        if ((task.status === 'error' && task.error) || task.status === 'blocked') continue
         task.status = 'error'
         task.error = msg
       }
@@ -484,6 +514,7 @@ export function useUploadQueue(opts: {
     tasks: tasks as Ref<UploadTask[]>,
     isUploading: isUploading as ComputedRef<boolean>,
     canStart: canStart as ComputedRef<boolean>,
+    blockedCount: blockedCount as ComputedRef<number>,
     addFiles,
     remove,
     cancel,
