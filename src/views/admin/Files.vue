@@ -175,7 +175,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="owner_ip" :label="t('admin.filesPage.colIp')" width="130" align="center">
+        <el-table-column prop="owner_ip" :label="t('admin.filesPage.colIp')" width="140" align="center">
           <template #default="{ row }">
             <span class="owner-ip">{{ row.owner_ip || '-' }}</span>
           </template>
@@ -875,6 +875,9 @@ useRouteParam(
   font-family: monospace;
   font-size: 13px;
   color: var(--color-text-regular);
+  /* IP 是不可断的定长串，列宽临界时会被折成两行（实测 223.70.159.239 断成
+     "223.70.159.23" + "9"）⇒ 强制单行 */
+  white-space: nowrap;
 }
 
 .download-count {

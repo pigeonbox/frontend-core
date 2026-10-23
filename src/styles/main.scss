@@ -482,22 +482,40 @@ html.dark {
 }
 
 // =============================================================================
-// 表格固定列（fixed="right"）的底色与分隔 —— 2026-10-23
-// 症状：右侧固定列**背景透明** ⇒ 横向滚动时，被它「盖住」的底层列内容直接透视
+// 表格固定列（fixed）的底色与分隔 —— 2026-10-23
+// 症状：固定列**背景透明** ⇒ 横向滚动时，被它「盖住」的底层列内容直接透视
 // 出来（实测「上传 IP」列的数字从按钮缝里露出半个字，观感像渲染错乱）。
-// 根因：el-table 的 fixed 列是独立副本，底色不会自动跟随行/表的背景。
-// 处置：固定列补不透明底色 + 行 hover 时同步 + 左侧一道阴影当分隔。
+// 根因：el-table 2.13 的固定列用 `position: sticky` 实现（不是独立副本），
+//       而本项目暗色下把表格底色设为透明（`--el-table-tr-bg-color: transparent`，
+//       见上方 html.dark 段）⇒ sticky 单元格的透明底色把滚动到其下方的内容
+//       一起透出来。实测 `.el-table__fixed-right` 根本不存在（sticky 实现），
+//       固定单元格类名是 `el-table-fixed-column--right` + `el-table__cell`。
+// 处置：固定单元格补不透明底色（= 卡片底色 --el-bg-color）+ 行 hover 时同步
+//       + 一侧阴影当分隔。
 // 说明：这是「浮层压住内容」的正常观感修正（滚动到底即可露出被盖的列），
 //       不改变 fixed 列本身的定位行为。
+//
+// 两个易踩的坑（都实测过）：
+// 1) 特异度：应用自身已有 `.el-table .el-table__row:hover > td.el-table__cell
+//    { background-color: var(--primary-bg) !important }`（特异度 0,4,1），
+//    hover 规则必须写得更具体才压得住它 ⇒ 选择器带 `.el-table__cell`。
+// 2) hover 色：--primary-bg 在暗色下是**半透明** rgba(142,151,224,.14)，
+//    直接当 background-color 会让固定列重新透出被盖内容 ⇒ 底色保持不透明，
+//    浅色效果用 background-image 叠一层渐变（等效于「浅色盖在不透明底上」）。
 // =============================================================================
-.el-table td.el-table-fixed-column--right,
-.el-table .el-table__fixed-right td {
-  background-color: var(--el-bg-color, #141414) !important;
+.el-table td.el-table__cell.el-table-fixed-column--left {
+  background-color: var(--el-bg-color, #ffffff) !important;
+  box-shadow: 4px 0 6px -4px rgba(0, 0, 0, 0.35);
+}
+
+.el-table td.el-table__cell.el-table-fixed-column--right {
+  background-color: var(--el-bg-color, #ffffff) !important;
   box-shadow: -4px 0 6px -4px rgba(0, 0, 0, 0.35);
 }
 
-// 行 hover 时底色随行变浅；固定列不跟随 ⇒ hover 时同样会透视 ⇒ 一并同步
-.el-table tr:hover td.el-table-fixed-column--right,
-.el-table tr:hover .el-table__fixed-right td {
-  background-color: var(--el-fill-color-light, #262727) !important;
+// 行 hover 时固定列同步：底色保持不透明，浅色用渐变层叠加（--primary-bg 可能是半透明）
+.el-table .el-table__row:hover > td.el-table__cell.el-table-fixed-column--left,
+.el-table .el-table__row:hover > td.el-table__cell.el-table-fixed-column--right {
+  background-color: var(--el-bg-color, #ffffff) !important;
+  background-image: linear-gradient(var(--primary-bg), var(--primary-bg));
 }
