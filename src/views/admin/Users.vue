@@ -85,7 +85,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('admin.usersPage.colActions')" width="240" align="center">
+        <el-table-column :label="t('admin.usersPage.colActions')" width="280" align="center" class-name="nowrap-actions">
           <template #default="{ row }">
             <el-button
               @click="toggleUserStatus(row)"

@@ -58,7 +58,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('admin.moderation.colActions')" width="220" align="center" fixed="right">
+        <el-table-column :label="t('admin.moderation.colActions')" width="240" align="center" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <el-button type="success" size="small" round :loading="acting === row.id" @click="act(row, 'normal')">
               {{ t('admin.moderation.approve') }}

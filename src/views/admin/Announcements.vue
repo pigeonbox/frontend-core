@@ -235,8 +235,4 @@ onMounted(load)
   justify-content: flex-end;
 }
 
-/* 操作列三按钮（编辑/下线/删除）不折行 */
-:deep(.nowrap-actions .cell) {
-  white-space: nowrap;
-}
 </style>
