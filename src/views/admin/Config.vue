@@ -117,6 +117,13 @@
               <el-input-number v-model="exForm.upload_ex.anonymous_daily_bytes" :min="0" :max="107374182400" />
               <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyBytesHint') }}</span>
             </el-form-item>
+            <!-- 单文件上限（upload_ex.max_file_size，字节）：此前后端能存能热应用，
+                 但管理台没有入口 ⇒ 管理员改不动，实际由反代层的 nginx 硬顶，
+                 表现是「大文件上传到一半被 nginx 拒成 413」。这里给出业务侧权威入口。 -->
+            <el-form-item :label="t('admin.configPage.upload.maxFileSize')">
+              <el-input-number v-model="maxFileSizeMb" :min="0" :max="1048576" :step="1024" />
+              <span class="field-hint">{{ t('admin.configPage.upload.maxFileSizeHint') }}</span>
+            </el-form-item>
             <el-form-item :label="t('admin.configPage.upload.allowedExpireStyles')">
               <el-select
                 v-model="exForm.upload_ex.allowed_expire_styles"
@@ -554,6 +561,9 @@ const exForm = reactive({
     require_login: false,
     anonymous_daily_count: 0,
     anonymous_daily_bytes: 0,
+    // 单文件上限（字节，0=不限）。服务端 presign init 阶段即按此值拒超限文件
+    // （错误码 30008），零流量拒绝；反代 nginx 上限须 ≥ 本值。
+    max_file_size: 0,
     // 允许用户选择的过期样式；**空 = 全部允许**（服务端 effectiveExpireStyles 语义）。
     // 此前管理台没有这个字段的编辑器（后端接受、界面不暴露）⇒ 管理员改不动，
     // 老实例若白名单不含 count（「按取件次数」）就永远加不回来（2026-10-22）。
@@ -590,6 +600,19 @@ const localImportRootsText = computed({
   get: () => exForm.local_import.roots.join(', '),
   set: (v: string) => {
     exForm.local_import.roots = v.split(',').map((x) => x.trim()).filter(Boolean)
+  },
+})
+
+// 单文件上限：配置以字节存储，界面以 MB 编辑（0 = 不限）。
+// 存回时按 1MB=1048576 字节换算并取整（4GiB 上限 = 4096MB = 4294967296 精确无误差）。
+const maxFileSizeMb = computed({
+  get: () => {
+    const bytes = exForm.upload_ex.max_file_size ?? 0
+    return bytes > 0 ? Math.round((bytes / 1024 / 1024) * 100) / 100 : 0
+  },
+  set: (v: number | undefined) => {
+    const mb = Number(v) || 0
+    exForm.upload_ex.max_file_size = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
   },
 })
 

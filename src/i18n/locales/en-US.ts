@@ -273,6 +273,7 @@ export default {
     clickHint: 'Multiple files supported, {clause}',
     maxFileLimited: 'up to {size} per file',
     maxFileUnlimited: 'no per-file size limit',
+    maxFileExceeded: 'File {size} exceeds the per-file limit of {limit}',
     formatHint: 'Any file type; you can also paste with Ctrl/Cmd + V',
     largeFileHint: 'Large files go through direct object-storage upload — faster and more reliable',
     presignFallback: 'Anonymous direct upload is disabled; switched to the standard channel',
@@ -782,6 +783,8 @@ export default {
         anonymousDailyCountHint: 'Uploads allowed per IP per day (0 = unlimited)',
         anonymousDailyBytes: 'Guest Daily Quota (MB/IP)',
         anonymousDailyBytesHint: 'Upload traffic per IP per day in MB (0 = unlimited)',
+        maxFileSize: 'Per-file Size Limit (MB)',
+        maxFileSizeHint: 'Maximum size of a single file in MB (0 = unlimited). Oversized files are rejected by the server before any upload starts; the reverse-proxy body limit must be at least this value',
       },
       download: {
         s3Direct: 'S3 Direct Download (302)',

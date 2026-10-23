@@ -273,6 +273,7 @@ export default {
     clickHint: '支持多文件上传，{clause}',
     maxFileLimited: '单文件最大 {size}',
     maxFileUnlimited: '单文件大小不限',
+    maxFileExceeded: '文件 {size} 超出单文件上限 {limit}',
     formatHint: '支持任意格式文件，可直接 Ctrl/Cmd + V 粘贴',
     largeFileHint: '大文件将走对象存储直传通道，更快更稳',
     presignFallback: '匿名直传未开放，已切换为普通上传通道',
@@ -782,6 +783,8 @@ export default {
         anonymousDailyCountHint: '单个 IP 每天可上传的次数，0 = 不限',
         anonymousDailyBytes: '访客日配额 (MB/IP)',
         anonymousDailyBytesHint: '单个 IP 每天可上传的流量上限（MB），0 = 不限',
+        maxFileSize: '单文件上限 (MB)',
+        maxFileSizeHint: '单个文件的最大体积（MB），0 = 不限。超限文件在发起上传前即被服务端拒绝，不浪费流量；反代层的 nginx 上限须 ≥ 本值',
       },
       download: {
         s3Direct: 'S3 直下（302）',

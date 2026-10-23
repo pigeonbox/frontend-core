@@ -6,6 +6,7 @@ import { multiDirect, chunkUploadFile, multiBind, type MultiShareOptions, type M
 import type { PresignCompleteData } from '@/api/presign'
 import { generateKeyB64, encryptFile } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
+import { formatFileSize } from '@/utils/format'
 import type { ShareSettings } from '@/composables/useShareSettings'
 import type { ShareResult } from '@/types/share'
 
@@ -36,7 +37,7 @@ const E2E_MAX_BYTES = 100 * 1024 * 1024
 
 export function useUploadQueue(opts: {
   settings: ShareSettings
-  t: (key: string) => string
+  t: (key: string, params?: Record<string, string>) => string
   bodyCap?: () => number
   presignThreshold?: number | (() => number)
   /** 匿名直传是否开放（后端 presign.anonymous_enabled 下发；false 时 >阈值 文件回退分片中转） */
@@ -45,6 +46,12 @@ export function useUploadQueue(opts: {
   presign?: (file: File, settings: ShareSettings) => Promise<PresignCompleteData>
   /** 登录态注入（custom_code 仅登录时发送；默认视为登录） */
   isLoggedIn?: () => boolean
+  /**
+   * 站点级单文件上限（字节，0=不限；后端 upload.max_file_size 经 /api/config 下发）。
+   * 超限文件在**任何通道发出前**本地拦截——服务端 presign init 阶段也会拒
+   * （错误码 30008），但那时已经浪费了一次往返和用户等待。
+   */
+  maxFileSize?: () => number
 }) {
   const { settings, t } = opts
 
@@ -78,17 +85,33 @@ export function useUploadQueue(opts: {
 
   const newId = () => crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
+  /** 单文件上限（字节，0=不限）。注意命名勿与 start() 内「本批最大文件」的局部量撞名 */
+  const maxFileSizeLimit = () => opts.maxFileSize?.() ?? 0
+
+  /** 超限提示文案（统一口径：实际大小 + 上限） */
+  const overLimitMsg = (size: number, limit: number) =>
+    t('upload.maxFileExceeded', { size: formatFileSize(size), limit: formatFileSize(limit) })
+
   const addFiles = (files: File[] | FileList) => {
+    const limit = maxFileSizeLimit()
     for (const f of Array.from(files)) {
+      // 超限文件直接落 error 态：选完文件即刻可见，不等到点上传才被服务端拒
+      const over = limit > 0 && f.size > limit
       tasks.value.push({
         id: newId(),
         file: f,
         payload: f,
-        status: 'pending',
+        status: over ? 'error' : 'pending',
         progress: 0,
         statusText: '',
-        error: '',
+        error: over ? overLimitMsg(f.size, limit) : '',
       })
+    }
+    if (limit > 0) {
+      const over = Array.from(files).filter((f) => f.size > limit)
+      if (over.length > 0) {
+        ElMessage.error(overLimitMsg(over[0]!.size, limit))
+      }
     }
   }
 
@@ -171,8 +194,25 @@ export function useUploadQueue(opts: {
   }
 
   const start = async (): Promise<ShareResult | null> => {
-    const pending = tasks.value.filter((f) => f.status === 'pending' || f.status === 'error')
+    let pending = tasks.value.filter((f) => f.status === 'pending' || f.status === 'error')
     if (pending.length === 0) return null
+    // 单文件上限兜底（addFiles 已拦一道）。此处补两条漏网路径：
+    // ① 上限在排队期间被管理员调低；② error 态任务被重试重置为 pending。
+    // 超限任务落 error 终态并剔出本批——不发出任何请求。
+    const limit = maxFileSizeLimit()
+    if (limit > 0) {
+      const over = pending.filter((f) => f.file.size > limit)
+      if (over.length > 0) {
+        for (const task of over) {
+          task.status = 'error'
+          task.error = overLimitMsg(task.file.size, limit)
+          task.statusText = ''
+        }
+        pending = pending.filter((f) => f.file.size <= limit)
+        ElMessage.error(overLimitMsg(over[0]!.file.size, limit))
+        if (pending.length === 0) return null
+      }
+    }
     for (const task of pending) {
       if (task.status === 'error') {
         task.status = 'pending'

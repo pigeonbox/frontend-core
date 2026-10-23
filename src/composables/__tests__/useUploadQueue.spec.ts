@@ -217,3 +217,65 @@ describe('useUploadQueue', () => {
     expect(q.canStart.value).toBe(false)
   })
 })
+
+/**
+ * 单文件上限预检（2026-10-23）。
+ * 背景：单文件上限（upload.max_file_size）此前只有服务端在 presign init 阶段拒
+ * （错误码 30008），反代 nginx 反而是唯一有硬顶的一层 ⇒ 大文件传一半被 nginx
+ * 拒成 413。改成「服务端为权威 + 前端上传前本地拦截」，本组用例钉死前端行为。
+ */
+describe('useUploadQueue — 单文件上限预检', () => {
+  it('超限文件在 addFiles 即落 error 态（选完文件就能看见）', () => {
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => 10 * MB })
+    q.addFiles([mkFile('big.bin', 20 * MB)])
+    expect(q.tasks.value[0]!.status).toBe('error')
+    expect(q.tasks.value[0]!.error).toContain('upload.maxFileExceeded')
+    expect(mocked.ElMessageError).toHaveBeenCalled()
+  })
+
+  it('超限文件 start 时被剔除：不发任何请求', async () => {
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => 10 * MB })
+    q.addFiles([mkFile('big.bin', 20 * MB)])
+    const out = await q.start()
+    expect(out).toBeNull()
+    expect(mocked.uploadFile).not.toHaveBeenCalled()
+    expect(mocked.multiDirect).not.toHaveBeenCalled()
+    expect(mocked.chunkUploadFile).not.toHaveBeenCalled()
+    expect(q.tasks.value[0]!.status).toBe('error')
+  })
+
+  it('上限为 0（不限）时大文件照常走普通通道，不被预检拦下', async () => {
+    mocked.uploadFile.mockResolvedValue({ code: 'U1', url: 'http://x/#/share/U1' })
+    const q = useUploadQueue({
+      settings: baseSettings(), t,
+      maxFileSize: () => 0,
+      bodyCap: () => 30 * MB,
+    })
+    q.addFiles([mkFile('huge.bin', 20 * MB)])
+    const out = await q.start()
+    expect(out).not.toBeNull()
+    expect(mocked.uploadFile).toHaveBeenCalledOnce()
+  })
+
+  it('混合批次：超限的剔除，未超限的照常上传', async () => {
+    mocked.uploadFile.mockResolvedValue({ code: 'M1', url: 'http://x/#/share/M1' })
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => 10 * MB })
+    q.addFiles([mkFile('ok.txt', 1 * MB), mkFile('big.bin', 20 * MB)])
+    const out = await q.start()
+    expect(out).not.toBeNull()
+    expect(mocked.uploadFile).toHaveBeenCalledOnce()
+    const over = q.tasks.value.find((f) => f.file.name === 'big.bin')!
+    expect(over.status).toBe('error')
+  })
+
+  it('排队期间上限被调低：start 时重新判定（防绕过）', async () => {
+    let limit = 0
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => limit })
+    q.addFiles([mkFile('a.txt', 5 * MB)])
+    limit = 1 * MB // 管理员在排队期间把上限调低
+    const out = await q.start()
+    expect(out).toBeNull()
+    expect(mocked.uploadFile).not.toHaveBeenCalled()
+    expect(q.tasks.value[0]!.status).toBe('error')
+  })
+})

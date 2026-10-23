@@ -125,6 +125,9 @@ const queue = useUploadQueue({
   settings,
   t,
   bodyCap: () => Math.max((configStore.config?.uploadSize || 0) - 1024 * 1024, 0) || 8 * 1024 * 1024,
+  // 站點級單文件上限（0=不限）——本地預檢：超限文件在發出任何請求前就攔掉
+  // （服務端 presign init 也會拒，錯誤碼 30008；本地攔只是省一次往返）
+  maxFileSize: () => configStore.config?.maxFileSize ?? 0,
   // 直传策略（管理后台"下载设置"下发）：disabled=全部关闭/authenticated=仅登录/everyone
   presignAllowed: () => {
     if (userStore.isLoggedIn) return true
