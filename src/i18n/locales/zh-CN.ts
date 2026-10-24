@@ -542,6 +542,15 @@ export default {
       empty: '还没有被取件过的文件',
       emptyHint: '当有人取走你的文件后，会在这里出现',
       loadFailed: '加载失败',
+      // 逐条取件明细（2026-10-24）：一次取件 = 一行（多文件逐个下载算同一次）
+      detailTitle: '取件明细',
+      detailCount: '{n} 次取件',
+      detailEmpty: '暂无取件明细',
+      detailChannel: {
+        download: '下载',
+        'select-text': '取件页',
+        retrieve: '取件码',
+      },
     },
     tokens: {
       title: 'API 令牌',

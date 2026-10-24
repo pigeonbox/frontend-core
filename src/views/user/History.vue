@@ -64,6 +64,27 @@
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
+      <!-- 逐条取件明细（2026-10-24）：一次取件 = 一行。
+           多文件逐个下载/断点续传属同一次取件 ⇒ 不会被显示成「取件 N 次」。 -->
+      <el-table-column :label="t('user.history.detailTitle')" width="160">
+        <template #default="{ row }">
+          <el-popover v-if="row.pickups && row.pickups.length" placement="left" :width="340" trigger="hover">
+            <template #reference>
+              <el-tag size="small" type="info" class="pickup-detail-tag">
+                {{ t('user.history.detailCount', { n: row.pickups.length }) }}
+              </el-tag>
+            </template>
+            <div class="pickup-detail">
+              <div v-for="(p, i) in row.pickups" :key="i" class="pickup-detail-row">
+                <code class="mono pickup-detail-ip">{{ p.ip || '—' }}</code>
+                <span class="pickup-detail-time">{{ formatDate(p.picked_at) }}</span>
+                <span class="pickup-detail-channel">{{ channelLabel(p.channel) }}</span>
+              </div>
+            </div>
+          </el-popover>
+          <span v-else class="muted">{{ t('user.history.detailEmpty') }}</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <el-empty
@@ -95,6 +116,7 @@ import { useI18n } from 'vue-i18n'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { userSharesApi, type UserShareItem } from '@/api/userShares'
 import { useTableQuery } from '@/composables/useTableQuery'
+import { isPickupChannel } from '@/utils/pickupChannel'
 import PageHeader from '@/components/data/PageHeader.vue'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
@@ -127,6 +149,12 @@ const { list, total, page, pageSize, loading, reload, handlePageChange, handleSi
       return { items: [], total: 0 }
     }
   })
+
+// 交付面标签（未知通道回显原值；契约里 channel 是可选字段）
+const channelLabel = (ch?: string | null) => {
+  if (!ch) return '—'
+  return isPickupChannel(ch) ? t(`user.history.detailChannel.${ch}`) : ch
+}
 
 onMounted(() => reload())
 </script>
@@ -223,5 +251,31 @@ onMounted(() => reload())
   color: var(--color-text-secondary);
   font-size: var(--text-sm);
   margin: var(--spacing-sm) 0 0;
+}
+
+.pickup-detail-tag {
+  cursor: pointer;
+}
+
+.pickup-detail-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 4px 0;
+  font-size: var(--text-sm);
+}
+
+.pickup-detail-ip {
+  flex: 0 0 auto;
+}
+
+.pickup-detail-time {
+  flex: 1 1 auto;
+  color: var(--color-text-secondary);
+}
+
+.pickup-detail-channel {
+  flex: 0 0 auto;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
 }
 </style>

@@ -543,6 +543,15 @@ export default {
       empty: 'No files picked up yet',
       emptyHint: 'Files picked up by others will show up here',
       loadFailed: 'Failed to load',
+      // Per-pickup detail rows (2026-10-24): one pickup = one row
+      detailTitle: 'Pickup detail',
+      detailCount: '{n} pickups',
+      detailEmpty: 'No pickup detail yet',
+      detailChannel: {
+        download: 'Download',
+        'select-text': 'Pickup page',
+        retrieve: 'Pickup code',
+      },
     },
     tokens: {
       title: 'API Tokens',
