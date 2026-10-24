@@ -112,10 +112,14 @@
       </el-table-column>
       <el-table-column :label="t('user.shares.usedCount')" width="120">
         <template #default="{ row }">
-          <span v-if="row.expired_count === -1 || row.expired_count === 0 && !row.require_auth">
-            {{ row.used_count }} / {{ t('user.shares.unlimited') }}
+          <span v-if="shareQuotaDisplay(row).kind === 'unlimited'">
+            {{ shareQuotaDisplay(row).used }} / {{ t('user.shares.unlimited') }}
           </span>
-          <span v-else>{{ row.used_count }} / {{ row.expired_count + row.used_count }}</span>
+          <span v-else-if="shareQuotaDisplay(row).kind === 'exhausted'">
+            {{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}
+            · {{ t('user.shares.countExhausted') }}
+          </span>
+          <span v-else>{{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}</span>
           <el-tooltip
             v-if="row.viewer_count > 0 && activeStatus !== 'deleted'"
             :content="`${t('user.shares.lastViewerIP')}: ${row.viewer_ip || '-'} | ${t('user.shares.lastViewerAt')}: ${formatDate(row.viewer_at)}`"
@@ -127,15 +131,16 @@
       </el-table-column>
       <el-table-column :label="t('user.shares.status')" width="100">
         <template #default="{ row }">
-          <template v-if="row.deleted_at">
-            <el-tag size="small" type="info">{{ t('user.shares.statusDeleted') }}</el-tag>
-          </template>
-          <template v-else-if="row.is_expired">
-            <el-tag size="small" type="danger">{{ t('user.shares.statusExpired') }}</el-tag>
-          </template>
-          <template v-else>
-            <el-tag size="small" type="success">{{ t('user.shares.statusActive') }}</el-tag>
-          </template>
+          <el-tag v-if="shareStatusKind(row) === 'deleted'" size="small" type="info">
+            {{ t('user.shares.statusDeleted') }}
+          </el-tag>
+          <el-tag v-else-if="shareStatusKind(row) === 'exhausted'" size="small" type="warning">
+            {{ t('user.shares.countExhausted') }}
+          </el-tag>
+          <el-tag v-else-if="shareStatusKind(row) === 'expired'" size="small" type="danger">
+            {{ t('user.shares.statusExpired') }}
+          </el-tag>
+          <el-tag v-else size="small" type="success">{{ t('user.shares.statusActive') }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.shares.createdAt')" width="150">
@@ -230,6 +235,7 @@ import { userSharesApi, type UserShareItem } from '@/api/userShares'
 import { copyToClipboard } from '@/utils/clipboard'
 import { withBase } from '@/utils/base'
 import { useTableQuery } from '@/composables/useTableQuery'
+import { shareQuotaDisplay, shareStatusKind } from '@/utils/pickupQuota'
 import PageHeader from '@/components/data/PageHeader.vue'
 import ExpireText from '@/components/data/ExpireText.vue'
 import { useErrorHandler } from '@/composables/useErrorHandler'

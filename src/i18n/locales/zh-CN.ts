@@ -491,6 +491,7 @@ export default {
       statusActive: '有效',
       statusExpired: '已过期',
       statusDeleted: '已删除',
+      countExhausted: '取件次数已用完',
       createdAt: '创建时间',
       forever: '永久',
       unlimited: '无限',

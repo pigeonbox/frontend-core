@@ -492,6 +492,7 @@ export default {
       statusActive: 'Active',
       statusExpired: 'Expired',
       statusDeleted: 'Deleted',
+      countExhausted: 'Pickups used up',
       createdAt: 'Created At',
       forever: 'Forever',
       unlimited: 'Unlimited',
