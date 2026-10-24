@@ -94,6 +94,45 @@
       <p class="empty-hint">{{ t('user.history.emptyHint') }}</p>
     </el-empty>
 
+    <!-- 窄屏卡片形态（2026-10-24 真机 390px 实测）：表格 7 列共 1160px，
+         而手机视口只有 ~374px ⇒ 右侧列（文件名/累计次数/**取件明细**）被裁掉，
+         且横向滚动条在手机上几乎看不见 ⇒ 页面基本不可用。
+         ⇒ ≤768px 用卡片（每条分享一张，信息完整、无横滑）。 -->
+    <div class="pickup-cards">
+      <div v-for="row in viewedShares" :key="row.code" class="pickup-card">
+        <div class="pickup-card-head">
+          <span class="pickup-card-name">
+            <span v-if="row.is_text_share" class="text-preview">{{ row.text || '—' }}</span>
+            <span v-else>{{ row.file_name || row.prefix + row.suffix || '—' }}</span>
+          </span>
+          <el-tag size="small" type="success">{{ row.viewer_count }} {{ t('user.history.times') }}</el-tag>
+        </div>
+        <div class="pickup-card-line">
+          <span class="pickup-card-label">{{ t('user.history.viewedAt') }}</span>
+          <span>{{ row.viewer_at ? formatDate(row.viewer_at) : '—' }}</span>
+        </div>
+        <div class="pickup-card-line">
+          <span class="pickup-card-label">{{ t('user.history.viewerIp') }}</span>
+          <code class="mono">{{ row.viewer_ip || '—' }}</code>
+        </div>
+        <div class="pickup-card-line">
+          <span class="pickup-card-label">{{ t('user.history.codeLabel') }}</span>
+          <code v-if="row.pickup_code" class="mono">{{ row.pickup_code }}</code>
+          <code v-else class="mono">{{ row.code }}</code>
+        </div>
+        <div v-if="row.pickups && row.pickups.length" class="pickup-card-line pickup-card-detail">
+          <span class="pickup-card-label">{{ t('user.history.detailTitle') }}</span>
+          <ul class="pickup-card-list">
+            <li v-for="(p, i) in row.pickups" :key="i">
+              <code class="mono">{{ p.ip || '—' }}</code>
+              <span class="pickup-card-time">{{ formatDate(p.picked_at) }}</span>
+              <span class="pickup-card-channel">{{ channelLabel(p.channel) }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
     <!-- 分页 -->
     <div v-if="total > 0" class="pagination-wrapper">
       <el-pagination
@@ -277,5 +316,93 @@ onMounted(() => reload())
 .pickup-detail-channel {
   flex: 0 0 auto;
   color: var(--color-text-tertiary, var(--color-text-secondary));
+}
+
+/* 窄屏卡片形态：默认不渲染（宽屏走表格） */
+.pickup-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* 表格在窄屏被裁（7 列 1160px vs 视口 ~374px）⇒ 换卡片 */
+  .history-table {
+    display: none;
+  }
+
+  .pickup-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .pickup-card {
+    border: 1px solid var(--color-border, var(--el-border-color));
+    border-radius: var(--radius-md, 8px);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: var(--text-sm);
+  }
+
+  .pickup-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--spacing-sm);
+  }
+
+  .pickup-card-name {
+    font-weight: 600;
+    color: var(--color-text-primary);
+    word-break: break-all;
+  }
+
+  .pickup-card-line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .pickup-card-label {
+    flex: 0 0 84px;
+    color: var(--color-text-tertiary, var(--color-text-secondary));
+  }
+
+  .pickup-card-detail {
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  /* 标签在**行**方向容器里是固定宽（76px）；到了**列**方向容器里 flex-basis
+     会变成**高度** ⇒ 标签下方空出 76px（真机截图实测到的空白带）。此处复位。 */
+  .pickup-card-detail .pickup-card-label {
+    flex: 0 0 auto;
+  }
+
+  .pickup-card-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .pickup-card-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+  }
+
+  .pickup-card-time {
+    color: var(--color-text-tertiary, var(--color-text-secondary));
+  }
+
+  .pickup-card-channel {
+    color: var(--color-text-tertiary, var(--color-text-secondary));
+  }
 }
 </style>
