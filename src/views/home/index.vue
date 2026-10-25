@@ -145,6 +145,7 @@ onMounted(async () => {
 /* 主容器 —— 纯净背景 */
 .home-container {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
 }
 
@@ -155,6 +156,7 @@ onMounted(async () => {
   margin: 0 auto;
   padding: var(--spacing-xl) clamp(16px, 4vw, 40px) var(--spacing-2xl);
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }

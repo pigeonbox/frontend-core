@@ -323,7 +323,10 @@ onMounted(() => reload())
   display: none;
 }
 
-@media (max-width: 768px) {
+/* 断点 1024px（不是 768px）：本表 7 列 ≈1160px ⇒ 600~1024px（折叠屏展开态
+   内屏 690~900 CSS px / 平板竖屏 / 桌面小窗分屏）同样放不下 ⇒ 旧断点会让这些
+   形态落回「表格被裁」形态，与手机上同型。 */
+@media (max-width: 1024px) {
   /* 表格在窄屏被裁（7 列 1160px vs 视口 ~374px）⇒ 换卡片 */
   .history-table {
     display: none;
@@ -411,6 +414,16 @@ onMounted(() => reload())
 
   .pickup-card-channel {
     color: var(--color-text-tertiary, var(--color-text-secondary));
+  }
+}
+
+/* 折叠屏展开态 / 平板竖屏（600~1024px）：卡片改多列网格 —— 单列在 900px 宽下
+   每张卡横跨全宽、标签与值被拉到两端 ⇒ 改 auto-fill 网格（800px→2 列）。 */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .pickup-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: start;
   }
 }
 </style>

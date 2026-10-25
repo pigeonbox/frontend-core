@@ -11,6 +11,14 @@
 }
 
 :root {
+  // ── 安全区（刘海 / 灵动岛 / 底部指示条 / 圆角屏 / 折叠屏内屏挖孔）──────
+  // 依赖 index.html 的 `viewport-fit=cover`（缺它时 iOS 把安全区恒为 0）。
+  // 横屏时刘海在侧边 ⇒ 左右也要内缩；竖屏时左右为 0。
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
   // 主色 / 强调色 —— 紫罗兰(与配置中心默认 accent 一致,运行时 admin 可改,
   // 见 utils/accent.ts;此处为权威默认值与首帧值,色阶公式与 accent.ts 相同)
   --primary-color: #5e6ad2;        // 品牌靛蓝=图标渐变深端,与 favicon 呼应
@@ -226,10 +234,19 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
+  // 横向安全区（横屏时刘海/圆角在侧边）—— 纵向由顶栏与页面底部各自处理
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
 }
 
 #app {
   min-height: 100vh;
+  // 动态视口高度：移动端浏览器地址栏收起/展开时 100vh 不变 ⇒ 页面底部被
+  // 浏览器 chrome 遮住（滚动到底看不见）；折叠屏展开/合上时同理。
+  // 旧浏览器不认 dvh ⇒ 前一条 100vh 兜底（写在前面 ⇒ 旧浏览器取它）。
+  min-height: 100dvh;
+  // 底部安全区（home indicator / 手势条）—— 主操作按钮不能压在指示条下
+  padding-bottom: var(--safe-bottom);
 }
 
 a {
@@ -545,7 +562,20 @@ html.dark {
   display: none;
 }
 
-@media (max-width: 768px) {
+/* 管理台「宽表 → 卡片」互斥断点。
+ *
+ * 为什么是 **1024px** 而不是 768px（2026-10-26 折叠屏适配）：
+ * 管理台 9 张宽表的列宽合计 ~990~1600px（Files 19 列 / TransferLogs 14 / …）
+ * ⇒ **600~1024px 这一段放不下任何一张宽表**（内容区还要再减侧栏/内边距）
+ * ⇒ 而这一段恰好是**折叠屏展开态**的典型宽度（内屏 690~900 CSS px）、
+ *   平板竖屏、桌面小窗分屏 ⇒ 旧断点（768px）会让这些形态落回「表格形态」
+ *   ⇒ 与手机上同型的「内容列被裁、横向滚动条几乎看不见」缺陷。
+ * ⇒ 断点提到 1024px：≤1024px 一律走卡片形态。
+ *
+ * 卡片在 600~1024px 改为**多列网格**（单列在 900px 宽下每张卡片横跨全宽、
+ * 标签与值被拉到两端 ⇒ 稀拉且难读）；≤768px 仍是单列（手机）。
+ */
+@media (max-width: 1024px) {
   // 宽屏表格在窄屏让位给卡片
   .admin-table-wide {
     display: none !important;
@@ -652,5 +682,18 @@ html.dark {
     width: 100%;
     text-align: center;
     margin: 0 0 var(--spacing-xs);
+  }
+}
+
+/* 折叠屏展开态 / 平板竖屏（600~1024px）：卡片改**多列网格**。
+ * 单列在 900px 宽下每张卡片横跨全宽 ⇒ 标签列（84~46%）与值列被拉到两端，
+ * 一屏只看得到 1~2 条、且标签与值要「扫」整行才对应得上 ⇒ 改自适应网格。
+ * auto-fill + minmax(320px,1fr) ⇒ 800px 宽出 2 列、1000px 出 3 列；
+ * ≤768px（手机）仍是上面的单列。 */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .narrow-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: start;
   }
 }

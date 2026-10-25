@@ -161,6 +161,7 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
   padding: var(--spacing-2xl) var(--spacing-xl);
 }

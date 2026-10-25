@@ -59,7 +59,10 @@ const goHome = () => {
   justify-content: space-between;
   align-items: center;
   height: 56px;
-  padding: 0 var(--spacing-xl);
+  /* 刘海/灵动岛/折叠屏外屏挖孔：顶栏内容不能压在缺口下 ⇒ 顶内缩安全区， */
+  /* 并把高度同步补上（border-box 下不补会被挤扁）。 */
+  height: calc(56px + var(--safe-top, 0px));
+  padding: var(--safe-top, 0px) var(--spacing-xl) 0;
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
 }
@@ -68,7 +71,10 @@ const goHome = () => {
 .top-nav--home {
   background: var(--color-bg);
   border-bottom: none;
-  padding: 0 var(--spacing-md);
+  /* ⚠️ 顶内缩安全区必须带进来：本变体在基础规则**之后**覆盖 padding，
+     若只写 `padding: 0 var(--spacing-md)` ⇒ 基础规则的 safe-top 被抹掉 ⇒
+     首页顶栏压到刘海/灵动岛下（2026-10-26 实测抓到的缺陷）。 */
+  padding: var(--safe-top, 0px) var(--spacing-md) 0;
   margin-bottom: var(--spacing-xl);
 }
 
@@ -127,7 +133,8 @@ const goHome = () => {
    (旧版纵向堆叠两行——logo 独占一行、控件挤第二行,高度翻倍且参差) */
 @media (max-width: 768px) {
   .top-nav--home {
-    padding: 0 var(--spacing-md);
+    /* 同上：窄屏覆盖也要带 safe-top，否则窄屏首页顶栏仍压刘海 */
+    padding: var(--safe-top, 0px) var(--spacing-md) 0;
   }
 
   .top-nav--home .nav-right {

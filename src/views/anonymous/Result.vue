@@ -167,6 +167,7 @@ const handleDownload = () => {
 .result-container {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
   overflow-x: hidden;
 }
@@ -178,6 +179,7 @@ const handleDownload = () => {
   margin: 0 auto;
   padding: 24px;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }

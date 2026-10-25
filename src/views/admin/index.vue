@@ -240,6 +240,9 @@ const handleCommand = async (command: string) => {
 <style scoped>
 .admin-layout {
   height: 100vh;
+  height: 100dvh;
+  /* 动态视口高度（移动端地址栏 / 折叠屏合上展开时 100vh 不变 ⇒ 内容被裁；
+     旧浏览器不认 dvh ⇒ 取上一行的 vh） */
   background: var(--color-bg);
 }
 
@@ -368,8 +371,10 @@ const handleCommand = async (command: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 var(--spacing-xl);
+  padding: var(--safe-top, 0px) var(--spacing-xl) 0;
   height: 56px;
+  /* 安全区顶内缩 + 高度补偿（刘海/灵动岛/折叠屏外屏挖孔） */
+  height: calc(56px + var(--safe-top, 0px));
 }
 
 .header-left h3 {
@@ -426,9 +431,14 @@ const handleCommand = async (command: string) => {
   background: var(--color-bg);
   padding: var(--spacing-2xl);
   min-height: calc(100vh - 56px);
+  min-height: calc(100dvh - 56px);
 }
 
-@media (max-width: 768px) {
+/* 断点 1024px（不是 768px）：折叠屏展开态内屏 690~900 CSS px、平板竖屏、
+   桌面小窗分屏都落在 769~1024px ⇒ 侧栏若仍常驻 240px，内容区只剩 ~500~700px，
+   宽表（990~1600px）必被裁 ⇒ 与手机同型缺陷。断点提到 1024px 后侧栏改抽屉，
+   内容区拿到整幅宽度。 */
+@media (max-width: 1024px) {
   .user-details {
     display: none;
   }
@@ -465,6 +475,9 @@ const handleCommand = async (command: string) => {
     left: 0;
     z-index: 2000;
     width: 240px;
+    /* 抽屉浮在最上层 ⇒ 安全区由它自己承担（刘海/圆角/底部指示条） */
+    padding-top: var(--safe-top, 0px);
+    padding-bottom: var(--safe-bottom, 0px);
     transform: translateX(-100%);
     transition: transform 0.2s ease;
     box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.28));

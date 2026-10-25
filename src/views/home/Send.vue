@@ -173,6 +173,7 @@ onMounted(async () => {
 /* 与首页同构的卡片体系（拆页复制,scoped 隔离;改动需两处同步） */
 .home-container {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
 }
 
@@ -182,6 +183,7 @@ onMounted(async () => {
   margin: 0 auto;
   padding: var(--spacing-xl) clamp(16px, 4vw, 40px) var(--spacing-2xl);
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }

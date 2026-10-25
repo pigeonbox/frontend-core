@@ -145,7 +145,7 @@
       </template>
 
       <div v-if="recentShares.length > 0">
-        <el-table :data="recentShares" v-loading="sharesLoading" class="shares-table">
+        <el-table :data="recentShares" v-loading="sharesLoading" class="shares-table dashboard-shares-table">
           <el-table-column :label="t('admin.fileName')" min-width="200">
             <template #default="{ row }">
               <div class="filename-cell">
@@ -191,6 +191,45 @@
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 窄屏 / 折叠屏展开态卡片形态：本表 5 列合计 ~900px（操作列 280px 固定
+             在右侧）⇒ 600~1024px（折叠屏内屏 690~900 CSS px、平板竖屏、桌面小窗
+             分屏）放不下 ⇒ 内容列被裁、且固定操作列会**盖住**相邻列。
+             与用户端 History.vue 同款：表格与卡片同时渲染、纯 CSS 互斥。 -->
+        <div class="dashboard-share-cards">
+          <div v-for="row in recentShares" :key="row.code" class="dashboard-share-card">
+            <div class="dashboard-share-card-head">
+              <el-icon class="file-icon"><Document /></el-icon>
+              <span class="dashboard-share-name">{{ row.file_name || t('user.textShare') }}</span>
+            </div>
+            <div class="dashboard-share-line">
+              <span class="dashboard-share-label">{{ t('admin.size') }}</span>
+              <span class="size-badge">{{ formatFileSize(row.size) }}</span>
+            </div>
+            <div class="dashboard-share-line">
+              <span class="dashboard-share-label">{{ t('admin.createdAt') }}</span>
+              <span>{{ formatDate(row.created_at) }}</span>
+            </div>
+            <div class="dashboard-share-line">
+              <span class="dashboard-share-label">{{ t('user.downloads') }}</span>
+              <el-tag type="info" size="small">{{ row.used_count }}</el-tag>
+            </div>
+            <div class="dashboard-share-actions">
+              <el-button @click="viewShare(row.code)" type="primary" size="small" plain>
+                <el-icon><View /></el-icon>
+                {{ t('common.view') }}
+              </el-button>
+              <el-button @click="copyShareLink(row.code)" type="success" size="small" plain>
+                <el-icon><CopyDocument /></el-icon>
+                {{ t('common.copy') }}
+              </el-button>
+              <el-button @click="deleteShare(row.code)" type="danger" size="small" plain>
+                <el-icon><Delete /></el-icon>
+                {{ t('common.delete') }}
+              </el-button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div v-else-if="!sharesLoading" class="empty-state">
@@ -688,6 +727,84 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .action-buttons {
     flex-wrap: wrap;
+  }
+}
+
+/* =============================================================================
+   折叠屏 / 平板竖屏 / 桌面小窗分屏（≤1024px）：「最近分享」表换卡片形态。
+   本表 5 列合计 ~900px（其中操作列 280px 且 fixed="right"）⇒ 600~1024px 放不下
+   ⇒ 内容列被裁、固定操作列还会**盖住**相邻列（与 2026-10-23 记录的
+   「半个字被按钮压住」同型）。与 History.vue 同款：纯 CSS 双形态互斥。
+   ============================================================================= */
+.dashboard-share-cards {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-shares-table {
+    display: none !important;
+  }
+
+  .dashboard-share-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .dashboard-share-card {
+    border: 1px solid var(--color-border, var(--el-border-color));
+    border-radius: var(--radius-md, 8px);
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: var(--text-sm);
+  }
+
+  .dashboard-share-card-head {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    word-break: break-all;
+  }
+
+  .dashboard-share-line {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    color: var(--color-text-regular);
+  }
+
+  /* 标签列按内容自适应（下限 84px、上限 46%）——英文长标签不折行 */
+  .dashboard-share-label {
+    flex: 0 0 auto;
+    min-width: 84px;
+    max-width: 46%;
+    color: var(--color-text-secondary);
+  }
+
+  .dashboard-share-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: 2px;
+  }
+
+  /* Element Plus 相邻按钮自带 margin-left，flex gap 下会叠出双倍间距 */
+  .dashboard-share-actions .el-button {
+    margin-left: 0;
+  }
+}
+
+/* 展开态（600~1024px）：卡片多列网格（单列在 900px 宽下横跨全宽、标签与值
+   被拉到两端 ⇒ 难读）。 */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .dashboard-share-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    align-items: start;
   }
 }
 </style>

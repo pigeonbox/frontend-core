@@ -24,10 +24,17 @@ const here = dirname(fileURLToPath(import.meta.url))
 const srcRoot = resolve(here, '..', '..', '..')
 const read = (rel: string) => readFileSync(resolve(srcRoot, rel), 'utf8')
 
-/** 取文件中第一个 ≤768px 媒体查询块的内容（按大括号配对截取，避免正则截断） */
-function narrowBlock(source: string): string {
-  const at = source.indexOf('@media (max-width: 768px)')
-  expect(at, '应存在 ≤768px 的窄屏媒体查询').toBeGreaterThan(-1)
+/**
+ * 取文件中第一个「≤某断点」媒体查询块的内容（按大括号配对截取，避免正则截断）。
+ *
+ * 断点参数化（2026-10-26 折叠屏适配）：管理台的「表格→卡片」与侧栏抽屉断点
+ * 已从 768px 提到 **1024px**（769~1024px = 折叠屏展开态内屏 / 平板竖屏 /
+ * 桌面小窗分屏 ⇒ 宽表 990~1600px 一样放不下），而 Config.vue 的表单标签断点
+ * 仍是 768px ⇒ 两处断点不同，helper 必须能按断点取块。
+ */
+function narrowBlock(source: string, breakpoint = '768px'): string {
+  const at = source.indexOf(`@media (max-width: ${breakpoint})`)
+  expect(at, `应存在 ≤${breakpoint} 的窄屏媒体查询`).toBeGreaterThan(-1)
   const open = source.indexOf('{', at)
   let depth = 0
   for (let i = open; i < source.length; i++) {
@@ -41,9 +48,12 @@ function narrowBlock(source: string): string {
 }
 
 describe('管理台窄屏可用性', () => {
-  it('侧栏在 ≤768px 必须脱离常规流（抽屉化），否则内容区被侧栏吃掉', () => {
+  it('侧栏在 ≤1024px 必须脱离常规流（抽屉化），否则内容区被侧栏吃掉', () => {
     const s = read('views/admin/index.vue')
-    const block = narrowBlock(s)
+    // 断点 1024px：折叠屏展开态（内屏 690~900 CSS px）/平板竖屏/桌面小窗分屏
+    // 都落在 769~1024px ⇒ 侧栏若仍常驻 240px，内容区只剩 ~500~700px，
+    // 宽表（990~1600px）必被裁（与手机同型缺陷）。
+    const block = narrowBlock(s, '1024px')
     expect(block, '窄屏下 .admin-aside 必须 position: fixed（脱离常规流）').toMatch(
       /\.admin-aside[\s\S]*?position:\s*fixed/
     )
@@ -116,9 +126,11 @@ describe('管理台窄屏卡片形态', () => {
     }
   })
 
-  it('全局样式必须保留「表格隐藏 / 卡片显示」的互斥开关', () => {
+  it('全局样式必须保留「表格隐藏 / 卡片显示」的互斥开关（断点 1024px）', () => {
     const s = read('styles/main.scss')
-    const block = narrowBlock(s)
+    // 断点 1024px（不是 768px）：管理台宽表列宽合计 990~1600px ⇒ 769~1024px
+    // （折叠屏展开态/平板竖屏/小窗分屏）同样放不下 ⇒ 一律走卡片形态。
+    const block = narrowBlock(s, '1024px')
     expect(block, '窄屏必须把 .admin-table-wide（表格）隐藏').toMatch(
       /\.admin-table-wide\s*\{[^}]*display:\s*none\s*!important/
     )
@@ -126,7 +138,7 @@ describe('管理台窄屏卡片形态', () => {
       /\.narrow-cards\s*\{[^}]*display:\s*flex/
     )
     // 宽屏默认隐藏卡片（否则宽屏会同时看到表格与卡片）
-    const beforeMedia = s.slice(0, s.indexOf('@media (max-width: 768px)'))
+    const beforeMedia = s.slice(0, s.indexOf('@media (max-width: 1024px)'))
     expect(beforeMedia, '宽屏必须默认隐藏 .narrow-cards').toMatch(
       /\.narrow-cards\s*\{\s*display:\s*none;\s*\}/
     )

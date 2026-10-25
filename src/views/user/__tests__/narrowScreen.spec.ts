@@ -22,10 +22,14 @@ const here = dirname(fileURLToPath(import.meta.url))
 const srcRoot = resolve(here, '..', '..', '..')
 const read = (rel: string) => readFileSync(resolve(srcRoot, rel), 'utf8')
 
-/** 取文件中第一个 ≤768px 媒体查询块的内容（按大括号配对截取，避免正则截断） */
-function narrowBlock(source: string): string {
-  const at = source.indexOf('@media (max-width: 768px)')
-  expect(at, '应存在 ≤768px 的窄屏媒体查询').toBeGreaterThan(-1)
+/**
+ * 取文件中第一个「≤某断点」媒体查询块的内容（按大括号配对截取，避免正则截断）。
+ * 断点参数化（2026-10-26 折叠屏适配）：取件历史页的表格→卡片断点已提到
+ * **1024px**（本表 7 列 ≈1160px ⇒ 折叠屏展开态 690~900 CSS px 一样放不下）。
+ */
+function narrowBlock(source: string, breakpoint = '768px'): string {
+  const at = source.indexOf(`@media (max-width: ${breakpoint})`)
+  expect(at, `应存在 ≤${breakpoint} 的窄屏媒体查询`).toBeGreaterThan(-1)
   const open = source.indexOf('{', at)
   let depth = 0
   for (let i = open; i < source.length; i++) {
@@ -39,17 +43,19 @@ function narrowBlock(source: string): string {
 }
 
 describe('取件历史页窄屏可用性', () => {
-  it('≤768px 必须隐藏表格（7 列 1160px 在手机上被裁，右侧列看不到）', () => {
+  it('≤1024px 必须隐藏表格（7 列 1160px 在手机/折叠屏展开态都被裁，右侧列看不到）', () => {
     const s = read('views/user/History.vue')
-    const block = narrowBlock(s)
+    // 断点 1024px：折叠屏展开态内屏 690~900 CSS px、平板竖屏、桌面小窗分屏
+    // 都落在 769~1024px ⇒ 本表（7 列 ≈1160px）一样放不下。
+    const block = narrowBlock(s, '1024px')
     expect(block, '窄屏下 .history-table 必须 display: none').toMatch(
       /\.history-table[\s\S]*?display:\s*none/
     )
   })
 
-  it('≤768px 必须显示卡片形态（信息完整、无横滑）', () => {
+  it('≤1024px 必须显示卡片形态（信息完整、无横滑）', () => {
     const s = read('views/user/History.vue')
-    const block = narrowBlock(s)
+    const block = narrowBlock(s, '1024px')
     expect(block, '窄屏下 .pickup-cards 必须显示').toMatch(
       /\.pickup-cards[\s\S]*?display:\s*flex/
     )
