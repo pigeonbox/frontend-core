@@ -594,6 +594,25 @@ html.dark {
     word-break: break-word;
   }
 
+  // 卡片头部的「名称行 + 预览行」：名称与标签同行；预览按**表格同款**单行省略
+  // （12px/次要色/ellipsis）⇒ 宽窄两屏对同一条分享看到的前缀一致。
+  .narrow-card-head .narrow-file-name {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+
+  .narrow-card-head .narrow-text-preview {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--color-text-secondary);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .narrow-card-actions {
     display: flex;
     flex-wrap: wrap;

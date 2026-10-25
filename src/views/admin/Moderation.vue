@@ -72,7 +72,7 @@
 
       <!-- 窄屏（≤768px）卡片形态：v-if 与上面 el-table 的 v-else 不相邻（插在中间会
            打断 v-if/v-else 链）⇒ 用显式条件渲染，语义等价。 -->
-      <NarrowCardList v-if="queue.length" :rows="queue" :fields="cardFields" :head="cardHead">
+      <NarrowCardList v-if="queue.length" :rows="queue" :fields="cardFields">
         <template #head="{ row }">
           <div class="narrow-file-name">
             {{ row.file_name || row.code }}
@@ -133,7 +133,6 @@ const cardFields = computed(() => [
   { key: 'size', label: t('admin.size') },
   { key: 'created_at', label: t('admin.moderation.colSubmittedAt') },
 ])
-const cardHead = (row: any) => row.file_name || row.code
 
 const acting = ref<number | null>(null)
 

@@ -83,7 +83,7 @@
 
       <!-- 窄屏（≤768px）卡片形态：条件与上面表格的 v-else 等价（不插在 v-if/v-else
            中间，免得打断指令链）。 -->
-      <NarrowCardList v-if="!featureDisabled" :rows="entries" :fields="cardFields" :head="cardHead">
+      <NarrowCardList v-if="!featureDisabled" :rows="entries" :fields="cardFields">
         <template #head="{ row }">
           <el-icon class="file-icon"><Document v-if="!row.is_dir" /><Folder v-else /></el-icon>
           <el-link v-if="row.is_dir" type="primary" @click="goto(row.path)">{{ row.name }}</el-link>
@@ -162,7 +162,6 @@ const cardFields = computed(() => [
   { key: 'size', label: t('admin.size') },
   { key: 'modified', label: t('admin.localFilesPage.colModified') },
 ])
-const cardHead = (row: any) => row.name
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()

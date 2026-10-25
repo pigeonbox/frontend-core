@@ -103,7 +103,7 @@
 
       <!-- 窄屏（≤768px）卡片形态：本表 5 列合计 ~1040px ⇒ 390px 视口下内容列全被裁。
            策展=用户名(头部) + 昵称/状态/存储/注册时间；操作按钮同桌面。 -->
-      <NarrowCardList :rows="usersList" :fields="cardFields" :head="cardHead">
+      <NarrowCardList :rows="usersList" :fields="cardFields">
         <template #head="{ row }">
           <div class="narrow-file-name">
             {{ row.username }}
@@ -345,7 +345,6 @@ const cardFields = computed(() => [
   { key: 'storage', label: t('admin.usersPage.colStorage') },
   { key: 'created_at', label: t('admin.registeredAt') },
 ])
-const cardHead = (row: any) => row.username
 
 const getStorageColor = (user: any): string => {
   const percentage = getStoragePercentage(user)

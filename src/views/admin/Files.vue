@@ -259,7 +259,7 @@
       <!-- 窄屏（≤768px）卡片形态：本表 9 列合计 ~1300px ⇒ 390px 视口下内容列全被裁。
            策展=手机上真正要看的（大小/状态/上传者/IP/取件次数/创建/过期），批量操作
            （表头多选）仍是桌面专属，窄屏不提供。 -->
-      <NarrowCardList :rows="filesList" :fields="cardFields" :head="cardHead">
+      <NarrowCardList :rows="filesList" :fields="cardFields">
         <template #head="{ row }">
           <div class="narrow-file-name">
             {{ row.file_name || row.code }}
@@ -493,7 +493,6 @@ const cardFields = computed(() => [
   { key: 'created_at', label: t('admin.createdAt') },
   { key: 'expired_at', label: t('admin.filesPage.colExpiresAt') },
 ])
-const cardHead = (row: any) => row.file_name || row.code
 
 const getFileIcon = (row: any) => {
   const filename = row.file_name || ''

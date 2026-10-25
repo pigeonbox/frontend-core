@@ -202,7 +202,7 @@
           </el-table>
 
           <!-- 窄屏（≤768px）卡片形态（仪表盘两张「最近 N 条」表同样会被裁） -->
-          <NarrowCardList :rows="recentUsers" :fields="userCardFields" :head="userCardHead">
+          <NarrowCardList :rows="recentUsers" :fields="userCardFields">
             <template #status="{ row }">
               <el-tag :type="isActiveStatus(row.status) ? 'success' : 'danger'" size="small">
                 {{ isActiveStatus(row.status) ? t('common.normal') : t('common.disabled') }}
@@ -250,7 +250,7 @@
             </el-table-column>
           </el-table>
 
-          <NarrowCardList :rows="recentFiles" :fields="fileCardFields" :head="fileCardHead">
+          <NarrowCardList :rows="recentFiles" :fields="fileCardFields">
             <template #file_size="{ row }">
               <el-tag type="info" size="small">{{ formatFileSize(row.file_size) }}</el-tag>
             </template>
@@ -299,13 +299,11 @@ const userCardFields = computed(() => [
   { key: 'status', label: t('common.status') },
   { key: 'created_at', label: t('admin.registeredAt') },
 ])
-const userCardHead = (row: any) => row.username
 const fileCardFields = computed(() => [
   { key: 'file_size', label: t('admin.size') },
   { key: 'username', label: t('admin.uploader') },
   { key: 'created_at', label: t('admin.uploadedAt') },
 ])
-const fileCardHead = (row: any) => row.filename
 
 const { t, locale } = useI18n()
 const userStore = useUserStore()
