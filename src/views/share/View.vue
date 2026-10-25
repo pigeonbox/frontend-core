@@ -137,13 +137,10 @@
                 <el-icon :size="80" class="icon-primary"><Folder /></el-icon>
               </div>
               <div class="file-info">
-                <h3 class="file-name">{{ shareData.name || shareData.file_name || shareData.text }}</h3>
+                <h3 class="file-name">{{ shareData.file_name || shareData.text }}</h3>
                 <div class="file-meta">
                   <el-tag type="info" size="large">
-                    {{ formatFileSize(shareData.size || shareData.file_size || 0) }}
-                  </el-tag>
-                  <el-tag v-if="shareData.upload_type" type="success" size="large">
-                    {{ shareData.upload_type === 'text' ? t('share.textShare') : t('share.fileShare') }}
+                    {{ formatFileSize(shareData.file_size || 0) }}
                   </el-tag>
                 </div>
               </div>
@@ -274,7 +271,7 @@ const fetchShare = async (pwd?: string) => {
   try {
     const res = await shareApi.getShare(shareCode.value, pwd)
 
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       shareData.value = res.data
       // E2E 文本解密（密文 base64 存于 text 字段）
       if (res.data?.encrypted && res.data?.text && e2eKey.value) {
@@ -408,7 +405,7 @@ const downloadFile = (fileId?: number, name?: string) => {
     return
   }
   // 文件分享的原始名存 text 字段（E2E 文本分享的 text 是密文，但文本分支不走下载）
-  const fallbackName = name || shareData.value?.file_name || shareData.value?.name
+  const fallbackName = name || shareData.value?.file_name
     || (shareData.value?.encrypted && shareFiles.value.length === 0 ? '' : shareData.value?.text)
     || `${shareCode.value}.bin`
   if (isEncrypted.value) {

@@ -92,8 +92,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
@@ -101,49 +101,25 @@ import {
   CircleCheckFilled, WarningFilled, Back
 } from '@element-plus/icons-vue'
 import { type RetrieveData } from '@/api/anonymous'
-import { getSession, newSessionKey, putSession } from '@/utils/localHistory'
+import { getSession } from '@/utils/localHistory'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 
 const route = useRoute()
-const router = useRouter()
 const { t } = useI18n()
 
 /**
  * 取件结果数据来源（2026-10-22）：
  * 主路径 = sessionStorage + URL 只带一个不透明 key（?k=）——结果元信息
  * （文件名/大小/下载地址）不再进 URL，地址栏/浏览器历史/Referer 不留痕。
- * 兼容路径 = 旧链路的 ?data=<JSON>（写入端 composables/usePickup.ts 尚未切
- * sessionStorage 前的过渡兜底；页面加载即迁移到 sessionStorage 并 replace
- * 地址栏，写入端切过来后本分支即可删除）。
+ * 旧链路的 ?data=<JSON> 兼容路径**已删**（2026-10-25 删除旧版本兼容）：写入端
+ * （composables/usePickup.ts）早已切到 sessionStorage + ?k=<不透明 key>，该形态
+ * 无生产方。
  */
 const data = computed<RetrieveData | null>(() => {
   const key = typeof route.query.k === 'string' ? route.query.k : ''
-  if (key) {
-    return getSession<RetrieveData>(key)
-  }
-  const legacy = typeof route.query.data === 'string' ? route.query.data : ''
-  if (!legacy) return null
-  try {
-    return JSON.parse(decodeURIComponent(legacy)) as RetrieveData
-  } catch {
-    return null
-  }
-})
-
-onMounted(() => {
-  // 旧链路自迁移：?data= 的 JSON 落 sessionStorage，地址栏 replace 成不透明 key
-  // （历史条目被覆写 → 后续地址栏/历史不再留元信息）
-  const legacy = typeof route.query.data === 'string' ? route.query.data : ''
-  if (!legacy) return
-  try {
-    const parsed = JSON.parse(decodeURIComponent(legacy)) as RetrieveData
-    const k = newSessionKey()
-    putSession(k, parsed)
-    void router.replace({ path: route.path, query: { k } })
-  } catch {
-    /* 解析失败：留旧态，下方空态兜底提示 */
-  }
+  if (!key) return null
+  return getSession<RetrieveData>(key)
 })
 
 const formatSize = (bytes: number): string => {

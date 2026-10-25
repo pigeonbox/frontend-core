@@ -630,7 +630,7 @@ const setStatus = async (row: any, status: FileStatus) => {
   }
   try {
     const res = await adminApi.setFileStatus(row.id, status)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(isBlock ? t('admin.filesPage.blockDone') : t('admin.filesPage.restoreDone'))
       await fetchFiles()
     } else {
@@ -656,7 +656,7 @@ const batchSetStatus = async (status: FileStatus) => {
   }
   try {
     const res = await adminApi.batchSetFileStatus(selectedIds.value, status)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       const n = res.data?.affected ?? selectedIds.value.length
       ElMessage.success(isBlock ? t('admin.filesPage.batchBlockDone', { n }) : t('admin.filesPage.batchRestoreDone', { n }))
       await fetchFiles()
@@ -682,7 +682,7 @@ const deleteFile = async (file: any) => {
 
     // 使用 code 而不是 ID
     const res = await adminApi.deleteFileByCode(file.code)
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.deleteDone'))
       await fetchFiles()
     } else {
@@ -717,7 +717,7 @@ const batchDelete = async () => {
   saving.value = true
   try {
     const res = await adminApi.batchDeleteFilesByIds(selectedIds.value)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.batchDeleteDone', { n: res.data?.deleted ?? selectedIds.value.length }))
       await fetchFiles()
     } else {
@@ -736,7 +736,7 @@ const submitBatchExtend = async () => {
   saving.value = true
   try {
     const res = await adminApi.batchExtendFiles(selectedIds.value, batchExtendValue.value, 'day')
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.batchExtendDone', { n: res.data?.extended ?? selectedIds.value.length }))
       batchExtendVisible.value = false
       await fetchFiles()
@@ -770,7 +770,7 @@ const submitEdit = async () => {
       expire_style: 'day',
       expired_count: editForm.expiredCount
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.saved'))
       editVisible.value = false
       await fetchFiles()

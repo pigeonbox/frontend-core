@@ -540,7 +540,7 @@ const fetchConfig = async () => {
 const fetchUserSettings = async () => {
   try {
     const res = await adminApi.getUserSettings()
-    if ((res.code === 0 || res.code === 200) && res.data) {
+    if ((res.code === 200) && res.data) {
       const d = res.data as Record<string, unknown>
       configForm.user.allowuserregistration = Number(d.allowuserregistration === true || d.allowuserregistration === 1)
       if (typeof d.useruploadsize === 'number' && d.useruploadsize > 0) configForm.user.useruploadsize = d.useruploadsize
@@ -673,7 +673,7 @@ const fetchExSections = (data: Record<string, unknown>) => {
 // 写入辅助：非成功码抛错，供多段/多端点分区串联，失败即中断并统一走 handleError
 const putConfig = async (payload: Record<string, unknown>) => {
   const res = await adminApi.updateConfig(payload)
-  if (!(res.code === 0 || res.code === 200)) {
+  if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
   }
 }
@@ -685,7 +685,7 @@ const putUserSettings = async () => {
     userstoragequota: configForm.user.userstoragequota,
     sessionexpiryhours: configForm.user.sessionexpiryhours
   })
-  if (!(res.code === 0 || res.code === 200)) {
+  if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
   }
 }
@@ -708,7 +708,7 @@ const putRateLimit = async () => {
   const res = await adminApi.updateRateLimitConfig({
     config: { ...rlSnapshot, ...rlForm }
   })
-  if (!(res.code === 0 || res.code === 200)) {
+  if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
   }
 }
@@ -768,7 +768,7 @@ const rlStatus = ref<Record<string, unknown> | null>(null)
 const fetchRateLimit = async () => {
   try {
     const res = await adminApi.getRateLimitConfig()
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       const data = (res.data || {}) as Record<string, unknown>
       rlSnapshot = { ...data }
       for (const k of Object.keys(rlForm) as (keyof typeof rlForm)[]) {
@@ -788,7 +788,7 @@ const fetchRateLimitStatus = async () => {
   rlStatusLoading.value = true
   try {
     const res = await adminApi.getRateLimitStatus()
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       rlStatus.value = res.data || null
     } else {
       handleError(new Error(res.message || t('admin.configPage.ratelimit.fetchStatusFailed')))
@@ -811,7 +811,7 @@ const doSMTPTest = async () => {
   smtpTesting.value = true
   try {
     const res = await adminApi.testSMTP(smtpTestTo.value)
-    if (res.code === 0 || res.code === 200) ElMessage.success(t('admin.configPage.notify.testSent'))
+    if (res.code === 200) ElMessage.success(t('admin.configPage.notify.testSent'))
     else handleError(new Error(res.message || t('admin.configPage.notify.sendFailed')))
   } catch (e) {
     handleError(e)
@@ -825,7 +825,7 @@ const doOIDCTest = async () => {
   oidcTesting.value = true
   try {
     const res = await adminApi.testOIDC()
-    if (res.code === 0 || res.code === 200) ElMessage.success(t('admin.configPage.oidc.testOk'))
+    if (res.code === 200) ElMessage.success(t('admin.configPage.oidc.testOk'))
     else handleError(new Error(res.message || t('admin.configPage.oidc.testFailed')))
   } catch (e) {
     handleError(e)

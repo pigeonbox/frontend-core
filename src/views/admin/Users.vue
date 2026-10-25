@@ -58,10 +58,10 @@
         <el-table-column :label="t('admin.usersPage.colStatus')" width="100" align="center">
           <template #default="{ row }">
             <el-tag
-              :type="row.status === 1 || row.status === 'active' ? 'success' : 'danger'"
+              :type="row.status === 1 ? 'success' : 'danger'"
               effect="light"
             >
-              {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
+              {{ row.status === 1 ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
             </el-tag>
           </template>
         </el-table-column>
@@ -89,11 +89,11 @@
           <template #default="{ row }">
             <el-button
               @click="toggleUserStatus(row)"
-              :type="row.status === 1 || row.status === 'active' ? 'warning' : 'success'"
+              :type="row.status === 1 ? 'warning' : 'success'"
               size="small"
               round
             >
-              {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
+              {{ row.status === 1 ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
             </el-button>
             <el-button @click="openResetPassword(row)" size="small" round>{{ t('admin.usersPage.resetPassword') }}</el-button>
             <el-button @click="removeUser(row)" type="danger" size="small" round plain>{{ t('admin.usersPage.delete') }}</el-button>
@@ -112,8 +112,8 @@
           <div class="narrow-text-preview">{{ row.email || t('admin.usersPage.noEmail') }}</div>
         </template>
         <template #status="{ row }">
-          <el-tag :type="row.status === 1 || row.status === 'active' ? 'success' : 'danger'" effect="light">
-            {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
+          <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light">
+            {{ row.status === 1 ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
           </el-tag>
         </template>
         <template #storage="{ row }">
@@ -124,11 +124,11 @@
         <template #actions="{ row }">
           <el-button
             @click="toggleUserStatus(row)"
-            :type="row.status === 1 || row.status === 'active' ? 'warning' : 'success'"
+            :type="row.status === 1 ? 'warning' : 'success'"
             size="small"
             round
           >
-            {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
+            {{ row.status === 1 ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
           </el-button>
           <el-button @click="openResetPassword(row)" size="small" round>{{ t('admin.usersPage.resetPassword') }}</el-button>
           <el-button @click="removeUser(row)" type="danger" size="small" round plain>{{ t('admin.usersPage.delete') }}</el-button>
@@ -260,7 +260,7 @@ const submitCreate = async () => {
       role: createForm.role,
       max_storage_quota: createForm.quotaUnit > 0 ? createForm.quotaUnit * 1024 * 1024 : 0
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.usersPage.created'))
       createVisible.value = false
       await fetchUsers()
@@ -288,7 +288,7 @@ const submitReset = async () => {
   saving.value = true
   try {
     const res = await adminApi.resetUserPassword(resetTarget.value.id, resetPassword.value)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.usersPage.passwordReset'))
       resetVisible.value = false
     } else {
@@ -313,7 +313,7 @@ const removeUser = async (user: any) => {
   }
   try {
     const res = await adminApi.deleteUser(user.id)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.usersPage.deleted'))
       await fetchUsers()
     } else {
@@ -362,16 +362,6 @@ const { list: usersList, total, page, pageSize, loading, reload, handleSizeChang
         if (res.data && Array.isArray(res.data.items)) {
           return { items: res.data.items, total: res.data.total ?? res.data.items.length }
         }
-        if (res.data && Array.isArray((res.data as Record<string, unknown>).users)) {
-          // 兼容历史响应结构
-          const legacy = res.data as Record<string, unknown>
-          const users = legacy.users as any[]
-          const pg = legacy.pagination as { total?: number } | undefined
-          return { items: users, total: pg?.total ?? users.length }
-        }
-        if (Array.isArray(res.data)) {
-          return { items: res.data, total: res.data.length }
-        }
       }
       return { items: [], total: 0 }
     } catch (error) {
@@ -385,7 +375,7 @@ const fetchUsers = () => reload()
 
 const toggleUserStatus = async (user: any) => {
   try {
-    const isActive = user.status === 1 || user.status === 'active'
+    const isActive = user.status === 1
     const newStatus = isActive ? 0 : 1
     await ElMessageBox.confirm(
       isActive

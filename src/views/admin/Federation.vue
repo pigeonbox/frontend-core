@@ -139,7 +139,7 @@ const expiresMin = (iv: P2pInvite): number => Math.max(0, Math.floor((iv.expires
 const fetchInvites = async () => {
   try {
     const res = await p2pApi.invites()
-    if (res.code === 200 || res.code === 0) invites.value = res.data?.invites ?? []
+    if (res.code === 200) invites.value = res.data?.invites ?? []
   } catch {
     /* 轮询失败静默（页面仍可手动刷新） */
   }
@@ -152,7 +152,7 @@ const acceptInvite = async (iv: P2pInvite) => {
   acceptingId.value = iv.id
   try {
     const res = await p2pApi.acceptInvite(iv.id)
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 200) {
       // 新契约：accept 返回纯信封 { invite }
       acceptedInvite.value = res.data?.invite ?? iv
       acceptedVisible.value = true
@@ -187,7 +187,7 @@ const doPush = async () => {
       configStore.siteName(),
       pushForm.note,
     )
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.federation.pushSuccess'))
       if (inviteTo.value) rememberPeer(inviteTo.value)
       pushForm.code = ''
@@ -234,7 +234,7 @@ const fetchPeers = async () => {
   peersLoading.value = true
   try {
     const res = await p2pApi.directory()
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 200) {
       peers.value = res.data?.peers ?? []
       peersError.value = false
     } else {

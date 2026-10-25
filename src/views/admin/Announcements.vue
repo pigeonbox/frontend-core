@@ -160,7 +160,7 @@ const { list: items, total, page, loading, reload, handlePageChange } = useTable
   async ({ page, page_size }) => {
     try {
       const res = await adminApi.listNotifies({ page, page_size })
-      if (res.code === 0 || res.code === 200) {
+      if (res.code === 200) {
         const d = res.data as Record<string, unknown>
         const list = (d.list || d.items || d.notifies) as NotifyRow[] | undefined
         const items = Array.isArray(list) ? list : Array.isArray(d) ? (d as unknown as NotifyRow[]) : []
@@ -210,7 +210,7 @@ const doSave = async () => {
     const res = editId.value
       ? await adminApi.updateNotify(editId.value, payload)
       : await adminApi.createNotify(payload)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.announcementsPage.saved'))
       dlg.value = false
       load()
@@ -229,7 +229,7 @@ const setStatus = async (row: NotifyRow, status: number) => {
     const res = await adminApi.updateNotify(row.id, {
       title: row.title, content: row.content, type: row.type, level: row.level, status,
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(status === 1 ? t('admin.announcementsPage.publishedToast') : t('admin.announcementsPage.offlineToast'))
       load()
     } else {
@@ -247,7 +247,7 @@ const onDelete = async (row: NotifyRow) => {
     return
   }
   const res = await adminApi.deleteNotify(row.id)
-  if (res.code === 0 || res.code === 200) {
+  if (res.code === 200) {
     ElMessage.success(t('admin.announcementsPage.deleted'))
     load()
   } else {

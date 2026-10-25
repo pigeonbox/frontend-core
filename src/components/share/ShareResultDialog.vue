@@ -347,7 +347,7 @@ const loadExpire = async (code: string) => {
   if (!code) return
   try {
     const res = await publicApi.getShareMetadata(code)
-    if ((res.code === 0 || res.code === 200) && res.data) {
+    if ((res.code === 200) && res.data) {
       expiredAt.value = res.data.expired_at ?? null
       expireKnown.value = true
     }

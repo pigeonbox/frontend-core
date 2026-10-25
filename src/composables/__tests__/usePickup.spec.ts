@@ -46,7 +46,9 @@ function makeDeps() {
   return deps
 }
 
-const ok = <T>(data: T) => Promise.resolve({ code: 0, message: 'success', data, trace_id: '' })
+// mock 打在 **api 模块边界** ⇒ 生产里该边界拿到的是**拦截器归一化后**的值
+// （utils/request.ts 把后端的 code=0 改写成 200）⇒ mock 必须给 200 才忠实于生产。
+const ok = <T>(data: T) => Promise.resolve({ code: 200, message: 'success', data, trace_id: '' })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -210,7 +212,7 @@ describe('usePickup（匿名取件状态机）', () => {
     // 等 #1 推进到 retrieve 挂起，再断言 #2 被 inFlight 闸掉
     await vi.waitFor(() => expect(mockedRetrieve).toHaveBeenCalledTimes(1))
     expect(mockedRetrieve).toHaveBeenCalledTimes(1)
-    resolveRetrieve({ code: 0, message: 'ok', data: { file_name: 'x' } })
+    resolveRetrieve({ code: 200, message: 'ok', data: { file_name: 'x' } })
     await Promise.all([first, second])
   })
 })

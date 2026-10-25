@@ -90,12 +90,7 @@ export const adminApi = {
   },
 
   // 别名：获取文件列表
-  getFilesList: (params: {
-    page?: number
-    page_size?: number
-    keyword?: string
-    sort_by?: string
-  }) => adminApi.getFiles(params),
+
 
   // 删除文件（按Code）
   deleteFile: (code: string) => {
@@ -146,12 +141,7 @@ export const adminApi = {
   },
 
   // 别名：获取用户列表
-  getUsersList: (params: {
-    page: number
-    page_size: number
-    keyword?: string
-    status?: number
-  }) => adminApi.getUsers(params),
+
 
   // 获取最新用户（用于 Dashboard）
   getRecentUsers: () => {
@@ -229,19 +219,6 @@ export const adminApi = {
   },
 
   // 带筛选的用户列表（后端已实现：GET /admin/users/filter）
-  getUsersFiltered: (params: {
-    page?: number
-    page_size?: number
-    keyword?: string
-    status?: string
-    role?: string
-  }) => {
-    return request<ApiResponse<{ list: any[]; total: number; page: number; page_size: number }>>({
-      url: '/admin/users/filter',
-      method: 'GET',
-      params,
-    })
-  },
 
   // 文件详情（后端已实现：GET /admin/files/:id）
   getFileDetail: (id: number) => {

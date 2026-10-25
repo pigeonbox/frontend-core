@@ -140,7 +140,11 @@ const queue = useUploadQueue({
     if (userStore.isLoggedIn) return true
     const policy = configStore.config?.presignPolicy
     if (policy) return policy === 'everyone'
-    return configStore.config?.presignEnabled ?? true // 旧后端无策略字段时兼容
+    // 无策略字段 ⇒ **不开放**（fail-closed）：后端恒下发 presignPolicy，缺字段只可能
+    // 出现在更旧的后端上；此时宁可不走直传（退回直发/分片中转），也不在管理员
+    // 关闭了匿名直传时仍替用户去试。
+    // 旧实现读 presignEnabled（后端为旧前端派生的兼容开关）⇒ 已删（2026-10-25）。
+    return false
   },
   presignThreshold: () =>
     (configStore.config?.presignThresholdMb || 100) * 1024 * 1024,

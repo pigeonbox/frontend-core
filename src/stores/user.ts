@@ -36,7 +36,7 @@ export const useUserStore = defineStore('user', () => {
 
   const login = async (username: string, password: string) => {
     const res = await userApi.login({ username, password })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       userInfo.value = res.data.user
       markSessionActive()
       return true
@@ -68,7 +68,7 @@ export const useUserStore = defineStore('user', () => {
     if (!isLoggedIn.value) return
     try {
       const res = await userApi.getUserInfo()
-      if (res.code === 0 || res.code === 200) {
+      if (res.code === 200) {
         userInfo.value = res.data
       }
     } catch (error) {
@@ -86,7 +86,8 @@ export const useUserStore = defineStore('user', () => {
         baseURL: import.meta.env.VITE_API_BASE_URL || appBase(),
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
-      return res.data?.code === 0 || res.data?.code === 200
+      // 裸 axios 刷新通道（不经 request.ts 拦截器 ⇒ 不做 0→200 归一化）⇒ 两个码都活
+    return res.data?.code === 0 || res.data?.code === 200
     } catch {
       // refresh 失败，返回 false，调用方处理登出
       return false

@@ -255,10 +255,10 @@ const fetchAudit = async () => {
       page_size: PER_FETCH,
       action: filterAction.value || undefined
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       const data: any = res.data
-      const items: any[] = Array.isArray(data) ? data : data?.list || []
-      auditTotal.value = Array.isArray(data) ? data.length : data?.total ?? 0
+      const items: any[] = data?.list || []
+      auditTotal.value = data?.total ?? 0
       rows.value.push(...items.map(auditRow))
       if (items.length < PER_FETCH) auditDone.value = true
       else auditPage.value++
@@ -276,7 +276,7 @@ const fetchTransfer = async () => {
       page_size: PER_FETCH,
       operation: filterOperation.value || undefined
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       const data: any = res.data
       const items: any[] = data?.items || (Array.isArray(data) ? data : [])
       transferTotal.value = data?.total ?? items.length

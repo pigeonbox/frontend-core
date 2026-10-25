@@ -101,7 +101,7 @@ const submitPassword = async () => {
       old_password: pwForm.oldPassword,
       new_password: pwForm.newPassword,
     })
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 200) {
       pwVisible.value = false
       ElMessage.success(t('account.password.success'))
       // 后端已 bump 会话纪元（本端令牌同样失效），走父级登出流程回登录页

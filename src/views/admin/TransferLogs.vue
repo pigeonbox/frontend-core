@@ -185,16 +185,6 @@ const { list: logsList, total, page, pageSize, loading, reload, handleSizeChange
         if (res.data && Array.isArray(res.data.items)) {
           return { items: res.data.items, total: res.data.total || res.data.items.length }
         }
-        if (res.data && Array.isArray((res.data as Record<string, unknown>).logs)) {
-          // 兼容历史响应结构
-          const legacy = res.data as Record<string, unknown>
-          const logs = legacy.logs as any[]
-          const pg = legacy.pagination as { total?: number } | undefined
-          return { items: logs, total: pg?.total || logs.length }
-        }
-        if (Array.isArray(res.data)) {
-          return { items: res.data, total: res.data.length }
-        }
       }
       return { items: [], total: 0 }
     } catch (error) {

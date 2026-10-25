@@ -159,7 +159,7 @@ const act = async (row: any, status: 'normal' | 'blocked') => {
   acting.value = row.id
   try {
     const res = await adminApi.setFileStatus(row.id, status)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(status === 'normal' ? t('admin.moderation.approved') : t('admin.moderation.rejected'))
       await reload()
     } else {

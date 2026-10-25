@@ -199,7 +199,7 @@ const load = async () => {
   loading.value = true
   try {
     const resp = await localFilesApi.list(rootIdx.value, dir.value)
-    if (resp.code === 0 || resp.code === 200) {
+    if (resp.code === 200) {
       featureDisabled.value = false
       roots.value = resp.data.roots || []
       entries.value = resp.data.entries || []
@@ -318,7 +318,7 @@ const doImport = async () => {
       password: f.password || undefined,
       custom_code: f.custom_code || undefined,
     })
-    if (!(resp.code === 0 || resp.code === 200)) {
+    if (!(resp.code === 200)) {
       ElMessage.error(resp.message || t('admin.localFilesPage.importFailed'))
       return
     }

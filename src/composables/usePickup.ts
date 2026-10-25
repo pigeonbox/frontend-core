@@ -89,7 +89,7 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
     try {
       const res = await federationApi.resolve(code)
       const data = res.data
-      if ((res.code === 200 || res.code === 0) && data?.available && data.url) {
+      if ((res.code === 200) && data?.available && data.url) {
         // 设备直传节点(p2pc 占位 url)不可网页取件:提示到设备端接收
         if (isDeviceNodeUrl(data.url)) {
           try {
@@ -152,7 +152,7 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
         password: pwd || undefined,
       })
       // 后端成功码两代约定并存：200（旧 handler）/ 0（resp.Success）
-      if ((res.code === 200 || res.code === 0) && res.data) {
+      if ((res.code === 200) && res.data) {
         // 记入本机取件记录（仅 code+文件名+大小，不含密码），再跳结果页
         recordPickup({
           code,
@@ -214,7 +214,7 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
     try {
       try {
         const res = await anonymousApi.search(c)
-        if ((res.code === 200 || res.code === 0) && res.data?.require_password) {
+        if ((res.code === 200) && res.data?.require_password) {
           password.value = ''
           phase.value = 'needPassword'
           info(t('anonymous.needPasswordHint'))

@@ -272,14 +272,14 @@ const load = async () => {
   loading.value = true
   try {
     const res = await adminApi.getStorageInfo()
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       const d = res.data as Record<string, unknown>
       info.current = (d.current as string) || ''
       info.effective = (d.effective as string) || ''
       info.available = (d.available as string[]) || []
     }
     const st = await adminApi.getEnhancedStats()
-    if (st.code === 0 || st.code === 200) {
+    if (st.code === 200) {
       const d = st.data as Record<string, unknown>
       used.value = Number(d.storage_used || 0)
       quota.value = Number(d.storage_quota || 0)
@@ -333,7 +333,7 @@ const doSwitch = async () => {
   switching.value = true
   try {
     const res = await adminApi.updateStorageConfig(buildPayload())
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.storagePage.switched'))
       load()
     } else {

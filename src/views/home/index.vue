@@ -104,11 +104,9 @@ const hostAppSettings = computed(() => host.capabilities.appSettings)
 const federationEnabled = computed(() => configStore.federationEnabled)
 
 // 取件专属页（2026-10-07 拆分：文件/文本分享迁往 /send,避免 tab 切换
-// 撑高卡片使取件失焦）。旧 ?tab=file|text 深链重定向到发送页
-const legacyTab = new URLSearchParams(window.location.hash.split('?')[1] || '').get('tab')
-if (legacyTab === 'file' || legacyTab === 'text') {
-  router.replace({ path: '/send', query: { tab: legacyTab } })
-}
+// 撑高卡片使取件失焦）。
+// 旧 ?tab=file|text 深链的重定向已删（2026-10-25 删除旧版本兼容）：全工作区零生产方
+// （首页拆分前的收藏/外链）⇒ 保留只是为一条没人再产生的链接服务。
 
 const handleUserCommand = (command: string) => {
   switch (command) {

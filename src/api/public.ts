@@ -25,8 +25,6 @@ export interface PublicConfig {
   background?: string
   /** 直传策略：everyone=所有人可直传 / authenticated=仅登录用户 / disabled=关闭直传 */
   presignPolicy?: 'everyone' | 'authenticated' | 'disabled'
-  /** 派生匿名开关（presignPolicy !== 'disabled'）；兼容旧语义判断 */
-  presignEnabled?: boolean
   /** 直传阈值 MB（超过走 presign 直传；缺省=100） */
   presignThresholdMb?: number
   /** 主题色（#hex，后端已校验） */

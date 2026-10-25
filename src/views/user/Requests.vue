@@ -120,7 +120,7 @@ const load = async () => {
   loadingList.value = true
   try {
     const res = await requestApi.listMine()
-    if (res.code === 200 || res.code === 0) list.value = res.data || []
+    if (res.code === 200) list.value = res.data || []
   } finally {
     loadingList.value = false
   }
@@ -136,7 +136,7 @@ const create = async () => {
       expire_value: form.expire_value,
       expire_style: form.expire_style,
     })
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 200) {
       ElMessage.success(t('request.created'))
       await load()
       const last = list.value[0]
@@ -164,7 +164,7 @@ const copyLink = async (token: string) => {
 
 const remove = async (token: string) => {
   const res = await requestApi.remove(token)
-  if (res.code === 200 || res.code === 0) {
+  if (res.code === 200) {
     ElMessage.success(t('request.revoked'))
     await load()
   } else {

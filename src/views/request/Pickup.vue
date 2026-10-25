@@ -130,7 +130,7 @@ const loadRequest = async (tok: string) => {
   view.value = null
   try {
     const res = await requestApi.getPublic(tok)
-    if (res.code === 200 || res.code === 0) view.value = res.data
+    if (res.code === 200) view.value = res.data
     else error.value = res.message || t('request.invalid')
   } catch (e: unknown) {
     const tr = translateError(e)

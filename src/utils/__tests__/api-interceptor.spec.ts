@@ -1,40 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { BizError, ERRCODE_KEY_MAP, onFulfilled, translateError } from '../api-interceptor'
-import type { AxiosResponse } from 'axios'
+import { BizError, ERRCODE_KEY_MAP, translateError } from '../api-interceptor'
 
-function makeResponse(code: number, traceId?: string): AxiosResponse {
-  return {
-    data: { code, message: 'msg', data: { ok: true }, trace_id: traceId },
-    headers: {},
-    status: 200,
-    statusText: 'OK',
-    config: { headers: {} as never },
-  } as unknown as AxiosResponse
-}
-
-describe('onFulfilled（统一响应拦截）', () => {
-  it('code=200（旧式 handler）放行原始 response', () => {
-    const res = makeResponse(200)
-    expect(onFulfilled(res)).toBe(res)
-  })
-
-  it('code=0（新版 resp.Success / contracts errcode）同样放行', () => {
-    const res = makeResponse(0)
-    expect(onFulfilled(res)).toBe(res)
-  })
-
-  it('其他业务码抛 BizError 且带 code/traceId', () => {
-    const res = makeResponse(20003, 'tid-1')
-    try {
-      onFulfilled(res)
-      expect.unreachable('应当抛出 BizError')
-    } catch (e) {
-      expect(e).toBeInstanceOf(BizError)
-      expect((e as BizError).code).toBe(20003)
-      expect((e as BizError).traceId).toBe('tid-1')
-    }
-  })
-})
 
 describe('ERRCODE_KEY_MAP 覆盖新增安全错误码', () => {
   it('锁定/会话/令牌/类型/端点错误码均有映射', () => {

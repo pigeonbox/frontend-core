@@ -26,11 +26,17 @@ export interface PasswordErrorLike {
 /**
  * 是否是「取件页密码族」错误（需要密码 / 密码错误 / 缺下载令牌）。
  *
- * 后端对这些情况一律回 HTTP 401；403 也按密码族处理（历史兼容）。
+ * 后端对这些情况一律回 HTTP 401。
+ *
+ * ⚠️ 旧实现还把 `code === 403` 算作密码族（历史兼容）——后端**从不**产生业务码
+ * 403（密码错=20003→401；次数耗尽=20004→403 但**不是**密码问题），而 request.ts
+ * 的包装 `code: data.code ?? error.response.status ?? 0` 会在**反向代理返回裸 403**
+ * （无 JSON body）时回退成 HTTP 状态码 ⇒ 把「代理拒绝」显示成「需要密码」= 误判。
+ * ⇒ 2026-10-25 删除该旧兼容。
  */
 export function isPasswordFamilyError(err: unknown): boolean {
   const e = (err ?? {}) as PasswordErrorLike
-  return e.code === 403 || e.response?.status === 401
+  return e.response?.status === 401
 }
 
 /**

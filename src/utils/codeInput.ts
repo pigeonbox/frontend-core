@@ -20,7 +20,6 @@
 
 export const PICKUP_LEN = 6
 /** 分享码长度（后端 file_codes.code 恒 8 位） */
-export const SHARE_CODE_LEN = 8
 /**
  * 合法口令的最大长度（2026-10-22）：分享码 8 位；自定义口令 3-32 位；
  * 深链 /?code= 允许 3-64 位。取 64 作上限——超长不是合法口令形态，

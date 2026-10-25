@@ -12,8 +12,14 @@ describe('isPasswordFamilyError（密码族错误识别）', () => {
     expect(isPasswordFamilyError({ code: 20003, response: { status: 401 } })).toBe(true)
   })
 
-  it('403 按密码族处理（历史兼容）', () => {
-    expect(isPasswordFamilyError({ code: 403 })).toBe(true)
+  it('裸 403（反向代理拒绝、无 JSON body）**不**算密码族', () => {
+    // 旧实现把 code===403 也算密码族（历史兼容）——但后端**从不**产生业务码 403：
+    // 密码错=20003→HTTP 401；取件次数耗尽=20004→HTTP 403（**不是**密码问题）。
+    // request.ts 的包装 `code: data.code ?? error.response.status ?? 0` 会在
+    // **裸 403**（无 body）时回退成 HTTP 状态码 ⇒ 旧实现把「代理拒绝」显示成
+    // 「需要密码」= 误判 ⇒ 2026-10-25 删除该旧兼容。
+    expect(isPasswordFamilyError({ code: 403 })).toBe(false)
+    expect(isPasswordFamilyError({ code: 403, response: { status: 403 } })).toBe(false)
   })
 
   it('非密码族错误不误判', () => {

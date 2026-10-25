@@ -193,7 +193,7 @@
             </el-table-column>
             <el-table-column :label="t('common.status')" width="100">
               <template #default="{ row }">
-                <!-- status wire 形态两代并存：数字 1/0（/admin/users 列表）与 'active' 旧串 -->
+                <!-- status 形态：数字 1/0（/admin/users 列表） -->
                 <el-tag :type="isActiveStatus(row.status) ? 'success' : 'danger'" size="small">
                   {{ isActiveStatus(row.status) ? t('common.normal') : t('common.disabled') }}
                 </el-tag>
@@ -315,8 +315,10 @@ const loading = ref(false)
 const serverVersion = ref('')
 
 // 用户状态激活判定：/admin/users wire 返回数字 1/0（Users.vue 同款双形态兼容）；
-// 此前只比对 'active' 旧串,数字形态恒判假→最新用户表全员显示「禁用」
-const isActiveStatus = (s: unknown): boolean => s === 1 || s === 'active'
+// status 形态：**只有数字 1/0**（/admin/users 列表的 wire 形态）；'active' 旧串
+// 形态已删（2026-10-25 删除旧版本兼容——唯一产生旧串的 /admin/users/filter 端点
+// 前端零调用，已随死导出一并删除）
+const isActiveStatus = (s: unknown): boolean => s === 1
 
 // 页脚版本号展示:空值显示 —;dev/commit 哈希等非语义化版本不带 v 前缀
 const formatVersion = (v: string) => {
@@ -456,14 +458,8 @@ const fetchRecentUsers = async () => {
     const res = await adminApi.getRecentUsers()
     if (res.code === 200) {
       // 后端 GET /admin/users 返回 {items,total,page,page_size}（此前读 data.users 恒空）
-      const data = res.data as { items?: RecentUser[] } | RecentUser[] | undefined
-      if (data && Array.isArray((data as { items: RecentUser[] }).items)) {
-        recentUsers.value = (data as { items: RecentUser[] }).items.slice(0, 5)
-      } else if (Array.isArray(data)) {
-        recentUsers.value = data.slice(0, 5)
-      } else {
-        recentUsers.value = []
-      }
+      const data = res.data as { items?: RecentUser[] } | undefined
+      recentUsers.value = Array.isArray(data?.items) ? data.items.slice(0, 5) : []
     }
   } catch (error) {
     console.error('Failed to fetch recent users:', error)
@@ -481,30 +477,15 @@ const fetchRecentFiles = async () => {
         file_name?: string
         code?: string
         file_size?: number
-        size?: number
         created_at?: string
-        CreatedAt?: string
-      }> } | RecentFile[] | undefined
-      if (data && Array.isArray((data as { items: unknown[] }).items)) {
-        const list = (data as { items: Array<{
-          file_name?: string
-          code?: string
-          file_size?: number
-          size?: number
-          created_at?: string
-          CreatedAt?: string
-        }> }).items
-        recentFiles.value = list.slice(0, 5).map((f) => ({
-          filename: f.file_name || f.code || '-',
-          file_size: f.file_size || f.size || 0,
-          username: '-',
-          created_at: f.created_at || f.CreatedAt || '',
-        }))
-      } else if (Array.isArray(data)) {
-        recentFiles.value = (data as RecentFile[]).slice(0, 5)
-      } else {
-        recentFiles.value = []
-      }
+      }> } | undefined
+      const list = Array.isArray(data?.items) ? data.items : []
+      recentFiles.value = list.slice(0, 5).map((f) => ({
+        filename: f.file_name || f.code || '-',
+        file_size: f.file_size || 0,
+        username: '-',
+        created_at: f.created_at || '',
+      }))
     }
   } catch (error) {
     console.error('Failed to fetch recent files:', error)
@@ -568,7 +549,7 @@ const enhanced = ref<{
 const fetchEnhancedStats = async () => {
   try {
     const res = await adminApi.getEnhancedStats()
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       enhanced.value = res.data as typeof enhanced.value
     }
   } catch {

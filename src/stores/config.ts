@@ -17,7 +17,7 @@ export const useConfigStore = defineStore('config', () => {
     loading.value = true
     try {
       const res = await publicApi.getConfig()
-      if ((res.code === 0 || res.code === 200) && res.data) {
+      if ((res.code === 200) && res.data) {
         config.value = res.data
         loaded.value = true
         return res.data

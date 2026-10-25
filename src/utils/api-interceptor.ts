@@ -1,5 +1,5 @@
 // Axios 统一响应拦截器：把 {code, data, message, trace_id} 转换成可读错误
-import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 
 export interface BizResponse<T = unknown> {
   code: number
@@ -142,39 +142,11 @@ export interface ResolvedError {
   httpStatus: number | null
 }
 
-function resolveErrorMessage(code: number | null, fallback: string): string {
-  // 这个函数在 axios 拦截器里调用，但 i18n 是 vue 的，
-  // 因此这里只返回原始 code + fallback message；
-  // 实际翻译由 useErrorHandler 在组件上下文里完成。
-  if (code === null) return fallback
-  return fallback
-}
 
 export interface AxiosBizError extends Omit<AxiosError, 'response'> {
   biz?: ResolvedError
 }
 
-export function onFulfilled(response: AxiosResponse): AxiosResponse {
-  // 后端约定：HTTP 200 + {code, data, message, trace_id}。
-  // 成功码：200（旧式 handler）或 0（新版 resp.Success / contracts errcode）。
-  const body = response.data as unknown as BizResponse
-  if (body && typeof body === 'object' && 'code' in body) {
-    if (body.code === 200 || body.code === 0) {
-      return response
-    }
-    // 业务错误
-    const traceId = body.trace_id || (response.headers?.['x-trace-id'] as string | undefined) || ''
-    const message = body.message || 'Error'
-    const err = new BizError({
-      code: body.code,
-      message: resolveErrorMessage(body.code, message),
-      traceId,
-      raw: body,
-    })
-    throw err
-  }
-  return response
-}
 
 export function onRejected(error: AxiosError): Promise<never> {
   const traceId =
