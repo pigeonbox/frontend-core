@@ -47,7 +47,7 @@
 
       <el-divider />
 
-      <el-table :data="rows" v-loading="loading" class="activities-table">
+      <el-table :data="rows" v-loading="loading" class="admin-table-wide activities-table">
         <el-table-column :label="t('admin.activitiesPage.colTime')" width="170">
           <template #default="{ row }">
             {{ formatDate(row.time) }}
@@ -85,6 +85,30 @@
         </el-table-column>
       </el-table>
 
+      <!-- 窄屏（≤768px）卡片形态：本表 7 列合计 ~1060px ⇒ 390px 视口下内容列全被裁。
+           策展=动作(头部) + 来源/执行者/对象/IP/结果/时间。 -->
+      <NarrowCardList :rows="rows" :fields="cardFields" :head="cardHead">
+        <template #source="{ row }">
+          <el-tag size="small" :type="row.source === 'transfer' ? 'primary' : 'info'" effect="plain">
+            {{ row.source === 'transfer' ? t('admin.activitiesPage.sourceTransfer') : t('admin.activitiesPage.sourceAudit') }}
+          </el-tag>
+        </template>
+        <template #actor="{ row }">
+          <el-tag size="small" :type="row.actor === 'system' ? 'info' : 'primary'" effect="plain">{{ row.actor || 'system' }}</el-tag>
+        </template>
+        <template #action="{ row }">
+          <el-tag size="small" effect="plain" :title="row.action">{{ actionLabel(row.action) }}</el-tag>
+        </template>
+        <template #target="{ row }">{{ row.target }}</template>
+        <template #ip="{ row }">{{ row.ip }}</template>
+        <template #result="{ row }">
+          <el-tag :type="row.success ? 'success' : 'danger'" size="small">
+            {{ row.success ? t('admin.activitiesPage.resultSuccess') : t('admin.activitiesPage.resultFailed') }}
+          </el-tag>
+        </template>
+        <template #time="{ row }">{{ formatDate(row.time) }}</template>
+      </NarrowCardList>
+
       <div class="stream-footer">
         <span class="stream-count">{{ t('admin.activitiesPage.loadedCount', { n: rows.length }) }}{{ totalCountLabel }}</span>
         <el-button v-if="hasMore" :loading="loading" @click="loadMore">{{ t('admin.activitiesPage.loadMore') }}</el-button>
@@ -101,6 +125,7 @@ import { useI18n } from 'vue-i18n'
 import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -118,6 +143,19 @@ interface ActivityRow {
   ip: string
   success: boolean
 }
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const cardFields = computed(() => [
+  { key: 'source', label: t('admin.activitiesPage.colSource') },
+  { key: 'actor', label: t('admin.activitiesPage.colActor') },
+  { key: 'action', label: t('admin.activitiesPage.colAction') },
+  { key: 'target', label: t('admin.activitiesPage.colTarget') },
+  { key: 'ip', label: t('admin.activitiesPage.colIp') },
+  { key: 'result', label: t('admin.activitiesPage.colResult') },
+  { key: 'time', label: t('admin.activitiesPage.colTime') },
+])
+const cardHead = (row: ActivityRow) => actionLabel(row.action)
 
 const PER_FETCH = 25
 

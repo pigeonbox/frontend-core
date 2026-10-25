@@ -78,6 +78,7 @@ declare module 'vue' {
     GetShare: typeof import('./components/upload/GetShare.vue')['default']
     LocaleSwitcher: typeof import('./components/LocaleSwitcher.vue')['default']
     LocalHistoryDialog: typeof import('./components/history/LocalHistoryDialog.vue')['default']
+    NarrowCardList: typeof import('./components/admin/NarrowCardList.vue')['default']
     NotifyBanner: typeof import('./components/NotifyBanner.vue')['default']
     NotifyBell: typeof import('./components/NotifyBell.vue')['default']
     PageHeader: typeof import('./components/data/PageHeader.vue')['default']

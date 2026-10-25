@@ -89,7 +89,7 @@
         :closable="false"
         class="mb"
       />
-      <el-table v-if="hostDirs.length" :data="hostDirs" size="small">
+      <el-table v-if="hostDirs.length" :data="hostDirs" size="small" class="admin-table-wide">
         <el-table-column :label="t('admin.storagePage.colSemantic')" min-width="240">
           <template #default="{ row }">{{ row.semantic || row.path }}</template>
         </el-table-column>
@@ -103,6 +103,14 @@
           </template>
         </el-table-column>
       </el-table>
+      <!-- 窄屏（≤768px）卡片形态 -->
+      <NarrowCardList v-if="hostDirs.length" :rows="hostDirs" :fields="cardFields" :head="cardHead">
+        <template #path="{ row }"><span class="mono">{{ row.path }}</span></template>
+        <template #actions="{ row }">
+          <el-button size="small" type="primary" plain @click="applyAsDataPath(row)">{{ t('admin.storagePage.useAsDataPath') }}</el-button>
+          <el-button size="small" @click="openDir(row)">{{ t('admin.storagePage.openDir') }}</el-button>
+        </template>
+      </NarrowCardList>
       <el-empty v-else :description="t('admin.storagePage.noHostDirs')" :image-size="80" />
     </el-card>
   </div>
@@ -115,7 +123,15 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 import { host } from '@/host'
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const cardFields = computed(() => [
+  { key: 'path', label: t('admin.storagePage.colPath') },
+])
+const cardHead = (row: any) => row.semantic || row.path
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()

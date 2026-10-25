@@ -437,6 +437,20 @@ const handleCommand = async (command: string) => {
     padding: var(--spacing-lg);
   }
 
+  /* 窄屏：页头「标题 + 操作按钮」并排会把操作区挤成一条窄柱（按钮一行一个、
+     右侧对齐，视觉上像一列悬空的按钮）⇒ 改为竖排，操作区整行横向换行。
+     （:deep 必需 —— 页头的 .card-header/.header-actions 定义在**各页面组件**的
+     scoped 样式里，本组件的 scoped 选择器命中不到。） */
+  .admin-main :deep(.card-header) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .admin-main :deep(.header-actions) {
+    justify-content: flex-start;
+  }
+
   /* 窄屏：侧栏改为汉堡唤出的浮层抽屉，不再占位。
      此前侧栏 240px 固定占位 ⇒ 内容区被压到 ~150px（390px 视口实测），
      配置表单输入框宽度为 0 ⇒ 手机上进管理台基本没法用。 */

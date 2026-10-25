@@ -519,3 +519,109 @@ html.dark {
   background-color: var(--el-bg-color, #ffffff) !important;
   background-image: linear-gradient(var(--primary-bg), var(--primary-bg));
 }
+
+// =============================================================================
+// 管理台窄屏卡片形态（≤768px）—— 2026-10-25 真机 390/768 实测后落地
+//
+// 【背景】管理台 9 个表格页都用 `el-table`，列宽合计 ~990~1600px
+//   （Files 19 列 / TransferLogs 14 / Activities·Dashboard 13 / Announcements·Users 12
+//    / Moderation 10 / LocalFiles 8 / Storage 6）⇒
+//   · ≤390px：**只露得下 ID 列 + 固定右侧的操作列**（Actions 240~360px），
+//     标题/类型/状态/时间等**内容列全被裁**，而 Element Plus 的横向滚动条在手机上
+//     几乎看不见 ⇒ 手机上**等于不可用**；
+//   · ≤768px：固定操作列还**盖住**相邻的「状态」列（与 2026-10-23 记录的
+//     「半个字被按钮压住」同型）。
+//
+// 【形态】CSS 双形态（与用户端 views/user/History.vue 同款）：表格与卡片
+//   **同时渲染**，靠媒体查询互斥显示（**纯 CSS，不用 JS 媒体查询** ⇒ 无需等挂载后
+//   测量，也不受首帧时序影响）。页面侧只需两件事：
+//   ① 表格加 class="admin-table-wide"；② 表格后放 <NarrowCardList>。
+//
+// 【为什么放全局而不是各页 scoped】表格与卡片**分属两个组件**（表格在页面组件、
+//   卡片在 NarrowCardList 组件）⇒ 互斥显示的开关**两边都要能命中** ⇒ 只能放全局。
+//   集中在一处也让守卫（views/admin/__tests__/narrowScreen.spec.ts）能一次钉住。
+// =============================================================================
+.narrow-cards {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  // 宽屏表格在窄屏让位给卡片
+  .admin-table-wide {
+    display: none !important;
+  }
+
+  .narrow-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .narrow-card {
+    border: 1px solid var(--color-border, var(--el-border-color));
+    border-radius: var(--radius-md, 10px);
+    background: var(--color-surface, var(--el-bg-color));
+    padding: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: var(--text-sm);
+  }
+
+  .narrow-card-head {
+    font-weight: 600;
+    font-size: var(--text-base);
+    color: var(--color-text-primary);
+    word-break: break-all;
+  }
+
+  .narrow-card-line {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+    color: var(--color-text-regular);
+  }
+
+  // 标签列固定宽（84px），值列占剩余 —— 与用户端 History.vue 同口径
+  .narrow-card-label {
+    flex: 0 0 84px;
+    color: var(--color-text-secondary);
+  }
+
+  .narrow-card-value {
+    flex: 1 1 auto;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .narrow-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+    margin-top: 2px;
+  }
+
+  // Element Plus 相邻按钮自带 margin-left，flex gap 下会叠出双倍间距
+  .narrow-card-actions .el-button {
+    margin-left: 0;
+  }
+
+  /* 批量操作依赖表格的「多选」列，而表格在窄屏被卡片形态替换 ⇒ 多选在窄屏
+     **不存在** ⇒ 批量按钮永远禁用，却占掉 4 行竖排空间 ⇒ 窄屏隐藏。 */
+  .batch-only {
+    display: none !important;
+  }
+
+  // 分页条：窄屏挤成一行 ⇒ 「共 N 条」被切掉半个字 ⇒ 总数独占一行、翻页器居中
+  .admin-layout .el-pagination {
+    justify-content: center;
+    flex-wrap: wrap;
+    row-gap: var(--spacing-xs);
+  }
+
+  .admin-layout .el-pagination__total {
+    width: 100%;
+    text-align: center;
+    margin: 0 0 var(--spacing-xs);
+  }
+}

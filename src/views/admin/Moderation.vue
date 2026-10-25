@@ -23,7 +23,7 @@
         show-icon
       />
 
-      <el-table v-else :data="queue" v-loading="loading" class="moderation-table">
+      <el-table v-else :data="queue" v-loading="loading" class="admin-table-wide moderation-table">
         <el-table-column :label="t('admin.moderation.colContent')" min-width="280">
           <template #default="{ row }">
             <div class="content-cell">
@@ -70,6 +70,32 @@
         </el-table-column>
       </el-table>
 
+      <!-- 窄屏（≤768px）卡片形态：v-if 与上面 el-table 的 v-else 不相邻（插在中间会
+           打断 v-if/v-else 链）⇒ 用显式条件渲染，语义等价。 -->
+      <NarrowCardList v-if="queue.length" :rows="queue" :fields="cardFields" :head="cardHead">
+        <template #head="{ row }">
+          <div class="narrow-file-name">
+            {{ row.file_name || row.code }}
+            <el-tag v-if="row.is_text" size="small" type="success">{{ t('admin.moderation.tagText') }}</el-tag>
+          </div>
+          <div v-if="row.text_preview" class="narrow-text-preview">{{ row.text_preview }}</div>
+        </template>
+        <template #uploader="{ row }">
+          <div>{{ row.user_id ? `ID: ${row.user_id}` : t('admin.moderation.anonymous') }}</div>
+          <div class="ip-line">{{ row.owner_ip || '-' }}</div>
+        </template>
+        <template #size="{ row }">{{ row.is_text ? '-' : formatFileSize(row.size) }}</template>
+        <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+        <template #actions="{ row }">
+          <el-button type="success" size="small" round :loading="acting === row.id" @click="act(row, 'normal')">
+            {{ t('admin.moderation.approve') }}
+          </el-button>
+          <el-button type="danger" size="small" round :loading="acting === row.id" @click="act(row, 'blocked')">
+            {{ t('admin.moderation.reject') }}
+          </el-button>
+        </template>
+      </NarrowCardList>
+
       <div class="pagination-wrapper">
         <el-pagination
           v-model:current-page="page"
@@ -88,16 +114,26 @@
 
 <script setup lang="ts">
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const cardFields = computed(() => [
+  { key: 'uploader', label: t('admin.uploader') },
+  { key: 'size', label: t('admin.size') },
+  { key: 'created_at', label: t('admin.moderation.colSubmittedAt') },
+])
+const cardHead = (row: any) => row.file_name || row.code
 
 const acting = ref<number | null>(null)
 

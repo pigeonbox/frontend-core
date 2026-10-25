@@ -23,7 +23,7 @@
       <el-table
         :data="usersList"
         v-loading="loading"
-        class="users-table"
+        class="admin-table-wide users-table"
       >
         <el-table-column :label="t('admin.usersPage.colUserInfo')" min-width="200">
           <template #default="{ row }">
@@ -101,6 +101,40 @@
         </el-table-column>
       </el-table>
 
+      <!-- 窄屏（≤768px）卡片形态：本表 5 列合计 ~1040px ⇒ 390px 视口下内容列全被裁。
+           策展=用户名(头部) + 昵称/状态/存储/注册时间；操作按钮同桌面。 -->
+      <NarrowCardList :rows="usersList" :fields="cardFields" :head="cardHead">
+        <template #head="{ row }">
+          <div class="narrow-file-name">
+            {{ row.username }}
+            <el-tag v-if="row.role === 'admin'" type="danger" size="small" effect="dark">{{ t('admin.usersPage.roleAdmin') }}</el-tag>
+          </div>
+          <div class="narrow-text-preview">{{ row.email || t('admin.usersPage.noEmail') }}</div>
+        </template>
+        <template #status="{ row }">
+          <el-tag :type="row.status === 1 || row.status === 'active' ? 'success' : 'danger'" effect="light">
+            {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
+          </el-tag>
+        </template>
+        <template #storage="{ row }">
+          <el-progress :percentage="getStoragePercentage(row)" :stroke-width="8" :color="getStorageColor(row)" />
+          <div class="storage-text">{{ formatFileSize(row.quota_used || row.total_storage || 0) }}</div>
+        </template>
+        <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+        <template #actions="{ row }">
+          <el-button
+            @click="toggleUserStatus(row)"
+            :type="row.status === 1 || row.status === 'active' ? 'warning' : 'success'"
+            size="small"
+            round
+          >
+            {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
+          </el-button>
+          <el-button @click="openResetPassword(row)" size="small" round>{{ t('admin.usersPage.resetPassword') }}</el-button>
+          <el-button @click="removeUser(row)" type="danger" size="small" round plain>{{ t('admin.usersPage.delete') }}</el-button>
+        </template>
+      </NarrowCardList>
+
       <div class="pagination-wrapper">
         <el-pagination
           v-model:current-page="page"
@@ -171,13 +205,14 @@
 
 <script setup lang="ts">
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -301,6 +336,16 @@ const getStoragePercentage = (user: any): number => {
   // 保留两位小数：原始浮点会以全精度灌进 el-progress 文案（0.00594826...%）
   return Math.round(Math.min(percentage, 100) * 100) / 100
 }
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const cardFields = computed(() => [
+  { key: 'nickname', label: t('admin.nickname') },
+  { key: 'status', label: t('admin.usersPage.colStatus') },
+  { key: 'storage', label: t('admin.usersPage.colStorage') },
+  { key: 'created_at', label: t('admin.registeredAt') },
+])
+const cardHead = (row: any) => row.username
 
 const getStorageColor = (user: any): string => {
   const percentage = getStoragePercentage(user)

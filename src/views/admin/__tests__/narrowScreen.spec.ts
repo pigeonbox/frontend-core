@@ -67,3 +67,77 @@ describe('管理台窄屏可用性', () => {
     )
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 管理台窄屏「表格 → 卡片」形态（2026-10-25 真机 390/768 实测后落地）
+//
+// 实测事故：管理台 9 个表格页的列宽合计 ~990~1600px（Files 19 列 / TransferLogs 14
+// / Activities·Dashboard 13 / Announcements·Users 12 / Moderation 10 / LocalFiles 8
+// / Storage 6）⇒ ≤390px **只露得下 ID 列 + 固定右侧的操作列**，标题/类型/状态/时间等
+// 内容列全被裁（横向滚动条在手机上几乎看不见）⇒ 手机上等于不可用；≤768px 固定操作列
+// 还盖住相邻的「状态」列。
+//
+// 修法：CSS 双形态（表格与卡片**同时渲染**，≤768px 互斥显示）——表格加
+// `.admin-table-wide`，页面再挂 `<NarrowCardList>`（字段策展后的卡片列表）。
+//
+// 本守卫断言**每个含表格的管理台页面都接了这套形态**，防止「以后新增一个表格页
+// 又忘了接 ⇒ 窄屏静默不可用」——这类回归正是本轮要根治的。
+// ─────────────────────────────────────────────────────────────────────────────
+const TABLE_PAGES = [
+  'Files.vue',
+  'Users.vue',
+  'Activities.vue',
+  'Announcements.vue',
+  'Moderation.vue',
+  'LocalFiles.vue',
+  'Storage.vue',
+  'TransferLogs.vue',
+  'Dashboard.vue',
+]
+
+describe('管理台窄屏卡片形态', () => {
+  it('每个含表格的管理台页面都必须：表格加 .admin-table-wide + 挂 NarrowCardList + 有字段策展', () => {
+    for (const page of TABLE_PAGES) {
+      const s = read(`views/admin/${page}`)
+      expect(s, `${page} 应含 el-table（清单与实现不一致，请同步 TABLE_PAGES）`).toContain('<el-table')
+      expect(
+        s,
+        `${page} 的表格未加 class="admin-table-wide" ⇒ 窄屏会显示被裁切的表格`
+      ).toMatch(/<el-table[\s\S]{0,200}?class="[^"]*\badmin-table-wide\b/)
+      expect(s, `${page} 未挂 <NarrowCardList> ⇒ 窄屏没有卡片形态`).toContain('<NarrowCardList')
+      expect(
+        s,
+        `${page} 未 import NarrowCardList 组件`
+      ).toContain("import NarrowCardList from '@/components/admin/NarrowCardList.vue'")
+      expect(
+        s,
+        `${page} 缺少卡片字段策展（cardFields = computed(() => [...])）`
+      ).toMatch(/cardfields = computed\(\(\) => \[\s*\{ key:/i)
+    }
+  })
+
+  it('全局样式必须保留「表格隐藏 / 卡片显示」的互斥开关', () => {
+    const s = read('styles/main.scss')
+    const block = narrowBlock(s)
+    expect(block, '窄屏必须把 .admin-table-wide（表格）隐藏').toMatch(
+      /\.admin-table-wide\s*\{[^}]*display:\s*none\s*!important/
+    )
+    expect(block, '窄屏必须把 .narrow-cards（卡片）显示出来').toMatch(
+      /\.narrow-cards\s*\{[^}]*display:\s*flex/
+    )
+    // 宽屏默认隐藏卡片（否则宽屏会同时看到表格与卡片）
+    const beforeMedia = s.slice(0, s.indexOf('@media (max-width: 768px)'))
+    expect(beforeMedia, '宽屏必须默认隐藏 .narrow-cards').toMatch(
+      /\.narrow-cards\s*\{\s*display:\s*none;\s*\}/
+    )
+  })
+
+  it('仪表盘的栅格必须带 xs 断点，否则窄屏两栏并排 ⇒ 字段竖排成一字一行', () => {
+    const s = read('views/admin/Dashboard.vue')
+    const cols = s.match(/<el-col[^>]*>/g) || []
+    expect(cols.length, 'Dashboard 应含 el-col 栅格').toBeGreaterThan(0)
+    for (const c of cols) {
+      expect(c, `Dashboard 的 el-col 缺 :xs 断点（窄屏不堆叠）：${c}`).toContain(':xs=')
+    }
+  })
+})

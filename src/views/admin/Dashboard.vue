@@ -27,7 +27,7 @@
 
     <!-- 统计卡片 -->
     <el-row :gutter="24" class="stats-row">
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-primary">
           <div class="stat-icon">
             <el-icon size="32"><User /></el-icon>
@@ -39,7 +39,7 @@
         </div>
       </el-col>
 
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-violet">
           <div class="stat-icon">
             <el-icon size="32"><Folder /></el-icon>
@@ -51,7 +51,7 @@
         </div>
       </el-col>
 
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-teal">
           <div class="stat-icon">
             <el-icon size="32"><Coin /></el-icon>
@@ -63,7 +63,7 @@
         </div>
       </el-col>
 
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-amber">
           <div class="stat-icon">
             <el-icon size="32"><TrendCharts /></el-icon>
@@ -101,7 +101,7 @@
 
     <!-- 图表区域 -->
     <el-row :gutter="24" class="charts-row">
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="chart-card" shadow="hover">
           <template #header>
             <div class="card-header">
@@ -118,7 +118,7 @@
         </el-card>
       </el-col>
 
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="chart-card" shadow="hover">
           <template #header>
             <div class="card-header">
@@ -154,7 +154,7 @@
 
     <!-- 最近活动 -->
     <el-row :gutter="24" class="recent-row">
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="recent-card" shadow="hover">
           <template #header>
             <div class="card-header">
@@ -172,6 +172,7 @@
             :data="recentUsers"
             size="small"
             v-loading="loading"
+            class="admin-table-wide"
             :header-cell-style="{ background: 'var(--color-muted)', fontWeight: '600' }"
           >
             <el-table-column :label="t('common.username')">
@@ -199,10 +200,20 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <!-- 窄屏（≤768px）卡片形态（仪表盘两张「最近 N 条」表同样会被裁） -->
+          <NarrowCardList :rows="recentUsers" :fields="userCardFields" :head="userCardHead">
+            <template #status="{ row }">
+              <el-tag :type="isActiveStatus(row.status) ? 'success' : 'danger'" size="small">
+                {{ isActiveStatus(row.status) ? t('common.normal') : t('common.disabled') }}
+              </el-tag>
+            </template>
+            <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+          </NarrowCardList>
         </el-card>
       </el-col>
 
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="recent-card" shadow="hover">
           <template #header>
             <div class="card-header">
@@ -220,6 +231,7 @@
             :data="recentFiles"
             size="small"
             v-loading="loading"
+            class="admin-table-wide"
             :header-cell-style="{ background: 'var(--color-muted)', fontWeight: '600' }"
           >
             <el-table-column :label="t('admin.fileName')" prop="filename" show-overflow-tooltip />
@@ -237,6 +249,13 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <NarrowCardList :rows="recentFiles" :fields="fileCardFields" :head="fileCardHead">
+            <template #file_size="{ row }">
+              <el-tag type="info" size="small">{{ formatFileSize(row.file_size) }}</el-tag>
+            </template>
+            <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+          </NarrowCardList>
         </el-card>
       </el-col>
     </el-row>
@@ -267,10 +286,26 @@ import {
 import { adminApi } from '@/api/admin'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 import TrendChart, { type TrendPoint } from '@/components/TrendChart.vue'
 
 // vite define 注入的构建版本（package.json,对齐发布列车）
 const appVersion = __APP_VERSION__
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const userCardFields = computed(() => [
+  { key: 'nickname', label: t('admin.nickname') },
+  { key: 'status', label: t('common.status') },
+  { key: 'created_at', label: t('admin.registeredAt') },
+])
+const userCardHead = (row: any) => row.username
+const fileCardFields = computed(() => [
+  { key: 'file_size', label: t('admin.size') },
+  { key: 'username', label: t('admin.uploader') },
+  { key: 'created_at', label: t('admin.uploadedAt') },
+])
+const fileCardHead = (row: any) => row.filename
 
 const { t, locale } = useI18n()
 const userStore = useUserStore()

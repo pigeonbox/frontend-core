@@ -8,6 +8,7 @@
         </div>
         <div class="header-actions">
           <el-button
+            class="batch-only"
             type="danger"
             plain
             :disabled="!selectedIds.length"
@@ -16,6 +17,7 @@
             {{ selectedIds.length ? t('admin.filesPage.batchBlockCount', { n: selectedIds.length }) : t('admin.filesPage.batchBlock') }}
           </el-button>
           <el-button
+            class="batch-only"
             type="success"
             plain
             :disabled="!selectedIds.length"
@@ -24,6 +26,7 @@
             {{ t('admin.filesPage.batchRestore') }}
           </el-button>
           <el-button
+            class="batch-only"
             type="warning"
             plain
             :disabled="!selectedIds.length"
@@ -32,6 +35,7 @@
             {{ t('admin.filesPage.batchExtend') }}
           </el-button>
           <el-button
+            class="batch-only"
             type="danger"
             plain
             :disabled="!selectedIds.length"
@@ -119,7 +123,7 @@
       <el-table
         :data="filesList"
         v-loading="loading"
-        class="files-table"
+        class="admin-table-wide files-table"
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="44" />
@@ -252,6 +256,63 @@
         </el-table-column>
       </el-table>
 
+      <!-- 窄屏（≤768px）卡片形态：本表 9 列合计 ~1300px ⇒ 390px 视口下内容列全被裁。
+           策展=手机上真正要看的（大小/状态/上传者/IP/取件次数/创建/过期），批量操作
+           （表头多选）仍是桌面专属，窄屏不提供。 -->
+      <NarrowCardList :rows="filesList" :fields="cardFields" :head="cardHead">
+        <template #head="{ row }">
+          <div class="narrow-file-name">
+            {{ row.file_name || row.code }}
+            <el-tag v-if="row.is_text" size="small" type="success">{{ t('admin.filesPage.tagText') }}</el-tag>
+            <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info">{{ t('admin.filesPage.fileCount', { n: row.file_count }) }}</el-tag>
+          </div>
+          <div v-if="row.is_text && row.text_preview" class="narrow-text-preview">{{ row.text_preview }}</div>
+        </template>
+        <template #size="{ row }">
+          <el-tag type="info" effect="plain">{{ formatFileSize(row.size) }}</el-tag>
+        </template>
+        <template #status="{ row }">
+          <el-tag :type="statusTagType(row.status)" effect="dark">{{ statusLabel(row.status) }}</el-tag>
+        </template>
+        <template #uploader="{ row }">
+          <el-tag v-if="row.user_id" type="info">ID: {{ row.user_id }}</el-tag>
+          <span v-else class="anonymous">{{ t('admin.filesPage.anonymous') }}</span>
+        </template>
+        <template #ip="{ row }">
+          <span class="owner-ip">{{ row.owner_ip || '-' }}</span>
+        </template>
+        <template #downloads="{ row }">
+          <div class="download-count">
+            <el-icon><Download /></el-icon>
+            {{ row.used_count || 0 }}
+          </div>
+        </template>
+        <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+        <template #expired_at="{ row }">
+          <div :class="['expire-time', { expired: isExpired(row.expired_at) }]">{{ formatDate(row.expired_at) }}</div>
+        </template>
+        <template #actions="{ row }">
+          <template v-if="row.deleted">
+            <el-button type="success" size="small" round @click="restoreDeleted(row)">{{ t('admin.filesPage.restore') }}</el-button>
+            <el-button type="danger" size="small" round @click="purgeDeleted(row)">{{ t('admin.filesPage.purge') }}</el-button>
+          </template>
+          <template v-else>
+            <el-button v-if="row.status !== 'blocked'" type="warning" size="small" round @click="setStatus(row, 'blocked')">
+              {{ t('admin.filesPage.block') }}
+            </el-button>
+            <el-button v-else type="success" size="small" round @click="setStatus(row, 'normal')">
+              {{ t('admin.filesPage.restore') }}
+            </el-button>
+            <el-button v-if="!row.is_text" size="small" round @click="downloadFile(row)">{{ t('admin.filesPage.download') }}</el-button>
+            <el-button size="small" round @click="openEdit(row)">{{ t('admin.filesPage.edit') }}</el-button>
+            <el-button type="danger" size="small" round @click="deleteFile(row)">
+              <el-icon><Delete /></el-icon>
+              {{ t('admin.filesPage.delete') }}
+            </el-button>
+          </template>
+        </template>
+      </NarrowCardList>
+
       <div class="pagination-wrapper">
         <el-pagination
           v-model:current-page="page"
@@ -325,6 +386,7 @@ import { loadViews, saveView, deleteView } from '@/utils/savedViews'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { useRouteParam } from '@/composables/useRouteParam'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -418,6 +480,20 @@ const statusTagType = (status: string): 'success' | 'danger' | 'warning' => {
     default: return 'success'
   }
 }
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+// 用 computed 而非常量数组：t() 随语言切换重算，常量数组会把标签冻结在首次渲染。
+const cardFields = computed(() => [
+  { key: 'size', label: t('admin.size') },
+  { key: 'status', label: t('admin.filesPage.colStatus') },
+  { key: 'uploader', label: t('admin.uploader') },
+  { key: 'ip', label: t('admin.filesPage.colIp') },
+  { key: 'downloads', label: t('admin.filesPage.colDownloads') },
+  { key: 'created_at', label: t('admin.createdAt') },
+  { key: 'expired_at', label: t('admin.filesPage.colExpiresAt') },
+])
+const cardHead = (row: any) => row.file_name || row.code
 
 const getFileIcon = (row: any) => {
   const filename = row.file_name || ''

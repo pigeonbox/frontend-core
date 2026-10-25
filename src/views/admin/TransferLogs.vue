@@ -39,7 +39,7 @@
       </el-row>
 
       <!-- 日志列表 -->
-      <el-table :data="logsList" stripe>
+      <el-table :data="logsList" stripe class="admin-table-wide">
         <el-table-column prop="id" label="ID" width="80" />
 
         <el-table-column prop="operation" :label="t('admin.transferLogs.colOperation')" width="100">
@@ -84,6 +84,26 @@
         </el-table-column>
       </el-table>
 
+      <!-- 窄屏（≤768px）卡片形态：本表 8 列合计 ~1100px ⇒ 390px 视口下内容列全被裁。
+           策展=操作(头部) + 分享码/文件名/大小/用户/Key/IP/时间。 -->
+      <NarrowCardList :rows="logsList" :fields="cardFields" :head="cardHead">
+        <template #operation="{ row }">
+          <el-tag :type="getOperationType(row.operation)" size="small">{{ getOperationLabel(row.operation) }}</el-tag>
+        </template>
+        <template #file_code="{ row }">{{ row.file_code }}</template>
+        <template #file_name="{ row }">{{ row.file_name }}</template>
+        <template #file_size="{ row }">{{ formatFileSize(row.file_size) }}</template>
+        <template #username="{ row }">{{ row.username || t('admin.transferLogs.anonymous') }}</template>
+        <template #api_key_id="{ row }">
+          <el-tooltip v-if="row.api_key_id" :content="t('admin.transferLogs.apiKeyTooltip')">
+            <el-tag size="small" type="warning">#{{ row.api_key_id }}</el-tag>
+          </el-tooltip>
+          <span v-else>-</span>
+        </template>
+        <template #ip="{ row }">{{ row.ip }}</template>
+        <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+      </NarrowCardList>
+
       <!-- 分页 -->
       <div class="pagination-container">
         <el-pagination
@@ -108,6 +128,20 @@ import { Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const cardFields = computed(() => [
+  { key: 'file_code', label: t('admin.transferLogs.colFileCode') },
+  { key: 'file_name', label: t('admin.fileName') },
+  { key: 'file_size', label: t('admin.transferLogs.colFileSize') },
+  { key: 'username', label: t('admin.transferLogs.colUser') },
+  { key: 'api_key_id', label: 'Key ID' },
+  { key: 'ip', label: t('admin.transferLogs.colIp') },
+  { key: 'created_at', label: t('admin.transferLogs.colOperatedAt') },
+])
+const cardHead = (row: any) => getOperationLabel(row.operation)
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()

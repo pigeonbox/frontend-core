@@ -48,7 +48,7 @@
           <el-button type="primary" @click="$router.push(adminBase + '/config')">{{ t('admin.localFilesPage.goConfig') }}</el-button>
         </div>
       </el-empty>
-      <el-table v-else v-loading="loading" :data="entries" style="width: 100%">
+      <el-table v-else v-loading="loading" :data="entries" class="admin-table-wide" style="width: 100%">
         <el-table-column :label="t('admin.localFilesPage.colName')" min-width="280">
           <template #default="{ row }">
             <el-icon class="file-icon"><Document v-if="!row.is_dir" /><Folder v-else /></el-icon>
@@ -80,6 +80,29 @@
         </el-table-column>
         <template #empty>{{ t('admin.localFilesPage.emptyDir') }}</template>
       </el-table>
+
+      <!-- 窄屏（≤768px）卡片形态：条件与上面表格的 v-else 等价（不插在 v-if/v-else
+           中间，免得打断指令链）。 -->
+      <NarrowCardList v-if="!featureDisabled" :rows="entries" :fields="cardFields" :head="cardHead">
+        <template #head="{ row }">
+          <el-icon class="file-icon"><Document v-if="!row.is_dir" /><Folder v-else /></el-icon>
+          <el-link v-if="row.is_dir" type="primary" @click="goto(row.path)">{{ row.name }}</el-link>
+          <span v-else>{{ row.name }}</span>
+        </template>
+        <template #size="{ row }">{{ row.is_dir ? '—' : formatFileSize(row.size) }}</template>
+        <template #modified="{ row }">{{ formatTime(row.mod_time) }}</template>
+        <template #actions="{ row }">
+          <template v-if="!row.is_dir">
+            <el-button size="small" type="primary" @click="openImport(row)">{{ t('admin.localFilesPage.genCode') }}</el-button>
+            <el-button size="small" type="danger" plain @click="onDelete(row)">{{ t('admin.localFilesPage.delete') }}</el-button>
+            <template v-if="hostAvailable">
+              <el-button size="small" @click="openInHost(row)">{{ t('admin.localFilesPage.open') }}</el-button>
+              <el-button size="small" @click="detailsInHost(row)">{{ t('admin.localFilesPage.details') }}</el-button>
+            </template>
+          </template>
+          <el-button v-else-if="hostAvailable" size="small" @click="openDirInHost(row)">{{ t('admin.localFilesPage.openDir') }}</el-button>
+        </template>
+      </NarrowCardList>
     </el-card>
 
     <!-- 生成提取码对话框 -->
@@ -130,7 +153,16 @@ import { useI18n } from 'vue-i18n'
 import { Document, Folder } from '@element-plus/icons-vue'
 import { localFilesApi, type LocalFileEntry } from '@/api/localFiles'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 import { host } from '@/host'
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const cardFields = computed(() => [
+  { key: 'size', label: t('admin.size') },
+  { key: 'modified', label: t('admin.localFilesPage.colModified') },
+])
+const cardHead = (row: any) => row.name
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
