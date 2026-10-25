@@ -365,9 +365,12 @@ onMounted(() => reload())
     color: var(--color-text-secondary);
   }
 
-  // 标签列**按内容自适应**（下限 84px）：固定 84px 时英文长标签（如
-  // "Pickup / Share Code"）会折成两行（真机 390px 实测）⇒ 标签占一行、值列被挤。
-  // max-width 46% ⇒ 再长的标签最多占卡片近一半，值列仍留得下位置。
+  /* 标签列**按内容自适应**（下限 84px）：固定 84px 时英文长标签（如
+     "Pickup / Share Code"）会折成两行（真机 390px 实测）⇒ 标签占一行、值列被挤。
+     max-width 46% ⇒ 再长的标签最多占卡片近一半，值列仍留得下位置。
+     ⚠️ 本块是**纯 CSS**（<style scoped>，非 scss）⇒ 注释必须用 C 风格块注释，
+        双斜杠行注释在纯 CSS 里不合法 ⇒ SFC 编译直接失败（2026-10-25 实录：
+        v0.11.24 的 tgz 因此构建失败，壳仓 CI 与 frontend-core CI 都红了）。 */
   .pickup-card-label {
     flex: 0 0 auto;
     min-width: 84px;
