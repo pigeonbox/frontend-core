@@ -643,10 +643,10 @@ const fetchExSections = (data: Record<string, unknown>) => {
   if (sec.download) {
     Object.assign(exForm.download, sec.download)
     // 旧库 download 段无直传新键 → 后端下发 null：归一为默认值（nil 语义=开启/100MB/600s）
+    // 旧开关 presign_anonymous_enabled 已退役（2026-10-26）：后端读配置时已把它的
+    // 语义并入 presign_policy，前端不再二次推导。
     if (!exForm.download.presign_policy) {
-      // 旧库无 presign_policy 键：按旧匿名开关推导（false=authenticated，否则 everyone）
-      const legacy = (exForm.download as Record<string, unknown>).presign_anonymous_enabled
-      exForm.download.presign_policy = legacy === false ? 'authenticated' : 'everyone'
+      exForm.download.presign_policy = 'everyone'
     }
     if (!exForm.download.presign_threshold_mb) exForm.download.presign_threshold_mb = 100
     if (!exForm.download.presign_expire_seconds) exForm.download.presign_expire_seconds = 600

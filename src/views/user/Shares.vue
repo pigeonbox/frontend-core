@@ -92,7 +92,7 @@
         <template #default="{ row }">
           <span v-if="row.is_text_share" class="text-preview">{{ row.text || '—' }}</span>
           <template v-else>
-            <span>{{ row.file_name || row.prefix + row.suffix || '—' }}</span>
+            <span>{{ row.file_name || '—' }}</span>
             <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info" style="margin-left: 6px">
               {{ row.file_count }} {{ t('user.shares.filesUnit') }}
             </el-tag>

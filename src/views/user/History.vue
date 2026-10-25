@@ -51,7 +51,7 @@
       <el-table-column :label="t('user.history.fileName')" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">
           <span v-if="row.is_text_share" class="text-preview">{{ row.text || '—' }}</span>
-          <span v-else>{{ row.file_name || row.prefix + row.suffix || '—' }}</span>
+          <span v-else>{{ row.file_name || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.history.viewerCount')" width="120">
@@ -103,7 +103,7 @@
         <div class="pickup-card-head">
           <span class="pickup-card-name">
             <span v-if="row.is_text_share" class="text-preview">{{ row.text || '—' }}</span>
-            <span v-else>{{ row.file_name || row.prefix + row.suffix || '—' }}</span>
+            <span v-else>{{ row.file_name || '—' }}</span>
           </span>
           <el-tag size="small" type="success">{{ row.viewer_count }} {{ t('user.history.times') }}</el-tag>
         </div>
