@@ -365,8 +365,13 @@ onMounted(() => reload())
     color: var(--color-text-secondary);
   }
 
+  // 标签列**按内容自适应**（下限 84px）：固定 84px 时英文长标签（如
+  // "Pickup / Share Code"）会折成两行（真机 390px 实测）⇒ 标签占一行、值列被挤。
+  // max-width 46% ⇒ 再长的标签最多占卡片近一半，值列仍留得下位置。
   .pickup-card-label {
-    flex: 0 0 84px;
+    flex: 0 0 auto;
+    min-width: 84px;
+    max-width: 46%;
     color: var(--color-text-tertiary, var(--color-text-secondary));
   }
 

@@ -582,9 +582,13 @@ html.dark {
     color: var(--color-text-regular);
   }
 
-  // 标签列固定宽（84px），值列占剩余 —— 与用户端 History.vue 同口径
+  // 标签列**按内容自适应**（下限 84px、上限 46%）——与用户端 History.vue 同口径：
+  // 固定 84px 时英文长标签（如 "Uploader IP" / "Pickup / Share Code"）会折成两行
+  // ⇒ 标签占两行、值列被挤窄（真机 390px 实测）。
   .narrow-card-label {
-    flex: 0 0 84px;
+    flex: 0 0 auto;
+    min-width: 84px;
+    max-width: 46%;
     color: var(--color-text-secondary);
   }
 
@@ -628,6 +632,12 @@ html.dark {
   /* 批量操作依赖表格的「多选」列，而表格在窄屏被卡片形态替换 ⇒ 多选在窄屏
      **不存在** ⇒ 批量按钮永远禁用，却占掉 4 行竖排空间 ⇒ 窄屏隐藏。 */
   .batch-only {
+    display: none !important;
+  }
+
+  /* 筛选栏里的竖分隔线（el-divider--vertical）：宽屏用于分组，窄屏下是 1px 的
+     孤立竖线、纯噪点 ⇒ 窄屏隐藏（分组靠换行已经表达清楚）。 */
+  .admin-layout .filter-bar .el-divider--vertical {
     display: none !important;
   }
 
