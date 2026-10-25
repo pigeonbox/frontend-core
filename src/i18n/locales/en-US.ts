@@ -1387,6 +1387,7 @@ export default {
     '20013': 'This share is still under review and can’t be picked up yet. Please try again later or contact the sender.',
     '30010': 'The direct-upload credential has expired. Please upload the file again.',
     '30013': 'The content did not pass the safety check and can’t be shared. Please check for sensitive words.',
+    '30014': 'Upload session already completed. Please start the upload again.',
     '40003': 'Incorrect username or password',
     '40005': 'Your session has expired. Please sign in again.',
     '40006': 'Your session has expired. Please sign in again.',

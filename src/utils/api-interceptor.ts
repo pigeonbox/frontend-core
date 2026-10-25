@@ -54,6 +54,7 @@ const ERRCODE_KEY_MAP: Record<number, string> = {
   30011: 'errcode.30011',
   30012: 'errcode.30012',
   30013: 'errcode.30013',
+  30014: 'errcode.30014',
   40001: 'errcode.40001',
   40002: 'errcode.40002',
   40003: 'errcode.40003',
