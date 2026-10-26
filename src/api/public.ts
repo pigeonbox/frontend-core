@@ -1,5 +1,6 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
+import type { share as shareContract } from '@pigeonbox/contracts'
 
 export interface PublicConfig {
   name: string
@@ -40,22 +41,17 @@ export interface PublicConfig {
   initialized?: boolean
 }
 
-/** 取件元数据（GET /share/metadata/:code，免密码、不扣次数；仅用于回显有效期） */
-export interface ShareMetadata {
-  code: string
-  /** text | file */
-  type: string
-  name?: string
-  size: number
-  has_password: boolean
-  /** 过期时间（RFC3339；null=永久有效） */
-  expired_at: string | null
-  expired_count: number
-  used_count: number
-  encrypted: boolean
-  file_count: number
-  created_at: string
-}
+/**
+ * 取件元数据（GET /share/metadata/:code，免密码、不扣次数；仅用于回显有效期）
+ *
+ * 契约派生（contracts v0.20.0：ShareMetadataData，2026-10-26 自 core 的
+ * customHandler 收敛进 IDL）——此前是前端手抄的副本，后端改字段名不会编译报错。
+ *
+ * ⚠️ 可空性差异：契约里 expired_at 是 **optional**（缺省不输出；后端原为
+ * *time.Time → null），手抄版是 `string | null` ⇒ 消费面必须 `?? null` 兜底
+ * （见 components/share/ShareResultDialog.vue 的 loadExpire）。
+ */
+export type ShareMetadata = shareContract.ShareMetadataData
 
 // 系统初始化请求（字段名与后端 thrift 模型 snake_case 对齐）
 export interface InitializeSystemReq {

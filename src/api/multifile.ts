@@ -8,25 +8,42 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
+import type { share as shareContract } from '@pigeonbox/contracts'
 
-export interface MultiShareOptions {
+/**
+ * 多文件分享公共参数（契约派生，contracts v0.20.0）。
+ *
+ * 契约侧 MultiShareDirectReq / MultiShareBindReq 的公共字段一律 **optional**
+ * （收敛前 core 用 DefaultPostForm 读 ⇒ 缺字段时 handler 显式兜底），但前端
+ * 这两项是**表单必填**且直接进 FormData（`String(undefined)` 会发出字面量
+ * "undefined"）⇒ 这里收紧为 required，其余字段跟契约走。
+ */
+export type MultiShareOptions = shareContract.MultiShareDirectReq & {
   expire_value: number
   expire_style: string
-  require_auth?: boolean
-  password?: string
-  encrypted?: boolean
-  custom_code?: string
-  /** 文件备注（可空）：随分享展示给取件人 */
-  note?: string
 }
 
-export interface MultiShareResult {
-  code: string
-  url: string
-  share_url: string
-  file_count: number
-  /** 6 位取件码（文件分享铸造；永久/文本分享为空） */
-  pickup_code?: string
+/** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
+export type MultiShareResult = shareContract.MultiShareData
+
+/**
+ * multi-bind 的一个条目（**前端视图**：契约 MultiShareBindEntry 的 file_name
+ * 放宽为可选）。
+ *
+ * ⚠️ 契约里 file_name 是 required，但前端实际**只发** upload_id/object_key
+ * （file_name 由服务端从 chunk 会话/对象键推导，core 的 multiBindEntry.FileName
+ * 允许空）⇒ 这里放宽为 optional，其余字段跟契约走。
+ *
+ * 刻意**不叫** MultiShareBindEntry：那是契约结构体的名字，本地再叫一遍就是
+ * 遮蔽契约类型（形状还不一样）⇒ 用 Input 后缀区分。
+ */
+export type MultiShareBindEntryInput = Omit<shareContract.MultiShareBindEntry, 'file_name'> & {
+  file_name?: string
+}
+
+/** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
+export type MultiShareBindBody = Omit<shareContract.MultiShareBindReq, 'entries'> & {
+  entries: MultiShareBindEntryInput[]
 }
 
 export const isOkCode = (code?: number) => code === 0 || code === 200
@@ -145,22 +162,23 @@ async function uploadChunkWithRetry(
 
 /** 把若干 chunk 会话/对象 key 绑定为一个多文件分享 */
 export async function multiBind(
-  entries: Array<{ upload_id?: string; object_key?: string; file_name?: string }>,
+  entries: MultiShareBindEntryInput[],
   opts: MultiShareOptions
 ): Promise<MultiShareResult> {
+  const body: MultiShareBindBody = {
+    entries,
+    expire_value: opts.expire_value,
+    expire_style: opts.expire_style,
+    require_auth: opts.require_auth || false,
+    password: opts.password || '',
+    encrypted: opts.encrypted || false,
+    custom_code: opts.custom_code || '',
+    note: opts.note || '',
+  }
   const res = await request<ApiResponse<MultiShareResult>>({
     url: '/api/v1/share/multi-bind',
     method: 'POST',
-    data: {
-      entries,
-      expire_value: opts.expire_value,
-      expire_style: opts.expire_style,
-      require_auth: opts.require_auth || false,
-      password: opts.password || '',
-      encrypted: opts.encrypted || false,
-      custom_code: opts.custom_code || '',
-      note: opts.note || '',
-    },
+    data: body,
     timeout: 600000,
   })
   if (isOkCode(res.code) && res.data) return res.data
