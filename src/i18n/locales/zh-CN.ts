@@ -599,6 +599,7 @@ export default {
       status: '状态',
       type: '类型',
       type_share_retrieved: '取件',
+      type_request_received: '新投递',
       type_feature: '新功能',
       type_maintenance: '维护',
       type_system: '系统',

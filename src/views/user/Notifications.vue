@@ -28,7 +28,15 @@
           <el-icon :size="20" :class="['type-icon', `type-${row.type}`]">
             <component :is="iconForType(row.type)" />
           </el-icon>
-          <span class="type-text">{{ t('user.notifications.type_' + row.type) || row.type }}</span>
+          <!-- ⚠️ vue-i18n 缺键时**返回键名本身**（不是空串）⇒ 原来的
+               `t(...) || row.type` 兜底是死代码 ⇒ 未知类型会把
+               "user.notifications.type_xxx" 裸键名显示给用户。
+               ⇒ 用 te() 判定「键是否存在」，没有才回退原始类型串。 -->
+          <span class="type-text">{{
+            te('user.notifications.type_' + row.type)
+              ? t('user.notifications.type_' + row.type)
+              : row.type
+          }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.notifications.titleField')" min-width="200">
@@ -80,7 +88,7 @@ import { useErrorHandler } from '@/composables/useErrorHandler'
 const { handleError } = useErrorHandler()
 import { usePolling } from '@/composables/usePolling'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 
 const unread = ref(0)
 const marking = ref(false)

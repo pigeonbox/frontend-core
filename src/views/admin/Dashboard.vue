@@ -106,7 +106,8 @@
           <template #header>
             <div class="card-header">
               <h3>{{ t('admin.trend7d') }}</h3>
-              <el-tag type="info">{{ t('admin.realtime') }}</el-tag>
+              <el-tag v-if="trendError" type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
+              <el-tag v-else type="info">{{ t('admin.realtime') }}</el-tag>
             </div>
           </template>
           <TrendChart
@@ -521,20 +522,26 @@ onMounted(async () => {
   }
 })
 
-// 趋势序列：后端 /admin/stats/trend 真实数据（uploads 按创建、downloads 按传输日志）；
-// 拉取失败时回退 mock，面板不空白
+// 趋势序列：后端 /admin/stats/trend 真实数据（uploads 按创建、downloads 按传输日志）。
+//
+// ⚠️ 2026-10-26 审计修复：原实现拉取失败时**回退 mock**（随机数生成的示例数据）
+// ⇒ 面板不空、但管理员会把**假数字当成真实趋势** ⇒ 静默失败（最危险的一类：
+// 看起来一切正常，数据是编的）。⇒ 改为：失败就**不画数据** + 显式错误标记
+// （`admin.loadFailed`），让「没有数据」和「数据坏了」可区分。
+const trendError = ref(false)
 const fetchTrend = async () => {
   try {
     const res = await adminApi.getStatsTrend(7)
     const days = (res.data as { days?: TrendPoint[] })?.days
     if (Array.isArray(days) && days.length > 0) {
       trendData.value = days
+      trendError.value = false
       return
     }
+    trendError.value = true
   } catch {
-    // 回退 mock
+    trendError.value = true
   }
-  generateMockTrend()
 }
 
 // 富指标（/admin/stats/enhanced）：真实昨日对比/下载总量/top 后缀分布
@@ -555,22 +562,6 @@ const fetchEnhancedStats = async () => {
   } catch {
     // 富指标失败不影响基础面板
   }
-}
-
-const generateMockTrend = () => {
-  // 后端尚未提供 /admin/stats/trend — 临时基于总数生成示例数据
-  const base = Math.max(stats.todayUploads, 10)
-  const now = new Date()
-  const days: TrendPoint[] = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now)
-    d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().slice(0, 10)
-    const uploads = Math.floor(base * (0.4 + Math.random() * 0.8))
-    const downloads = Math.floor(uploads * (0.6 + Math.random() * 0.6))
-    days.push({ date: dateStr, uploads, downloads })
-  }
-  trendData.value = days
 }
 
 const generateMockFileTypeDist = () => {

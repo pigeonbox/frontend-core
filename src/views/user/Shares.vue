@@ -176,6 +176,100 @@
       </el-table-column>
     </el-table>
 
+    <!-- 窄屏 / 折叠屏卡片形态：本表 9 列合计 ~1400px（操作列 380px 还固定在右侧）
+         ⇒ ≤1024px（手机、折叠屏内屏 690~900 CSS px、平板竖屏、桌面小窗分屏）
+         放不下 ⇒ 内容列被裁、固定操作列**盖住**相邻列（与 History/Dashboard 同型缺陷）。
+         与 views/user/History.vue 同款：表格与卡片同时渲染、纯 CSS 互斥。 -->
+    <div class="shares-cards">
+      <div v-for="row in list" :key="row.code" class="share-card">
+        <div class="share-card-head">
+          <code class="mono code-cell">{{ row.code }}</code>
+          <code v-if="row.pickup_code" class="mono code-cell code-primary">{{ row.pickup_code }}</code>
+          <el-tag v-if="row.is_text_share" size="small" type="info">{{ t('user.shares.typeText') }}</el-tag>
+          <el-tag v-else size="small" type="success">{{ t('user.shares.typeFile') }}</el-tag>
+          <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info">
+            {{ row.file_count }} {{ t('user.shares.filesUnit') }}
+          </el-tag>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.fileName') }}</span>
+          <span class="share-card-value">
+            <span v-if="row.is_text_share" class="text-preview">{{ row.text || '—' }}</span>
+            <span v-else>{{ row.file_name || '—' }}</span>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.size') }}</span>
+          <span class="share-card-value">
+            <span v-if="row.is_text_share">—</span>
+            <span v-else>{{ formatSize(row.size) }}</span>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.expireAt') }}</span>
+          <span class="share-card-value">
+            <ExpireText :value="row.expired_at" :expired="row.is_expired" />
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.usedCount') }}</span>
+          <span class="share-card-value">
+            <span v-if="shareQuotaDisplay(row).kind === 'unlimited'">
+              {{ shareQuotaDisplay(row).used }} / {{ t('user.shares.unlimited') }}
+            </span>
+            <span v-else-if="shareQuotaDisplay(row).kind === 'exhausted'">
+              {{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}
+              · {{ t('user.shares.countExhausted') }}
+            </span>
+            <span v-else>{{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}</span>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.status') }}</span>
+          <span class="share-card-value">
+            <el-tag v-if="shareStatusKind(row) === 'deleted'" size="small" type="info">
+              {{ t('user.shares.statusDeleted') }}
+            </el-tag>
+            <el-tag v-else-if="shareStatusKind(row) === 'exhausted'" size="small" type="warning">
+              {{ t('user.shares.countExhausted') }}
+            </el-tag>
+            <el-tag v-else-if="shareStatusKind(row) === 'expired'" size="small" type="danger">
+              {{ t('user.shares.statusExpired') }}
+            </el-tag>
+            <el-tag v-else size="small" type="success">{{ t('user.shares.statusActive') }}</el-tag>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.createdAt') }}</span>
+          <span class="share-card-value">{{ formatDate(row.created_at) }}</span>
+        </div>
+        <div class="share-card-actions">
+          <template v-if="row.deleted_at">
+            <el-button size="small" type="success" @click="confirmRestore(row)">
+              <el-icon><RefreshLeft /></el-icon> {{ t('user.shares.restore') }}
+            </el-button>
+            <el-button size="small" type="danger" @click="confirmHardDelete(row)">
+              <el-icon><Delete /></el-icon> {{ t('user.shares.hardDelete') }}
+            </el-button>
+          </template>
+          <template v-else>
+            <el-button size="small" @click="copyLink(row)">
+              <el-icon><Link /></el-icon> {{ t('user.shares.copyLink') }}
+            </el-button>
+            <el-button size="small" @click="copyCode(row)">
+              <el-icon><Postcard /></el-icon> {{ t('user.shares.copyCode') }}
+            </el-button>
+            <el-button size="small" type="warning" @click="openExtendDialog(row)">
+              <el-icon><Clock /></el-icon> {{ t('user.shares.extend') }}
+            </el-button>
+            <el-button size="small" type="danger" @click="confirmDelete(row)">
+              <el-icon><Delete /></el-icon> {{ t('common.delete') }}
+            </el-button>
+          </template>
+        </div>
+      </div>
+    </div>
+
     <!-- 空状态 -->
     <el-empty v-if="!loading && list.length === 0" :description="t('user.shares.empty')">
       <el-button type="primary" @click="$router.push('/')">
@@ -437,6 +531,87 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 窄屏卡片形态（与 views/user/History.vue 同款）：
+   表格与卡片**同时渲染**、纯 CSS 互斥（不用 JS 媒体查询 ⇒ 无首帧时序问题）。 */
+.shares-cards {
+  display: none;
+}
+
+.share-card {
+  border: 1px solid var(--color-border, var(--el-border-color));
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+
+.share-card-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.share-card-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  color: var(--color-text-regular);
+}
+
+/* 标签列按内容自适应（下限 84px、上限 46%）——英文长标签不折行 */
+.share-card-label {
+  flex: 0 0 auto;
+  min-width: 84px;
+  max-width: 46%;
+  color: var(--color-text-secondary);
+}
+
+.share-card-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.share-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: 2px;
+}
+
+/* Element Plus 相邻按钮自带 margin-left，flex gap 下会叠出双倍间距 */
+.share-card-actions .el-button {
+  margin-left: 0;
+  /* 触控热区：size="small" 的按钮仅 24px 高 ⇒ 移动端/折叠屏命中率极差 */
+  min-height: 40px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+@media (max-width: 1024px) {
+  .shares-table {
+    display: none !important;
+  }
+
+  .shares-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+}
+
+/* 展开态（600~1024px）：卡片多列网格（单列在 900px 宽下横跨全宽、标签与值
+   被拉到两端 ⇒ 难读） */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .shares-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-items: start;
+  }
+}
 .shares-page {
   max-width: 100%;
 }

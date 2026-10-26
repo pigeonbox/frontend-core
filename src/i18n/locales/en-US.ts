@@ -600,6 +600,7 @@ export default {
       status: 'Status',
       type: 'Type',
       type_share_retrieved: 'Pickup',
+      type_request_received: 'New delivery',
       type_feature: 'New Feature',
       type_maintenance: 'Maintenance',
       type_system: 'System',

@@ -1,0 +1,47 @@
+/* =============================================================================
+ * foldable.css — 折叠屏 / 新形态机型适配的**全局**样式（2026-10-26）
+ *
+ * 为什么单独一个文件：安全区变量与命中框规则是**全局**规则（跨组件生效），
+ * 而 styles/main.scss 正在被别的改造并行编辑 ⇒ 独立文件可避免同文件冲突、
+ * 也让「折叠屏适配」这一组规则有单一出处（便于守卫钉住）。
+ *
+ * 内容：
+ *   ① 安全区变量（env(safe-area-inset-*)）：刘海/灵动岛/底部指示条/圆角屏；
+ *      依赖 index.html 的 `viewport-fit=cover`（缺它时 iOS 恒为 0）。
+ *   ② 应用外壳：左右安全区内缩（横屏时刘海在侧边）、底部安全区内缩（home
+ *      indicator 不得压住主操作）、动态视口高度（dvh：移动端地址栏与折叠屏
+ *      合上/展开时 vh 不变 ⇒ 页面底部被浏览器 chrome 裁掉）。
+ *   ③ 卡片形态的操作按钮触控热区：Element Plus 的 size="small" 按钮只有
+ *      24px 高 ⇒ 触摸命中率极差（移动端可点目标建议 ≥44px，EP large 是 40px）。
+ *      这里只**放大命中框**，字号与视觉密度不变。
+ * ============================================================================= */
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+body {
+  /* 横向安全区（横屏时刘海/圆角在侧边）——纵向由顶栏与页面底部各自处理 */
+  padding-left: var(--safe-left);
+  padding-right: var(--safe-right);
+}
+
+#app {
+  min-height: 100vh;
+  /* 动态视口高度：旧浏览器不认 dvh ⇒ 取上一行的 vh */
+  min-height: 100dvh;
+  /* 底部安全区（home indicator / 手势条）——主操作按钮不能压在指示条下 */
+  padding-bottom: var(--safe-bottom);
+}
+
+/* 卡片形态的操作按钮：触控热区抬到 40px（EP size=small 仅 24px） */
+.narrow-card-actions .el-button,
+.share-card-actions .el-button,
+.dashboard-share-actions .el-button {
+  min-height: 40px;
+  padding-left: 14px;
+  padding-right: 14px;
+}

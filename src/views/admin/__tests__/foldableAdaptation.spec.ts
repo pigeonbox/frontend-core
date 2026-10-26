@@ -39,7 +39,8 @@ describe('折叠屏适配：安全区', () => {
   })
 
   it('全局必须定义四个安全区变量（env 兜底 0px）', () => {
-    const scss = read('styles/main.scss')
+    // 安全区规则放在独立文件 styles/foldable.css（与 main.scss 的并行改造解耦）
+    const scss = read('styles/foldable.css')
     for (const side of ['top', 'bottom', 'left', 'right']) {
       expect(
         scss,
@@ -76,7 +77,7 @@ describe('折叠屏适配：安全区', () => {
   })
 
   it('页面底部必须留出底部安全区（home indicator 不得压住主操作）', () => {
-    const scss = read('styles/main.scss')
+    const scss = read('styles/foldable.css')
     expect(scss, '#app 应有底部安全区内边距').toMatch(
       /#app[\s\S]*?padding-bottom:\s*var\(--safe-bottom/,
     )
@@ -156,6 +157,25 @@ describe('折叠屏适配：断点提档（769~1024px = 折叠屏展开态/平�
     expect(dash, '≤1024px 必须隐藏 .dashboard-shares-table').toMatch(
       /@media \(max-width: 1024px\)[\s\S]*?\.dashboard-shares-table\s*\{[^}]*display:\s*none/,
     )
+  })
+
+  it('卡片形态的操作按钮必须抬到触控热区（EP size=small 仅 24px 高）', () => {
+    // 折叠屏/手机是**触摸**设备：卡片里的操作按钮用的是 size="small"
+    // （Element Plus 高度仅 24px）⇒ 命中率极差（移动端可点目标建议 ≥44px，
+    // EP 自带 large 才是 40px）⇒ 卡片形态下必须显式抬高命中框。
+    const scss = read('styles/foldable.css')
+    const cardActions = scss.slice(scss.indexOf('.narrow-card-actions'))
+    expect(
+      cardActions,
+      '管理台卡片操作按钮须抬到 ≥40px（触控热区）',
+    ).toMatch(/min-height:\s*40px/)
+
+    const dash = read('views/user/Dashboard.vue')
+    const dashActions = dash.slice(dash.indexOf('.dashboard-share-actions'))
+    expect(
+      dashActions,
+      '用户仪表盘卡片操作按钮须抬到 ≥40px（触控热区）',
+    ).toMatch(/min-height:\s*40px/)
   })
 
   it('600~1024px 档位下三处卡片列表都必须走多列网格（单列会横跨全宽、难读）', () => {

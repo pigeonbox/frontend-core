@@ -795,6 +795,11 @@ onMounted(async () => {
   /* Element Plus 相邻按钮自带 margin-left，flex gap 下会叠出双倍间距 */
   .dashboard-share-actions .el-button {
     margin-left: 0;
+    /* 触控热区：size="small" 的按钮仅 24px 高 ⇒ 移动端/折叠屏命中率极差
+     * ⇒ 卡片形态下抬到 40px（只放大命中框，视觉密度不变）。 */
+    min-height: 40px;
+    padding-left: 14px;
+    padding-right: 14px;
   }
 }
 
