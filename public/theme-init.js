@@ -28,7 +28,25 @@
       var D = { r: 10, g: 10, b: 10 }
       var base = c
       if (dark) {
-        base = { r: Math.round(c.r + (255 - c.r) * 0.3), g: Math.round(c.g + (255 - c.g) * 0.3), b: Math.round(c.b + (255 - c.b) * 0.3) }
+        // 暗色主色：先提亮 30%，不足与深色底(#0a0a0a)的 4.5:1 对比度则继续提亮
+        // （与 src/utils/accent.ts 的 darkBase 同公式；灰阶 accent 墨黑需 42%）
+        var lum = function (v) {
+          var s = v / 255
+          return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+        }
+        var lumOf = function (o) {
+          return 0.2126 * lum(o.r) + 0.7152 * lum(o.g) + 0.0722 * lum(o.b)
+        }
+        var ratio = function (a, b) {
+          var la = lumOf(a), lb = lumOf(b)
+          return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+        }
+        var r = 0.3
+        base = { r: Math.round(c.r + (255 - c.r) * r), g: Math.round(c.g + (255 - c.g) * r), b: Math.round(c.b + (255 - c.b) * r) }
+        while (r < 1 && ratio(base, D) < 4.5) {
+          r = Math.min(1, Math.round((r + 0.01) * 100) / 100)
+          base = { r: Math.round(c.r + (255 - c.r) * r), g: Math.round(c.g + (255 - c.g) * r), b: Math.round(c.b + (255 - c.b) * r) }
+        }
       }
       var to = dark ? D : W
       var blk = { r: 0, g: 0, b: 0 }

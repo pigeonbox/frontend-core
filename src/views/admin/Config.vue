@@ -81,7 +81,7 @@
               <span class="field-hint">{{ t('admin.configPage.themes.hint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.appearance.accentColor')">
-              <el-input v-model="exForm.ui.accent_color" placeholder="#409eff" style="width: 220px" />
+              <el-input v-model="exForm.ui.accent_color" placeholder="#0e9f6e" style="width: 220px" />
               <span class="field-hint">{{ t('admin.configPage.appearance.accentHint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.appearance.showAdminEntry')">
