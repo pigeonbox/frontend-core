@@ -23,7 +23,7 @@
       :data="list"
       style="width: 100%"
       empty-text=" "
-      class="tokens-table"
+      class="tokens-table admin-table-wide"
     >
       <el-table-column :label="t('user.tokens.name')" min-width="160">
         <template #default="{ row }">
@@ -76,6 +76,41 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 窄屏（≤1024px）卡片形态：本表 8 列合计 ~1210px（操作列 110px 还
+         fixed="right"）⇒ 手机 / 折叠屏内屏 / 平板竖屏放不下 ⇒ 密钥名/前缀/状态
+         等内容列被裁（Element Plus 横向滚动条在手机上几乎看不见）。
+         表格与卡片**同时渲染**、纯 CSS 互斥（全局 .admin-table-wide / .narrow-cards）。 -->
+    <NarrowCardList :rows="list" :fields="cardFields" :row-key="(row: ApiKeyItem) => row.id">
+      <template #head="{ row }">
+        <span>{{ row.name }}</span>
+      </template>
+      <template #prefix="{ row }">
+        <code class="key-prefix">{{ row.prefix }}…</code>
+      </template>
+      <template #status="{ row }">
+        <el-tag v-if="row.revoked" size="small" type="danger">{{ t('user.tokens.revoked') }}</el-tag>
+        <el-tag v-else-if="isExpired(row)" size="small" type="warning">{{ t('user.tokens.expired') }}</el-tag>
+        <el-tag v-else size="small" type="success">{{ t('user.tokens.active') }}</el-tag>
+      </template>
+      <template #last_used_at="{ row }">
+        {{ formatTime(row.last_used_at, t('user.tokens.neverUsed')) }}
+      </template>
+      <template #last_used_ip="{ row }">{{ row.last_used_ip || '-' }}</template>
+      <template #expires_at="{ row }">{{ formatTime(row.expires_at, t('user.tokens.never')) }}</template>
+      <template #created_at="{ row }">{{ formatTime(row.created_at, '-') }}</template>
+      <template #actions="{ row }">
+        <el-button
+          v-if="!row.revoked"
+          size="small"
+          type="danger"
+          plain
+          @click="revoke(row)"
+        >
+          {{ t('user.tokens.revoke') }}
+        </el-button>
+      </template>
+    </NarrowCardList>
 
     <!-- 签发对话框 -->
     <el-dialog
@@ -154,11 +189,22 @@ import { Plus, CopyDocument, Delete } from '@element-plus/icons-vue'
 import { userApi, type ApiKeyItem } from '@/api/user'
 import { copyToClipboard } from '@/utils/clipboard'
 import PageHeader from '@/components/data/PageHeader.vue'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 
 const loading = ref(false)
 const list = ref<ApiKeyItem[]>([])
+
+// 窄屏卡片字段策展（标签复用表格列的同一批 i18n key ⇒ 宽窄两屏口径一致）
+const cardFields = computed(() => [
+  { key: 'prefix', label: t('user.tokens.prefix') },
+  { key: 'status', label: t('user.tokens.status') },
+  { key: 'last_used_at', label: t('user.tokens.lastUsed') },
+  { key: 'last_used_ip', label: t('user.tokens.lastIP') },
+  { key: 'expires_at', label: t('user.tokens.expiresAt') },
+  { key: 'created_at', label: t('user.tokens.createdAt') },
+])
 
 const activeCount = computed(() => list.value.filter((k) => !k.revoked && !isExpired(k)).length)
 
@@ -244,7 +290,9 @@ const revoke = async (row: ApiKeyItem) => {
     ElMessage.success(t('user.tokens.revokeSuccess'))
     loadList()
   } catch {
-    ElMessage.error(t('user.tokens.loadFailed'))
+    // 吊销失败 ≠ 加载失败（2026-10-26 审计）：复用 loadFailed 会弹出
+    // 「加载 API Key 列表失败」⇒ 与用户刚做的操作完全无关，看不出哪一步失败。
+    ElMessage.error(t('user.tokens.revokeFailed'))
   }
 }
 
@@ -268,7 +316,8 @@ const revokeAll = async () => {
     ElMessage.success(t('user.tokens.revokeAllSuccess', { count: res.data.revoked }))
     loadList()
   } catch {
-    ElMessage.error(t('user.tokens.loadFailed'))
+    // 同上：批量吊销失败用 revokeFailed，不用 loadFailed
+    ElMessage.error(t('user.tokens.revokeFailed'))
   }
 }
 

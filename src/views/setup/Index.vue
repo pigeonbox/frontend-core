@@ -266,7 +266,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { publicApi } from '@/api/public'
@@ -274,6 +274,7 @@ import { adminApi } from '@/api/admin'
 import { uploadFile } from '@/api/share'
 import { anonymousApi } from '@/api/anonymous'
 import { useUserStore } from '@/stores/user'
+import { resolveSetupToken } from '@/utils/setupToken'
 import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS, type ExpireStyleKey } from '@/config/expireStyles'
 
 /**
@@ -290,6 +291,7 @@ import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS, type ExpireStyleKey } from '
  * 「建号 → 登录 → admin config API 存 base.public_url」三步落库。
  */
 const router = useRouter()
+const route = useRoute()
 const { t } = useI18n()
 const userStore = useUserStore()
 
@@ -416,7 +418,11 @@ onMounted(async () => {
     // 拉不到就沿用默认值，不阻断首启
   }
   // 服务端若要求首启令牌，页面应直接能看到令牌输入框而不是等提交后报错
-  const fromQuery = new URLSearchParams(window.location.search).get('token')
+  // ⚠️ 2026-10-26 审计：应用是 hash 路由 ⇒ 站内链接的 query 都在 `#` 之后
+  // （`#/setup?token=xxx`）⇒ 只读 location.search **恒拿不到令牌** ⇒ 令牌框
+  // 不出现 ⇒ 管理员走完向导点「初始化」才吃 401（这次失败已计入失败锁定）。
+  // ⇒ 同时读 route.query.token（hash 模式下 vue-router 已解析进 route.query）。
+  const fromQuery = resolveSetupToken(route.query.token, window.location.search)
   if (fromQuery) {
     setupForm.setupToken = fromQuery
     tokenRequired.value = true

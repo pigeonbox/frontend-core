@@ -586,6 +586,9 @@ export default {
       revokeWarning: 'Calls using this key will return 401 immediately after revocation and cannot be undone. Revoke "{name}"?',
       revokeSuccess: 'Revoked',
       loadFailed: 'Failed to load API keys',
+      // Revoke failure is not a load failure (2026-10-26 audit): reusing
+      // loadFailed here hides which step actually failed.
+      revokeFailed: 'Failed to revoke',
       createFailed: 'Failed to issue',
       keyResultTitle: 'Key created',
       keyOnceWarning: 'Save it now: the plaintext key is shown only once and cannot be viewed again after closing',
@@ -625,6 +628,9 @@ export default {
     },
     serverVersion: 'Server',
     frontendVersion: 'Frontend',
+    // Explicit "failed to load" marker (2026-10-26 audit): a failed stats/list
+    // fetch must be visible — otherwise it looks exactly like "nobody used the site".
+    loadFailed: 'Failed to load',
     health: {
       title: 'File Health',
       subtitle: 'Click a card to jump to that file view',
@@ -1440,6 +1446,17 @@ export default {
     failed: 'Login failed',
     noAccount: 'No account yet? Sign up',
     oidc: 'Use Single Sign-On (OIDC)',
+    // Distinguishable OIDC callback failures (2026-10-26, core-side audit P2):
+    // core redirects back with oidc_code (state_invalid / account_disabled /
+    // login_failed / missing_code) ⇒ the UI picks the wording by code instead
+    // of one generic "login failed".
+    // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
+    oidcError: {
+      stateInvalid: 'The sign-in request expired or is invalid. Please start again.',
+      accountDisabled: 'This account is disabled. Contact the site administrator.',
+      loginFailed: 'Single sign-on failed. Please try again.',
+      missingCode: 'Authorization failed: missing authorization code. Please start again.',
+    },
   },
   share_view: {
     title: 'Share Details',

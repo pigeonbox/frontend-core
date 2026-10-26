@@ -50,6 +50,14 @@ instance.interceptors.request.use(
   }
 )
 
+// 只有**普通对象**载荷才做信封归一化；Blob / ArrayBuffer 等二进制载荷保持原样
+// （管理台文件下载走 responseType:'blob'，给它挂 trace_id / 改 code 会污染响应体）。
+function isPlainPayload(v: unknown): v is Record<string, unknown> {
+  if (!v || typeof v !== 'object') return false
+  const proto = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null
+}
+
 // 响应拦截器 — 不在这里弹 toast，由调用方 useErrorHandler 处理。
 // 401 自动刷新：token 过期时调 /user/refresh 换新，重放原请求；刷新失败跳登录。
 // 防并发：多个 401 共享同一次 refresh（refreshPromise）。
@@ -59,13 +67,13 @@ instance.interceptors.response.use(
   (response) => {
     // 提取 X-Trace-Id header（如果后端改了）
     const traceId = response.headers?.['x-trace-id'] as string | undefined
-    if (traceId && response.data && typeof response.data === 'object') {
+    if (traceId && isPlainPayload(response.data)) {
       ;(response.data as Record<string, unknown>).trace_id = traceId
     }
     // 成功码归一化：后端两代约定并存（旧 handler=200 / resp.Success=0），
     // 视图层普遍用 res.code===200 判成功；在这里把 0 统一改写成 200，
     // 避免每个调用方自己记忆约定差异（匿名取件/config 拉取曾因此误判失败）
-    const body = response.data as Record<string, unknown> | null
+    const body = isPlainPayload(response.data) ? response.data : null
     if (body && typeof body === 'object' && body.code === 0) {
       body.code = 200
     }

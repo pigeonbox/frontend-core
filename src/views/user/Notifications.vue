@@ -14,7 +14,7 @@
       :data="list"
       style="width: 100%"
       empty-text=" "
-      class="notifications-table"
+      class="notifications-table admin-table-wide"
       :row-class-name="(args: { row: UserNotifyItem }) => args.row.is_read ? 'is-read' : 'is-unread'"
     >
       <el-table-column :label="t('user.notifications.status')" width="100">
@@ -56,6 +56,29 @@
       </el-table-column>
     </el-table>
 
+    <!-- 窄屏（≤1024px）卡片形态：本表 5 列合计 ~880px ⇒ 手机 / 折叠屏内屏 /
+         平板竖屏放不下 ⇒ 标题/内容列被裁（横向滚动条在手机上几乎看不见）。
+         表格与卡片**同时渲染**、纯 CSS 互斥（全局 .admin-table-wide / .narrow-cards）。 -->
+    <NarrowCardList :rows="list" :fields="cardFields" :row-key="(row: UserNotifyItem) => row.id">
+      <template #head="{ row }">{{ row.title }}</template>
+      <template #status="{ row }">
+        <el-tag v-if="!row.is_read" size="small" type="danger">{{ t('user.notifications.unread') }}</el-tag>
+        <el-tag v-else size="small" type="info">{{ t('user.notifications.read') }}</el-tag>
+      </template>
+      <template #type="{ row }">
+        <el-icon :size="20" :class="['type-icon', `type-${row.type}`]">
+          <component :is="iconForType(row.type)" />
+        </el-icon>
+        <span class="type-text">{{
+          te('user.notifications.type_' + row.type)
+            ? t('user.notifications.type_' + row.type)
+            : row.type
+        }}</span>
+      </template>
+      <template #content="{ row }">{{ row.content }}</template>
+      <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+    </NarrowCardList>
+
     <el-empty v-if="!loading && list.length === 0" :description="t('user.notifications.empty')">
       <p class="empty-hint">{{ t('user.notifications.emptyHint') }}</p>
     </el-empty>
@@ -76,13 +99,14 @@
 
 <script setup lang="ts">
 import { formatDateTime } from '@/utils/format'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Check, Bell, Setting, Tools, Share, CircleCheck } from '@element-plus/icons-vue'
 import { userNotifyApi, type UserNotifyItem } from '@/api/userNotify'
 import { useTableQuery } from '@/composables/useTableQuery'
 import PageHeader from '@/components/data/PageHeader.vue'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { handleError } = useErrorHandler()
@@ -92,6 +116,14 @@ const { t, te } = useI18n()
 
 const unread = ref(0)
 const marking = ref(false)
+
+// 窄屏卡片字段策展（标签复用表格列的同一批 i18n key ⇒ 宽窄两屏口径一致）
+const cardFields = computed(() => [
+  { key: 'status', label: t('user.notifications.status') },
+  { key: 'type', label: t('user.notifications.type') },
+  { key: 'content', label: t('user.notifications.content') },
+  { key: 'created_at', label: t('user.notifications.time') },
+])
 
 const iconForType = (type: string) => {
   switch (type) {

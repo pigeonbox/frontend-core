@@ -405,6 +405,11 @@ const copyCode = async (row: UserShareItem) => {
   else ElMessage.error(t('common.failed'))
 }
 
+// ⚠️ 2026-10-26 审计修复：确认框与 API 调用**必须拆成两个 try**。
+// 此前五处操作（单删/批删/恢复/批恢复/彻底删除）把「用户取消确认框」与
+// 「接口调用失败」合进同一个 try ⇒ catch 把异常整个吃掉 ⇒ 请求层不弹 toast
+// ⇒ 页面**零反馈**：用户点「恢复」后确认框关闭但什么都没发生，
+// 无法区分「没反应」与「失败」。⇒ API 段统一走 useErrorHandler.handleError。
 const confirmDelete = async (row: UserShareItem) => {
   try {
     await ElMessageBox.confirm(
@@ -412,11 +417,15 @@ const confirmDelete = async (row: UserShareItem) => {
       t('user.deleteConfirmTitle'),
       { type: 'warning' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.batchDelete([row.code])
     ElMessage.success(t('user.deleteSuccess'))
     await loadList()
   } catch (e) {
-    // user cancel or error
+    handleError(e)
   }
 }
 
@@ -428,11 +437,17 @@ const confirmBatchDelete = async () => {
       t('user.deleteConfirmTitle'),
       { type: 'warning' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.batchDelete(selectedCodes.value)
     ElMessage.success(t('user.shares.batchDeleteSuccess', { n: selectedCodes.value.length }))
     selectedRows.value = []
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const confirmRestore = async (row: UserShareItem) => {
@@ -442,10 +457,16 @@ const confirmRestore = async (row: UserShareItem) => {
       t('user.shares.restore'),
       { type: 'info' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.restore(row.code)
     ElMessage.success(t('user.shares.restoreSuccess'))
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const confirmBatchRestore = async () => {
@@ -456,13 +477,19 @@ const confirmBatchRestore = async () => {
       t('user.shares.restore'),
       { type: 'info' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     for (const code of selectedCodes.value) {
       await userSharesApi.restore(code)
     }
     ElMessage.success(t('user.shares.batchRestoreSuccess', { n: selectedCodes.value.length }))
     selectedRows.value = []
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const confirmHardDelete = async (row: UserShareItem) => {
@@ -472,10 +499,16 @@ const confirmHardDelete = async (row: UserShareItem) => {
       t('user.shares.hardDelete'),
       { type: 'error' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.hardDelete(row.code)
     ElMessage.success(t('user.shares.hardDeleteSuccess'))
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const openExtendDialog = (row: UserShareItem) => {

@@ -108,8 +108,3 @@ export async function encryptFile(keyB64: string, file: File): Promise<File> {
   const payload = await encryptBytes(keyB64, await file.arrayBuffer())
   return new File([payload], file.name, { type: 'application/octet-stream' })
 }
-
-/** 从当前 hash 路由 query 中取密钥（View 页用） */
-export function keyFromHashQuery(queryKey: unknown): string {
-  return typeof queryKey === 'string' ? queryKey : ''
-}

@@ -203,11 +203,15 @@ import { copyToClipboard } from '@/utils/clipboard'
 import { translateError } from '@/utils/api-interceptor'
 import { isPasswordFamilyError, isPasswordMissingOnly } from '@/utils/password-error'
 import { useRouteParam } from '@/composables/useRouteParam'
+import { useLatestRequest } from '@/composables/useLatestRequest'
 import { identifyShareCode } from './codeIdentity'
 import { shareRouteKey } from './shareRouteKey'
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, te } = useI18n()
+
+// 取数竞态守卫（2026-10-26）：旧响应不得覆盖新码的内容
+const latest = useLatestRequest()
 
 const shareCode = ref('')
 const loading = ref(false)
@@ -257,6 +261,11 @@ const downloadBlocked = computed(() => shareHasPassword.value && !serverDownload
 
 
 const fetchShare = async (pwd?: string) => {
+  // ⚠️ 2026-10-26 审计修复：加**请求序号**（竞态守卫）。
+  // 此前无任何序号 ⇒ 两次取数重叠时（密码重试 A、随即切码 B）**后到的旧响应
+  // 会覆盖新数据** ⇒ 地址栏是 B 码、页面渲染 A 码的内容（正是本仓已复发三次的
+  // 「内容挂在别的地址下」那类缺陷）。与 useTableQuery 的 seq 丢弃同款。
+  const mySeq = latest.begin()
   loading.value = true
   error.value = ''
   needPassword.value = false
@@ -270,6 +279,8 @@ const fetchShare = async (pwd?: string) => {
 
   try {
     const res = await shareApi.getShare(shareCode.value, pwd)
+    // 已有更新的请求发出 ⇒ 丢弃本次（旧响应不得覆盖新码的内容）
+    if (latest.isStale(mySeq)) return
 
     if (res.code === 200) {
       shareData.value = res.data
@@ -290,6 +301,8 @@ const fetchShare = async (pwd?: string) => {
       error.value = t('share.not_found')
     }
   } catch (err: any) {
+    // 竞态守卫：错误分支同样不得让旧请求覆盖新状态
+    if (latest.isStale(mySeq)) return
     // /share/select 的密码族错误（需要密码/密码错误）返回 HTTP 401，经响应
     // 拦截器包装后 reject 到这里——一律回到密码输入分支并提示，而非错误页
     // （2026-10-05 浏览器 E2E 发现的历史 bug：此前密码框永远不出现，输错密码
@@ -307,10 +320,14 @@ const fetchShare = async (pwd?: string) => {
     }
     // 走统一错误映射：否则英文界面会直接显示后端中文原文
     // （2026-10-22 审计：取件页是英文界面夹中文的重灾区）
+    // ⚠️ `t(k) || fallback` 是死代码（vue-i18n 缺键返回键名本身）⇒ 用 te() 判存在性
     const translated = translateError(err)
-    error.value = translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback
+    error.value = translated.i18nKey
+      ? (te(translated.i18nKey) ? t(translated.i18nKey) : translated.fallback)
+      : translated.fallback
   } finally {
-    loading.value = false
+    // 只有「仍是最新的一次请求」才收尾 loading；旧的请求不得把新请求的加载态关掉
+    if (!latest.isStale(mySeq)) loading.value = false
   }
 }
 

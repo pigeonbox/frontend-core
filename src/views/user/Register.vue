@@ -105,7 +105,7 @@ import { userApi } from '@/api/user'
 import { useConfigStore } from '@/stores/config'
 
 const router = useRouter()
-const { t } = useI18n()
+const { t, te } = useI18n()
 const configStore = useConfigStore()
 
 // 站点关闭注册时直接劝退（此前表单可填可提交，只会得到裸"注册失败"）
@@ -180,14 +180,20 @@ const handleRegister = async () => {
     } else {
       const translated = translateError(res)
       ElMessage.error(
-        translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback || t('register.failed')
+        // ⚠️ `t(k) || fallback` 是死代码（vue-i18n 缺键返回键名本身）⇒ 用 te() 判存在性
+        translated.i18nKey
+          ? (te(translated.i18nKey) ? t(translated.i18nKey) : translated.fallback)
+          : translated.fallback || t('register.failed')
       )
     }
   } catch (error: unknown) {
     // 走统一错误映射（英文界面否则直接显示后端中文原文，2026-10-22 审计）
     const translated = translateError(error)
     ElMessage.error(
-      translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback || t('register.failed')
+      // ⚠️ `t(k) || fallback` 是死代码（vue-i18n 缺键返回键名本身）⇒ 用 te() 判存在性
+      translated.i18nKey
+        ? (te(translated.i18nKey) ? t(translated.i18nKey) : translated.fallback)
+        : translated.fallback || t('register.failed')
     )
   } finally {
     loading.value = false

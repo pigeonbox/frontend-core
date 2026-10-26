@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { BizError, ERRCODE_KEY_MAP, translateError } from '../api-interceptor'
+import { ERRCODE_KEY_MAP, translateError } from '../api-interceptor'
+
+// ⚠️ 2026-10-26 审计清理：原来的 `BizError` 类**从未被抛出**（request.ts 真正
+// reject 的是普通对象 {code, message, trace_id}）⇒ useErrorHandler 的
+// `e instanceof BizError` 分支恒为假 ⇒ 注释里声称的 common.errorTitle 标题
+// 从未生效。⇒ BizError 已删除，下面的用例改用**真实形态**（后端信封对象）。
 
 
 describe('ERRCODE_KEY_MAP 覆盖新增安全错误码', () => {
@@ -26,9 +31,8 @@ describe('ERRCODE_KEY_MAP 覆盖新增安全错误码', () => {
 })
 
 describe('translateError', () => {
-  it('BizError 返回 i18n key 与 fallback', () => {
-    const err = new BizError({ code: 10002, message: 'unauthorized', traceId: 't' })
-    const r = translateError(err)
+  it('后端信封对象 {code,message,trace_id} 返回 i18n key 与 fallback', () => {
+    const r = translateError({ code: 10002, message: 'unauthorized', trace_id: 't' })
     expect(r.i18nKey).toBe('errcode.10002')
     expect(r.fallback).toBe('unauthorized')
     expect(r.code).toBe(10002)
@@ -37,12 +41,11 @@ describe('translateError', () => {
   it('带动态信息的后端文案不被 i18n 覆盖（保留超限数字/秒数等关键信息）', () => {
     // 10011 的后端文案带「等 N 秒」，i18n 通用文案只有「已临时锁定」——
     // 覆盖会抹掉用户最需要的「还要等多久」（2026-10-22 审计）。
-    const err = new BizError({
+    const r = translateError({
       code: 10011,
       message: '尝试过于频繁，已临时锁定，请 42 秒后重试',
-      traceId: 't',
+      trace_id: 't',
     })
-    const r = translateError(err)
     expect(r.i18nKey).toBeNull()
     expect(r.fallback).toContain('42 秒')
   })
@@ -50,7 +53,7 @@ describe('translateError', () => {
   it('未逐码登记的错误码按段位兜底到本地化文案（不裸露英文原文）', () => {
     // 2xxxx = 分享/取件段。哪怕该码没登记进 ERRCODE_KEY_MAP，
     // 也要落到本地化的段位通用文案，而不是后端英文原文。
-    const r = translateError(new BizError({ code: 29999, message: 'something went sideways', traceId: 't' }))
+    const r = translateError({ code: 29999, message: 'something went sideways', trace_id: 't' })
     expect(r.i18nKey).toBe('errcode.20001')
   })
 

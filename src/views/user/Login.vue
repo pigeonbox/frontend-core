@@ -9,6 +9,17 @@
         <h1>{{ t('login.title') }}</h1>
       </div>
 
+      <!-- OIDC 失败回跳（core 302 到 /#/user/login?oidc_error=1&oidc_code=…）：
+           按 oidc_code 显示**可区分**的提示，不再笼统弹「登录失败」。 -->
+      <el-alert
+        v-if="oidcErrorKey"
+        :title="t(oidcErrorKey)"
+        type="error"
+        show-icon
+        :closable="false"
+        class="oidc-error"
+      />
+
       <el-form
         ref="loginFormRef"
         :model="loginForm"
@@ -71,19 +82,32 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { translateError } from '@/utils/api-interceptor'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import { withBase } from '@/utils/base'
+import { isOidcErrorRedirect, oidcErrorI18nKey } from '@/utils/oidcError'
 import { host } from '@/host'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const configStore = useConfigStore()
-const { t } = useI18n()
+const { t, te } = useI18n()
+
+/**
+ * OIDC 失败回跳的提示 key（空串 = 不是失败回跳）。
+ *
+ * core 失败时 302 回 `/#/user/login?oidc_error=1&oidc_code=<短码>&msg=<…>`。
+ * ⚠️ 应用是 **hash 路由** ⇒ query 都在 `#` 之后 ⇒ 必须读 `route.query`
+ * （`location.search` 恒为空）。
+ * ⚠️ 只按 `oidc_code` 映射自己的文案——**不展示 core 的 msg**（那是 core 的
+ * 措辞、只有中文，且可能变更）。
+ */
+const oidcErrorKey = ref('')
 
 // 站点关闭注册时隐藏入口（后端 /user/register 也会 403，双保险）
 const registerVisible = computed(() => configStore.config?.registerEnabled !== false)
@@ -108,6 +132,11 @@ const attemptHostSso = async () => {
 onMounted(() => {
   configStore.fetchConfig().catch(() => {})
   attemptHostSso()
+  // OIDC 失败回跳：core 带 oidc_error/oidc_code 302 回到本页 ⇒ 按码选
+  // **可区分**的提示（账号被禁用 / state 过期 / 登录失败），不再笼统「登录失败」。
+  if (isOidcErrorRedirect(route.query)) {
+    oidcErrorKey.value = oidcErrorI18nKey(route.query.oidc_code)
+  }
 })
 
 const loginFormRef = ref<FormInstance>()
@@ -145,9 +174,13 @@ const handleLogin = async () => {
     router.push(redirect || '/')
   } catch (error: any) {
     // 走统一错误映射（英文界面否则直接显示后端中文原文，2026-10-22 审计）
+    // ⚠️ `t(k) || fallback` 是死代码（vue-i18n 缺键返回键名本身，非空串）⇒
+    // 用 te() 判存在性（2026-10-26 审计）
     const translated = translateError(error)
     ElMessage.error(
-      translated.i18nKey ? t(translated.i18nKey) || translated.fallback : translated.fallback || t('login.failed')
+      translated.i18nKey
+        ? (te(translated.i18nKey) ? t(translated.i18nKey) : translated.fallback)
+        : translated.fallback || t('login.failed')
     )
   } finally {
     loading.value = false
@@ -212,6 +245,11 @@ const handleLogin = async () => {
   font-size: 16px;
   font-weight: 600;
   border-radius: 999px;
+}
+
+/* OIDC 失败回跳提示（与表单之间留白） */
+.oidc-error {
+  margin-bottom: var(--spacing-lg);
 }
 
 .login-footer {

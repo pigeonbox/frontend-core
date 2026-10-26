@@ -18,10 +18,3 @@ export type PickupChannel = (typeof PICKUP_CHANNELS)[number]
 export function isPickupChannel(value: unknown): value is PickupChannel {
   return typeof value === 'string' && (PICKUP_CHANNELS as readonly string[]).includes(value)
 }
-
-/** 取件明细行的展示形态（时间 + IP + 交付面） */
-export interface PickupRecordView {
-  picked_at: string
-  ip: string
-  channel?: string | null
-}

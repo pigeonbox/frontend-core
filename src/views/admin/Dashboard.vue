@@ -26,6 +26,13 @@
     </div>
 
     <!-- 统计卡片 -->
+    <!-- ⚠️ 2026-10-26 审计修复：取数失败时**必须显式标记**。此前 catch 只
+         console.error，随后 stats.* 保持 0、recent* 置空 ⇒ 页面渲染「用户数 0 /
+         文件数 0 / 今日上传 0」+ 空表格，与「站点真的没人用」**视觉上完全一致**
+         ⇒ 管理员可能据此误触发清理运维。 -->
+    <div v-if="statsError" class="stats-error">
+      <el-tag type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
+    </div>
     <el-row :gutter="24" class="stats-row">
       <el-col :span="6" :xs="12">
         <div class="stat-card tone-primary">
@@ -163,6 +170,7 @@
                 <el-icon><User /></el-icon>
                 {{ t('admin.recentUsers') }}
               </h3>
+              <el-tag v-if="recentUsersError" type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
               <el-button text type="primary" @click="$router.push(adminBase + '/users')">
                 {{ t('common.viewAll') }}
                 <el-icon><ArrowRight /></el-icon>
@@ -222,6 +230,7 @@
                 <el-icon><Folder /></el-icon>
                 {{ t('admin.recentFiles') }}
               </h3>
+              <el-tag v-if="recentFilesError" type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
               <el-button text type="primary" @click="$router.push(adminBase + '/files')">
                 {{ t('common.viewAll') }}
                 <el-icon><ArrowRight /></el-icon>
@@ -311,6 +320,13 @@ const userStore = useUserStore()
 const router = useRouter()
 
 const loading = ref(false)
+
+// 取数失败标记（2026-10-26 审计）：三个取数函数各自置位，模板渲染
+// `admin.loadFailed` 标签 ⇒ 「没有数据」与「数据坏了」可区分。
+// （与趋势图的 trendError 同构；此前三处 catch 只 console.error，页面零标记。）
+const statsError = ref(false)
+const recentUsersError = ref(false)
+const recentFilesError = ref(false)
 
 // 服务端构建版本（/version,管理员门禁;拉取失败静默,页脚显示 —）
 const serverVersion = ref('')
@@ -448,9 +464,11 @@ const fetchDashboardStats = async () => {
       animateNumber('userCount', stats.userCount)
       animateNumber('fileCount', stats.fileCount)
       animateNumber('todayUploads', stats.todayUploads)
+      statsError.value = false
     }
   } catch (error) {
     console.error('Failed to fetch dashboard stats:', error)
+    statsError.value = true
   }
 }
 
@@ -461,10 +479,12 @@ const fetchRecentUsers = async () => {
       // 后端 GET /admin/users 返回 {items,total,page,page_size}（此前读 data.users 恒空）
       const data = res.data as { items?: RecentUser[] } | undefined
       recentUsers.value = Array.isArray(data?.items) ? data.items.slice(0, 5) : []
+      recentUsersError.value = false
     }
   } catch (error) {
     console.error('Failed to fetch recent users:', error)
     recentUsers.value = []
+    recentUsersError.value = true
   }
 }
 
@@ -487,10 +507,12 @@ const fetchRecentFiles = async () => {
         username: '-',
         created_at: f.created_at || '',
       }))
+      recentFilesError.value = false
     }
   } catch (error) {
     console.error('Failed to fetch recent files:', error)
     recentFiles.value = []
+    recentFilesError.value = true
   }
 }
 
@@ -600,6 +622,11 @@ const generateMockFileTypeDist = () => {
 </script>
 
 <style scoped>
+/* 取数失败标记（2026-10-26）：贴在统计行上方，避免与正常卡片重叠 */
+.stats-error {
+  margin-bottom: 12px;
+}
+
 /* 文件健康洞察卡 */
 .health-card {
   margin-bottom: 24px;

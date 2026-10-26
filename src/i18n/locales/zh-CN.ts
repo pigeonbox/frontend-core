@@ -585,6 +585,9 @@ export default {
       revokeWarning: '吊销后使用该 Key 的调用将立即返回 401，且不可恢复。确认吊销「{name}」？',
       revokeSuccess: '已吊销',
       loadFailed: '加载 API Key 列表失败',
+      // 吊销失败 ≠ 加载失败（2026-10-26 审计）：撤销路径复用 loadFailed 会让用户
+      // 看到「加载 API Key 列表失败」，完全看不出是哪一步失败。
+      revokeFailed: '吊销失败',
       createFailed: '签发失败',
       keyResultTitle: 'Key 已生成',
       keyOnceWarning: '请立即保存：明文 Key 仅显示这一次，关闭后无法再查看',
@@ -624,6 +627,9 @@ export default {
     },
     serverVersion: '服务端版本',
     frontendVersion: '前端版本',
+    // 取数失败标记（2026-10-26 审计）：仪表盘核心指标/最近列表失败时必须**显式**
+    // 标出来——此前失败与「站点真的没人用」视觉上完全一致 ⇒ 可能误触发清理运维。
+    loadFailed: '加载失败',
     health: {
       title: '文件健康',
       subtitle: '点击卡片直达对应文件视图',
@@ -1439,6 +1445,16 @@ export default {
     failed: '登录失败',
     noAccount: '还没有账号？立即注册',
     oidc: '使用单点登录（OIDC）',
+    // OIDC 回调失败的**可区分**提示（2026-10-26 core 侧审计 P2 的后半段）：
+    // core 按 oidc_code 回跳（state_invalid / account_disabled / login_failed /
+    // missing_code）⇒ 前端按码选文案，不再笼统弹「登录失败」。
+    // ⚠️ 不展示 core 下发的 msg（那是 core 的措辞、且只有中文）⇒ 只按码映射。
+    oidcError: {
+      stateInvalid: '登录请求已过期或无效，请重新发起登录',
+      accountDisabled: '账号已被禁用，请联系站点管理员',
+      loginFailed: '单点登录失败，请重试',
+      missingCode: '授权失败：缺少授权码，请重新发起登录',
+    },
   },
   share_view: {
     title: '分享详情',

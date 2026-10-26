@@ -382,6 +382,7 @@ import {
   VideoPlay, Headset, Reading
 } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
+import { request } from '@/utils/request'
 import { loadViews, saveView, deleteView } from '@/utils/savedViews'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
@@ -786,14 +787,20 @@ const submitEdit = async () => {
 
 const downloadFile = async (row: any) => {
   // 管理端下载：/admin/files/:id 受 AdminMiddleware 保护，window.open 带不上
-  // 凭证——改为同源 fetch（自动携带会话 Cookie）→ blob → 触发保存
+  // 凭证——改为同源请求（自动携带会话 Cookie）→ blob → 触发保存。
+  //
+  // ⚠️ 2026-10-26 审计修复：此前用**裸 axios**（`await import('axios')`）绕过统一
+  // 实例 ⇒ 裸 axios 走浏览器**根路径**，不带部署前缀 ⇒ 在「统一网关下页面挂在
+  // /app/pigeonbox/ 前缀」的部署形态（src/utils/base.ts 的 appBase() 明确支持）
+  // 下**必然 404 ⇒ 管理台一个文件都下载不了**。
+  // ⇒ 改走统一实例（src/utils/request.ts：baseURL = VITE_API_BASE_URL || appBase()）。
   try {
-    const { default: axios } = await import('axios')
-    const res = await axios.get(adminApi.fileDownloadUrl(row.id), {
+    const blob = await request<Blob>({
+      url: adminApi.fileDownloadUrl(row.id),
       responseType: 'blob',
-      withCredentials: true
+      withCredentials: true,
     })
-    const url = URL.createObjectURL(res.data)
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = row.file_name || `${row.code}.bin`

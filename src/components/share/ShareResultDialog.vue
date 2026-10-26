@@ -171,7 +171,7 @@ import type { ShareResult } from '@/types/share'
  * +发件记录写入本机（utils/localHistory，仅存 code+链接，不存密码/密钥）。
  * 调用方在分享成功回调里 `ref.open(result)` 即可。
  */
-const { t } = useI18n()
+const { t, te } = useI18n()
 const configStore = useConfigStore()
 
 const visible = ref(false)
@@ -364,7 +364,9 @@ const copyShareUrl = async () => {
 
 const copyPickup = async () => {
   const ok = await copyToClipboard(sharePickupCode.value)
-  if (ok) ElMessage.success(t('home.codeCopied') || t('home.linkCopied'))
+  // ⚠️ `t(k) || fallback` 是死代码（vue-i18n 缺键返回键名本身，非空串）⇒
+  // 用 te() 判「键在不在」（2026-10-26 审计）
+  if (ok) ElMessage.success(te('home.codeCopied') ? t('home.codeCopied') : t('home.linkCopied'))
   else ElMessage.error(t('home.copyLinkFailed'))
 }
 

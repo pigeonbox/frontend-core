@@ -50,7 +50,7 @@
     <!-- 链接列表 -->
     <el-card shadow="never" style="margin-top: 16px">
       <template #header>{{ t('request.listTitle') }}</template>
-      <el-table :data="list" v-loading="loadingList" style="width: 100%">
+      <el-table :data="list" v-loading="loadingList" style="width: 100%" class="admin-table-wide">
         <el-table-column :label="t('request.formTitle')" prop="title" min-width="160">
           <template #default="{ row }">{{ row.title || t('request.noTitle') }}</template>
         </el-table-column>
@@ -79,19 +79,48 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 窄屏（≤1024px）卡片形态：本表 5 列合计 ~790px（其中操作列 220px 且
+           fixed="right"）⇒ 手机 / 折叠屏内屏 / 平板竖屏放不下 ⇒ 内容列被裁、
+           固定操作列**盖住**相邻列（与 user/Shares.vue 同型缺陷）。
+           表格与卡片**同时渲染**、纯 CSS 互斥（全局 .admin-table-wide / .narrow-cards）。 -->
+      <NarrowCardList :rows="list" :fields="cardFields" :row-key="(row: FileRequestItem) => row.token">
+        <template #head="{ row }">{{ row.title || t('request.noTitle') }}</template>
+        <template #status="{ row }">
+          <el-tag v-if="isExpired(row)" type="danger" size="small">{{ t('request.expired') }}</el-tag>
+          <el-tag v-else type="success" size="small">{{ t('request.active') }}</el-tag>
+        </template>
+        <template #usage="{ row }">
+          {{ t('request.usedTimes', { n: row.used_count ?? 0 }) }} / {{ formatSize(row.recv_bytes) }}
+        </template>
+        <template #expire="{ row }">
+          {{ row.expired_at ? new Date(row.expired_at).toLocaleString() : t('request.forever') }}
+        </template>
+        <template #actions="{ row }">
+          <el-button size="small" type="primary" text @click="copyLink(row.token)">
+            <el-icon><CopyDocument /></el-icon> {{ t('request.copyLink') }}
+          </el-button>
+          <el-popconfirm :title="t('request.revokeConfirm')" @confirm="remove(row.token)">
+            <template #reference>
+              <el-button size="small" type="danger" text>{{ t('request.revoke') }}</el-button>
+            </template>
+          </el-popconfirm>
+        </template>
+      </NarrowCardList>
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { formatFileSize as formatSize } from '@/utils/format'
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { CopyDocument } from '@element-plus/icons-vue'
 import { requestApi, type FileRequestItem } from '@/api/request'
 import { copyToClipboard } from '@/utils/clipboard'
 import PageHeader from '@/components/data/PageHeader.vue'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { handleError } = useErrorHandler()
@@ -113,6 +142,12 @@ const form = reactive({
 const isExpired = (row: FileRequestItem) =>
   !!row.expired_at && new Date(row.expired_at).getTime() < Date.now()
 
+// 窄屏卡片字段策展（标签复用表格列的同一批 i18n key ⇒ 宽窄两屏口径一致）
+const cardFields = computed(() => [
+  { key: 'status', label: t('request.statusCol') },
+  { key: 'usage', label: t('request.usageCol') },
+  { key: 'expire', label: t('request.expireCol') },
+])
 
 const buildLink = (token: string) => `${window.location.origin}/#/request/${token}`
 
@@ -121,6 +156,10 @@ const load = async () => {
   try {
     const res = await requestApi.listMine()
     if (res.code === 200) list.value = res.data || []
+  } catch (e) {
+    // 取数失败必须显式反馈（2026-10-26 审计）：此前只有 finally ⇒ 后端 5xx 时
+    // 页面渲染一张**空表格且零提示** ⇒ 用户以为「自己从没建过请求」。
+    handleError(e)
   } finally {
     loadingList.value = false
   }
@@ -163,12 +202,19 @@ const copyLink = async (token: string) => {
 }
 
 const remove = async (token: string) => {
-  const res = await requestApi.remove(token)
-  if (res.code === 200) {
-    ElMessage.success(t('request.revoked'))
-    await load()
-  } else {
-    handleError(new Error(res.message || '撤销失败'))
+  // 撤销失败必须有提示（2026-10-26 审计）：此前整个函数**没有 try/catch** ⇒
+  // popconfirm 回调 reject ⇒ 无提示、列表不刷新 ⇒ **用户以为撤销成功，
+  // 实际链接仍可对外投递**（最危险的一类静默失败）。
+  try {
+    const res = await requestApi.remove(token)
+    if (res.code === 200) {
+      ElMessage.success(t('request.revoked'))
+      await load()
+    } else {
+      handleError(new Error(res.message || '撤销失败'))
+    }
+  } catch (e) {
+    handleError(e)
   }
 }
 
