@@ -8,7 +8,7 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
-import type { share as shareContract } from '@pigeonbox/contracts'
+import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 
 /**
  * 多文件分享公共参数（契约派生，contracts v0.20.0）。
@@ -18,13 +18,13 @@ import type { share as shareContract } from '@pigeonbox/contracts'
  * 这两项是**表单必填**且直接进 FormData（`String(undefined)` 会发出字面量
  * "undefined"）⇒ 这里收紧为 required，其余字段跟契约走。
  */
-export type MultiShareOptions = shareContract.MultiShareDirectReq & {
+export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
   expire_value: number
   expire_style: string
 }
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
-export type MultiShareResult = shareContract.MultiShareData
+export type MultiShareResult = publicapiContract.MultiShareData
 
 /**
  * multi-bind 的一个条目（**前端视图**：契约 MultiShareBindEntry 的 file_name
@@ -37,12 +37,12 @@ export type MultiShareResult = shareContract.MultiShareData
  * 刻意**不叫** MultiShareBindEntry：那是契约结构体的名字，本地再叫一遍就是
  * 遮蔽契约类型（形状还不一样）⇒ 用 Input 后缀区分。
  */
-export type MultiShareBindEntryInput = Omit<shareContract.MultiShareBindEntry, 'file_name'> & {
+export type MultiShareBindEntryInput = Omit<publicapiContract.MultiShareBindEntry, 'file_name'> & {
   file_name?: string
 }
 
 /** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
-export type MultiShareBindBody = Omit<shareContract.MultiShareBindReq, 'entries'> & {
+export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> & {
   entries: MultiShareBindEntryInput[]
 }
 

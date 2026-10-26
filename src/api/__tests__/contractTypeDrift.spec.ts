@@ -20,10 +20,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { listSrcFiles, readSrc, stripComments, matchBrace, srcRoot } from '@/utils/__tests__/sourceScan'
 
-const CONTRACTS_MIN_VERSION = '0.20.1'
+const CONTRACTS_MIN_VERSION = '0.20.3'
 
 /** 契约结构体所在 d.ts（相对 contracts/gen/ts） */
-type Dts = 'share' | 'user' | 'notify' | 'p2p' | 'admin' | 'common'
+type Dts = 'share' | 'user' | 'notify' | 'p2p' | 'admin' | 'common' | 'publicapi'
 
 interface RouteSpec {
   /** 路由路径字面量（前端源码里出现即视为「该路由有前端调用点」） */
@@ -52,28 +52,28 @@ const ROUTES: RouteSpec[] = [
   {
     path: '/share/metadata/',
     types: ['ShareMetadataData'],
-    dts: 'common',
+    dts: 'publicapi',
     dupStructs: ['ShareMetadataData'],
     note: 'GET /share/metadata/:code（模板字面量前缀）',
   },
   {
     path: '/api/v1/share/multi-direct',
     types: ['MultiShareDirectReq', 'MultiShareData'],
-    dts: 'share',
+    dts: 'publicapi',
     dupStructs: ['MultiShareData', 'MultiShareDirectReq'],
     note: 'POST /api/v1/share/multi-direct',
   },
   {
     path: '/api/v1/share/multi-bind',
     types: ['MultiShareBindReq', 'MultiShareData'],
-    dts: 'share',
+    dts: 'publicapi',
     dupStructs: ['MultiShareData', 'MultiShareBindReq'],
     note: 'POST /api/v1/share/multi-bind',
   },
   {
     path: '/api/v1/user/shares/import-local',
     types: ['UserSharesImportLocalData'],
-    dts: 'common',
+    dts: 'publicapi',
     noConsumer: true,
     note: 'POST /api/v1/user/shares/import-local（前端未接；前端走 admin 面）',
   },
@@ -107,14 +107,14 @@ const ROUTES: RouteSpec[] = [
   {
     path: '/api/v1/notifies/public',
     types: ['NotifyPublicListData', 'NotifyPublicItem'],
-    dts: 'notify',
+    dts: 'common',
     dupStructs: ['NotifyPublicItem'],
     note: 'GET /api/v1/notifies/public',
   },
   {
     path: '/api/v1/federation/resolve',
     types: ['FederationResolveData'],
-    dts: 'common',
+    dts: 'publicapi',
     dupStructs: ['FederationResolveData'],
     note: 'GET /api/v1/federation/resolve',
   },
@@ -153,10 +153,19 @@ function structFields(dts: string, name: string): string[] {
   return fields
 }
 
-/** 文件里 contracts 命名空间的本地别名（如 shareContract） */
-function contractNamespaceAlias(src: string): string | null {
-  const m = /import\s+type\s*\{[^}]*?\bas\s+([A-Za-z_$][\w$]*)\s*\}\s*from\s*'@pigeonbox\/contracts'/.exec(src)
-  return m ? m[1]! : null
+/**
+ * 文件里 contracts 命名空间的本地别名（如 shareContract）。
+ *
+ * ⚠️ 一个文件可能同时导入**多个** contracts 命名空间（如 notify.ts 同时用
+ * notify 域的管理面类型与 common 域的公开公告类型）⇒ 必须收齐全部别名，
+ * 否则纯别名判定会拿错命名空间，把合法别名误判成遮蔽。
+ */
+function contractNamespaceAliases(src: string): string[] {
+  const out: string[] = []
+  const re = /import\s+type\s*\{[^}]*?\bas\s+([A-Za-z_$][\w$]*)\s*\}\s*from\s*'@pigeonbox\/contracts'/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src)) !== null) out.push(m[1]!)
+  return out
 }
 
 /**
@@ -167,8 +176,8 @@ function contractNamespaceAlias(src: string): string | null {
  * - `type X = 其它名字`（**别名**，典型是契约派生）⇒ 字段集为空，但**仍进名字
  *   列表** ⇒ 别名与契约类型同名（会遮蔽契约类型）也能被抓到。
  */
-function localTypeDecls(src: string): Array<{ name: string; fields: string[] }> {
-  const out: Array<{ name: string; fields: string[] }> = []
+function localTypeDecls(src: string): Array<{ name: string; fields: string[]; rhs: string }> {
+  const out: Array<{ name: string; fields: string[]; rhs: string }> = []
   const collect = (name: string, open: number) => {
     const end = matchBrace(src, open)
     if (end < 0) return
@@ -177,7 +186,7 @@ function localTypeDecls(src: string): Array<{ name: string; fields: string[] }> 
       const m = /^\s*([A-Za-z_$][\w$]*)\s*\??\s*:/.exec(line)
       if (m) fields.push(m[1]!)
     }
-    out.push({ name, fields })
+    out.push({ name, fields, rhs: src.slice(open, end + 1) })
   }
   // interface X { ... }
   const ifaceRe = /(?:^|\n)\s*(?:export\s+)?interface\s+([A-Za-z_$][\w$]*)\s*(?:extends\s+[^{]+)?\{/g
@@ -192,10 +201,10 @@ function localTypeDecls(src: string): Array<{ name: string; fields: string[] }> 
     const open = src.indexOf('{', m.index + m[0].length - 1)
     collect(m[1]!, open)
   }
-  // type X = <别名>（非对象字面量）⇒ 只进名字列表
-  const aliasRe = /(?:^|\n)\s*(?:export\s+)?type\s+([A-Za-z_$][\w$]*)\s*=\s*(?!\{)/g
+  // type X = <别名>（非对象字面量）⇒ 只进名字列表，rhs = 别名表达式本体
+  const aliasRe = /(?:^|\n)\s*(?:export\s+)?type\s+([A-Za-z_$][\w$]*)\s*=\s*([^\n{]+)/g
   while ((m = aliasRe.exec(src)) !== null) {
-    out.push({ name: m[1]!, fields: [] })
+    out.push({ name: m[1]!, fields: [], rhs: m[2]!.trim() })
   }
   return out
 }
@@ -297,14 +306,21 @@ describe('契约类型漂移守卫（10 条业务路由）', () => {
         //    纯透传别名（`type X = ns.X`，形状完全相同）不算遮蔽 ⇒ 放行；
         //    形状不同却同名（`type X = Omit<ns.X,…> & {…}`）⇒ 遮蔽，红。
         const locals = localTypeDecls(src)
-        const ns = contractNamespaceAlias(src)
+        const namespaces = contractNamespaceAliases(src)
         for (const t of spec.types) {
           const declared = locals.filter((l) => l.name === t)
-          const pureAlias = ns
-            ? new RegExp(`type\\s+${t}\\s*=\\s*${ns}\\.${t}\\b`).test(src)
-            : false
+          // 纯透传别名（`type X = ns.X`，形状完全相同）不算遮蔽 ⇒ 放行；
+          // 形状不同却同名（`type X = Omit<ns.X,…> & {…}`）⇒ 遮蔽，红。
+          // ⚠️ 必须**同名声明全部**都是纯别名才放行：只要有一条同名声明是手写
+          //    对象字面量，就是双维护（此前"文件里有一条别名 + 一条手写"会被
+          //    别名的豁免一起放过 ⇒ 守卫漏判）。
+          const allPureAlias =
+            declared.length > 0 &&
+            declared.every((d) =>
+              namespaces.some((ns) => new RegExp(`^${ns}\\.${t}\\s*$`).test(d.rhs)),
+            )
           expect(
-            declared.length > 0 && !pureAlias,
+            declared.length > 0 && !allPureAlias,
             `${file} 不得本地声明 ${t}（契约类型已存在；同名不同形即遮蔽，重复声明即双维护）`,
           ).toBe(false)
         }
