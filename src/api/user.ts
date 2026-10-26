@@ -1,7 +1,7 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
 import type { UserInfo, UserStats } from '@/types/user'
-import type { user as userContract } from '@pigeonbox/contracts'
+import type { common as commonContract } from '@pigeonbox/contracts'
 
 export const userApi = {
   // 用户注册
@@ -100,7 +100,7 @@ export const userApi = {
   // 一键吊销全部有效 API Key（应急止损，返回吊销数量）
   // 契约派生（contracts v0.20.0：UserAPIKeysRevokeAllData）
   revokeAllApiKeys: () => {
-    return request<ApiResponse<userContract.UserAPIKeysRevokeAllData>>({
+    return request<ApiResponse<commonContract.UserAPIKeysRevokeAllData>>({
       url: '/user/api-keys/revoke-all',
       method: 'POST',
     })

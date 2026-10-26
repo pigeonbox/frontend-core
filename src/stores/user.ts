@@ -4,7 +4,7 @@ import axios from 'axios'
 import { userApi } from '@/api/user'
 import type { UserInfo } from '@/types/user'
 import { appBase } from '@/utils/base'
-import type { user as userContract } from '@pigeonbox/contracts'
+import type { common as commonContract } from '@pigeonbox/contracts'
 
 // 会话承载（2026-10-05 遗留修复）：JWT 迁 HttpOnly Cookie——服务端在
 // 登录/刷新/OIDC 回调时下发，前端不再持久化令牌。localStorage 仅存非敏感
@@ -53,7 +53,7 @@ export const useUserStore = defineStore('user', () => {
     loggingOut = true
     axios
       // 契约派生（contracts v0.20.0：UserLogoutResp——成功响应**无 data 字段**）
-      .post<userContract.UserLogoutResp>('/api/v1/user/logout', null, {
+      .post<commonContract.UserLogoutResp>('/api/v1/user/logout', null, {
         baseURL: import.meta.env.VITE_API_BASE_URL || appBase(),
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
@@ -85,7 +85,7 @@ export const useUserStore = defineStore('user', () => {
     if (loggingOut || localStorage.getItem(SESSION_FLAG) !== '1') return false
     try {
       // 契约派生（contracts v0.20.0：UserRefreshResp）
-      const res = await axios.post<userContract.UserRefreshResp>('/api/v1/user/refresh', null, {
+      const res = await axios.post<commonContract.UserRefreshResp>('/api/v1/user/refresh', null, {
         baseURL: import.meta.env.VITE_API_BASE_URL || appBase(),
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })

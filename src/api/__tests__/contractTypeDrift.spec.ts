@@ -20,10 +20,10 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { listSrcFiles, readSrc, stripComments, matchBrace, srcRoot } from '@/utils/__tests__/sourceScan'
 
-const CONTRACTS_MIN_VERSION = '0.20.0'
+const CONTRACTS_MIN_VERSION = '0.20.1'
 
 /** 契约结构体所在 d.ts（相对 contracts/gen/ts） */
-type Dts = 'share' | 'user' | 'notify' | 'p2p' | 'admin'
+type Dts = 'share' | 'user' | 'notify' | 'p2p' | 'admin' | 'common'
 
 interface RouteSpec {
   /** 路由路径字面量（前端源码里出现即视为「该路由有前端调用点」） */
@@ -52,7 +52,7 @@ const ROUTES: RouteSpec[] = [
   {
     path: '/share/metadata/',
     types: ['ShareMetadataData'],
-    dts: 'share',
+    dts: 'common',
     dupStructs: ['ShareMetadataData'],
     note: 'GET /share/metadata/:code（模板字面量前缀）',
   },
@@ -73,35 +73,35 @@ const ROUTES: RouteSpec[] = [
   {
     path: '/api/v1/user/shares/import-local',
     types: ['UserSharesImportLocalData'],
-    dts: 'share',
+    dts: 'common',
     noConsumer: true,
     note: 'POST /api/v1/user/shares/import-local（前端未接；前端走 admin 面）',
   },
   {
     path: '/api/v1/user/refresh',
     types: ['UserRefreshResp'],
-    dts: 'user',
+    dts: 'common',
     dupStructs: ['UserRefreshResp'],
     note: 'POST /api/v1/user/refresh（stores/user.ts + request.ts 的 401 刷新链路）',
   },
   {
     path: '/api/v1/user/logout',
     types: ['UserLogoutResp'],
-    dts: 'user',
+    dts: 'common',
     dupStructs: ['UserLogoutResp'],
     note: 'POST /api/v1/user/logout',
   },
   {
     path: '/api/v1/user/check-auth',
     types: ['UserCheckAuthData'],
-    dts: 'user',
+    dts: 'common',
     noConsumer: true,
     note: 'GET /api/v1/user/check-auth（前端未接）',
   },
   {
     path: '/user/api-keys/revoke-all',
     types: ['UserAPIKeysRevokeAllData'],
-    dts: 'user',
+    dts: 'common',
     note: 'POST /user/api-keys/revoke-all（载荷只有 revoked 一个字段 ⇒ 无字段集判别力，靠内联字面量守卫兜底）',
   },
   {
@@ -114,7 +114,7 @@ const ROUTES: RouteSpec[] = [
   {
     path: '/api/v1/federation/resolve',
     types: ['FederationResolveData'],
-    dts: 'p2p',
+    dts: 'common',
     dupStructs: ['FederationResolveData'],
     note: 'GET /api/v1/federation/resolve',
   },

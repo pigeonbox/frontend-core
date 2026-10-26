@@ -1,6 +1,6 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
-import type { share as shareContract } from '@pigeonbox/contracts'
+import type { common as commonContract } from '@pigeonbox/contracts'
 
 export interface PublicConfig {
   name: string
@@ -51,7 +51,7 @@ export interface PublicConfig {
  * *time.Time → null），手抄版是 `string | null` ⇒ 消费面必须 `?? null` 兜底
  * （见 components/share/ShareResultDialog.vue 的 loadExpire）。
  */
-export type ShareMetadata = shareContract.ShareMetadataData
+export type ShareMetadata = commonContract.ShareMetadataData
 
 // 系统初始化请求（字段名与后端 thrift 模型 snake_case 对齐）
 export interface InitializeSystemReq {
