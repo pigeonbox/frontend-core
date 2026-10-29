@@ -465,6 +465,9 @@ export const adminApi = {
         status: string
         upload_type: string
         user_id: number | null
+        // username 上传者用户名（2026-10-29 新增）：账号已删/匿名时为空，
+        // 前端据此回退显示 user_id 或「匿名」。
+        username?: string
         owner_ip: string
         require_auth: boolean
         created_at: string

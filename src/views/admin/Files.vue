@@ -170,10 +170,10 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('admin.uploader')" width="100" align="center">
+        <el-table-column :label="t('admin.uploader')" width="120" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.user_id" type="info">
-              ID: {{ row.user_id }}
+              {{ row.username || `ID: ${row.user_id}` }}
             </el-tag>
             <span v-else class="anonymous">{{ t('admin.filesPage.anonymous') }}</span>
           </template>
@@ -275,7 +275,7 @@
           <el-tag :type="statusTagType(row.status)" effect="dark">{{ statusLabel(row.status) }}</el-tag>
         </template>
         <template #uploader="{ row }">
-          <el-tag v-if="row.user_id" type="info">ID: {{ row.user_id }}</el-tag>
+          <el-tag v-if="row.user_id" type="info">{{ row.username || `ID: ${row.user_id}` }}</el-tag>
           <span v-else class="anonymous">{{ t('admin.filesPage.anonymous') }}</span>
         </template>
         <template #ip="{ row }">
