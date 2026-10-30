@@ -1,0 +1,79 @@
+/**
+ * 能力位消费（2026-10-30）。
+ *
+ * 「这个面支持什么」此前由各部署面各写一份条件判断拼出来（多副本无直传/联邦、
+ * charts 缺省关 p2p/relay、NAS 有 Beam 而 docker 没有）⇒ 2026-10-22 设计稿
+ * Q1 拍板的「没有就是没有、不给坏入口」无法统一执行。
+ *
+ * 现在服务端按**运行时真实状态**下发能力位（core /api/config 的 capabilities 段），
+ * 前端统一从这里读，不再各写各的。
+ *
+ * ## 缺字段 = 未知，不是 false
+ *
+ * 老后端（不含 capabilities 段）⇒ 一律按「未知」处理：
+ *   - **不得**据此隐藏功能（宁可多给入口，也别给坏入口）；
+ *   - 拿不准时仍以**运行时行为**为准（例：首启令牌缺失 → 仍靠 401 兜底）。
+ *
+ * 抽成纯函数是为了**能单测**（本仓无组件测试基建）。
+ */
+
+import type { ServerCapabilities } from '@/api/public'
+
+/** 能力位读取的最小输入（只用到 capabilities 段）。 */
+export interface CapabilitiesCarrier {
+  capabilities?: ServerCapabilities | null
+}
+
+/** 读取能力位；缺段/缺字段一律返回 undefined（=未知）。 */
+export function readCapabilities(cfg: CapabilitiesCarrier | null | undefined): ServerCapabilities {
+  return cfg?.capabilities ?? {}
+}
+
+/**
+ * 首启是否需要令牌。
+ *
+ * 缺字段 ⇒ false（老后端没有令牌门禁）——但首启页仍保留 401 兜底：
+ * 服务端若确实要令牌，提交会被 401 拦下 ⇒ 令牌框随即出现。
+ */
+export function setupTokenRequired(cfg: CapabilitiesCarrier | null | undefined): boolean {
+  return readCapabilities(cfg).setup_token_required === true
+}
+
+/** 部署模式（空串 = 未知）。 */
+export function deploymentMode(cfg: CapabilitiesCarrier | null | undefined): string {
+  return (readCapabilities(cfg).deployment_mode ?? '').trim()
+}
+
+/**
+ * 是否是多副本部署（public 副本或 admin 副本）。
+ *
+ * 多副本拓扑下直传/联邦在架构上不可用（core 的 deployment.go 会自动降级关闭）
+ * ⇒ 前端据此**不给出**这两个入口（而不是给一个点不动的按钮）。
+ * 缺字段 ⇒ false（未知时按单站处理，避免把功能藏没了）。
+ */
+export function isMultiReplica(cfg: CapabilitiesCarrier | null | undefined): boolean {
+  const mode = deploymentMode(cfg)
+  return mode === 'public' || mode === 'admin'
+}
+
+/**
+ * 站点公网地址是否已配置。
+ *
+ * 未配置 ⇒ 分享链接按**请求来源**拼 ⇒ NAS 内网部署会把内网 IP 发给外部用户
+ * （对外不可达）。缺字段 ⇒ false（=提示用户去配，属于"宁可多提醒"的一侧）。
+ */
+export function publicUrlConfigured(cfg: CapabilitiesCarrier | null | undefined): boolean {
+  return readCapabilities(cfg).public_url_set === true
+}
+
+/**
+ * 服务端**明确**告知「站点公网地址未配置」。
+ *
+ * 与 publicUrlConfigured 的区别：老后端不下发 capabilities 段 ⇒
+ * 属于**未知**（不是"未配置"）⇒ 不该弹提醒（否则老后端上满屏误报）。
+ * 只有服务端明确说 public_url_set === false 时才为 true。
+ */
+export function publicUrlMissing(cfg: CapabilitiesCarrier | null | undefined): boolean {
+  const caps = readCapabilities(cfg)
+  return caps.public_url_set === false
+}

@@ -118,6 +118,7 @@ export default {
     pickupIntro: 'This is a file locker. Send someone a 6-digit pickup code and they can collect the file right here.',
     // Cross-site pickup hint (shown only when federation is enabled)
     federationOffHint: 'This box is not part of the P2P federation — pick up codes issued by other sites on their site.',
+    publicUrlNotConfigured: 'The site public URL is not configured: share links will carry the address you are browsing from, so an internal deployment would hand out internal IPs that outsiders cannot open. Ask the admin to set the public address in Site Settings.',
     federationHint: 'This locker is linked to other sites: if the pickup code is not found here, we look it up on the linked sites automatically.',
     ctaSend: 'Send something too',
     cardTitle: {

@@ -2,6 +2,28 @@ import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
 import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 
+/**
+ * 服务端下发的**能力位**（2026-10-30，core /api/config 的 capabilities 段）。
+ *
+ * 「这个面支持什么」的一份真相源——后端按**运行时真实状态**计算，
+ * 前端据此显隐入口，不再各部署面各写一份条件判断。
+ *
+ * ⚠️ 只有**服务端知道**的事实在这里。客户端事实（WebCrypto 是否可用、
+ * Beam 入口是否挂载）**不在这里**——服务端无从得知，由前端探测
+ * （utils/e2e.ts、components/share/deliveryPath.ts）。
+ *
+ * ⚠️ 缺字段 ≠ false：老后端不下发 capabilities ⇒ 一律按"未知"处理，
+ * 不得据此隐藏功能（宁可多给入口，也别给坏入口）。
+ */
+export interface ServerCapabilities {
+  /** 部署模式：standalone | public | admin（多副本拓扑下 public=公开副本） */
+  deployment_mode?: string
+  /** 站点公网地址是否已配置（未配置 ⇒ 分享链接按请求来源拼 ⇒ 内网 IP 外发） */
+  public_url_set?: boolean
+  /** 首启建号是否需要令牌（服务端自动生成的一次性令牌或 PB_SETUP_TOKEN） */
+  setup_token_required?: boolean
+}
+
 export interface PublicConfig {
   name: string
   description: string
@@ -36,6 +58,8 @@ export interface PublicConfig {
   publicUrl?: string
   /** 联邦是否启用（多副本模式下后端强制降级为 false）；取件台据此显式给出「跨站取件」提示 */
   federationEnabled?: boolean
+  /** 能力位（2026-10-30）：「这个面支持什么」的一份真相源；缺字段=未知，不得据此隐藏功能 */
+  capabilities?: ServerCapabilities
   expireStyle: string[]
   textMaxBytes: number
   initialized?: boolean

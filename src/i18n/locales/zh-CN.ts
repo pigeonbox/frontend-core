@@ -118,6 +118,7 @@ export default {
     pickupIntro: '这是一个文件柜。把 6 位取件码发给别人，对方在这里输入即可取件。',
     // 跨站取件提示（仅联邦启用时出现）
     federationOffHint: '本柜未接入跨站联邦：其它站点的取件码，请在对方站点取件。',
+    publicUrlNotConfigured: '站点公网地址未配置：分享链接会带当前访问地址，内网部署会把内网 IP 发给外部用户（对外打不开）。请管理员在「站点配置」里填写对外地址。',
     federationHint: '本柜与其它站点联网：凭取件码取件时若本柜没有，会自动到联网站点查找。',
     ctaSend: '我也要寄',
     cardTitle: {
