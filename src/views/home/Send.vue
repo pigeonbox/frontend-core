@@ -29,6 +29,12 @@
             <h2 class="card-head-title">{{ t(cardTitleKey) }}</h2>
           </div>
 
+          <!-- 站点公网地址未配置（能力位 public_url_set=false，2026-10-30）：
+               分享链接会按**当前访问地址**拼 ⇒ NAS 内网部署会把内网 IP 发给外部用户
+               （对外打不开）。提醒放在寄件台 —— 正是"把链接发给别人"的那一刻。
+               ⚠️ 只在服务端**明确**说未配置时出现（老后端无此字段 ⇒ 不误报）。 -->
+          <p v-if="publicUrlMissing" class="site-url-hint">{{ t('home.publicUrlNotConfigured') }}</p>
+
           <!-- 投递路径选择器：到柜（默认）/ 直连设备（仅本机挂了 /beam 才出现） -->
           <DeliveryPathSelector v-model="deliveryPath" />
 
@@ -113,6 +119,7 @@ import TopNav from '@/components/layout/TopNav.vue'
 import ShareResultDialog from '@/components/share/ShareResultDialog.vue'
 import DeliveryPathSelector from '@/components/share/DeliveryPathSelector.vue'
 import type { DeliveryPath } from '@/components/share/deliveryPath'
+import { publicUrlMissing as publicUrlMissingOf } from '@/utils/capabilities'
 
 // vite define 注入的构建版本（package.json,对齐发布列车）
 const appVersion = __APP_VERSION__
@@ -122,6 +129,9 @@ const userStore = useUserStore()
 const configStore = useConfigStore()
 const localeStore = useLocaleStore()
 const { t, locale } = useI18n()
+
+// 站点公网地址未配置（能力位）⇒ 分享链接会带当前访问地址（内网 IP 外发）
+const publicUrlMissing = computed(() => publicUrlMissingOf(configStore.config))
 
 // ?tab=file|text 深链直达,非法值回退 file;watch route 保证 URL 变化(前进/后退/页内深链)时页面同步响应
 const route = useRoute()
@@ -369,5 +379,14 @@ onMounted(async () => {
     margin-top: var(--spacing-xl);
     gap: var(--spacing-sm);
   }
+}
+/* 站点公网地址未配置提醒（2026-10-30 能力位）：这是**限制说明**（分享链接会带
+   当前访问地址），用警示色区分 —— 与首页 federation-hint--off 同款口径。 */
+.site-url-hint {
+  margin: var(--spacing-sm) 0 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--color-warning, #e6a23c);
 }
 </style>

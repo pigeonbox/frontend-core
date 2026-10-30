@@ -275,6 +275,7 @@ import { uploadFile } from '@/api/share'
 import { anonymousApi } from '@/api/anonymous'
 import { useUserStore } from '@/stores/user'
 import { resolveSetupToken } from '@/utils/setupToken'
+import { setupTokenRequired as capsSetupTokenRequired } from '@/utils/capabilities'
 import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS, type ExpireStyleKey } from '@/config/expireStyles'
 
 /**
@@ -413,6 +414,12 @@ onMounted(async () => {
     const enabled = cfg?.data?.registerEnabled
     if (typeof enabled === 'boolean') {
       setupForm.allowRegistration = enabled
+    }
+    // 能力位（2026-10-30）：服务端已启用首启令牌 ⇒ **直接**把令牌输入框亮出来，
+    // 而不是让管理员走完向导点「初始化」才吃一个 401（那一次点击还会被计入
+    // 按 IP 的失败预算）。缺字段 = 未知 ⇒ 仍靠 401 兜底（老后端无此机制）。
+    if (capsSetupTokenRequired(cfg?.data)) {
+      tokenRequired.value = true
     }
   } catch {
     // 拉不到就沿用默认值，不阻断首启

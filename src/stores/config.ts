@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { publicApi, type PublicConfig } from '@/api/public'
+// ⚠️ 别名：store 里对外暴露的 computed 与工具函数同名，直接 import 会**自引用**
+// （const setupTokenRequired = computed(() => setupTokenRequired(...)) ⇒ TDZ 报错）。
+import {
+  readCapabilities,
+  setupTokenRequired as capsSetupTokenRequired,
+  deploymentMode as capsDeploymentMode,
+  publicUrlConfigured as capsPublicUrlConfigured,
+} from '@/utils/capabilities'
 
 export const useConfigStore = defineStore('config', () => {
   const config = ref<PublicConfig | null>(null)
@@ -61,6 +69,13 @@ export const useConfigStore = defineStore('config', () => {
   // 取件台据此显式提示「本柜没有就去联网站点找」；缺省/未下发 = 单站 → 不提示
   const federationEnabled = computed(() => config.value?.federationEnabled === true)
 
+  // 能力位（2026-10-30）：服务端按运行时真实状态下发的一份真相源。
+  // 读法统一走 utils/capabilities（缺字段=未知，不得据此隐藏功能）。
+  const capabilities = computed(() => readCapabilities(config.value))
+  const setupTokenRequired = computed(() => capsSetupTokenRequired(config.value))
+  const deploymentMode = computed(() => capsDeploymentMode(config.value))
+  const publicUrlConfigured = computed(() => capsPublicUrlConfigured(config.value))
+
   return {
     config,
     loading,
@@ -72,5 +87,9 @@ export const useConfigStore = defineStore('config', () => {
     publicUrl,
     siteBaseUrl,
     federationEnabled,
+    capabilities,
+    setupTokenRequired,
+    deploymentMode,
+    publicUrlConfigured,
   }
 })
