@@ -124,6 +124,34 @@
               <el-input-number v-model="maxFileSizeMb" :min="0" :max="1048576" :step="1024" />
               <span class="field-hint">{{ t('admin.configPage.upload.maxFileSizeHint') }}</span>
             </el-form-item>
+            <!-- 单次发送**总量**上限（user.user_upload_size）：与上面的「单文件上限」是
+                 **两个不同的闸**——单文件上限管单个文件，本项管一次发送（多文件合计）的
+                 体积，只约束登录用户（匿名走访客日配额）。
+                 配成「总量 < 单文件」⇒ 超过单文件上限的文件永远发不出去（先被总量闸拒），
+                 而界面仍在宣称单文件上限有效 ⇒ 这里告警 + 一键对齐。
+                 编辑入口在「账户与登录」分区（user 段，PUT /admin/config/user）。 -->
+            <el-form-item :label="t('admin.configPage.upload.batchCap')">
+              <span class="field-hint">{{ t('admin.configPage.upload.batchCapCurrent', { size: batchCapText }) }}</span>
+              <el-button
+                v-if="uploadCapConflict"
+                size="small"
+                type="warning"
+                plain
+                :loading="aligningCap"
+                @click="alignUploadCap"
+              >
+                {{ t('admin.configPage.upload.batchCapAlign') }}
+              </el-button>
+              <el-alert
+                v-if="uploadCapConflict"
+                type="warning"
+                :closable="false"
+                show-icon
+                class="cap-conflict-alert"
+              >
+                {{ t('admin.configPage.upload.batchCapConflict', { total: batchCapText, perFile: maxFileSizeText }) }}
+              </el-alert>
+            </el-form-item>
             <el-form-item :label="t('admin.configPage.upload.allowedExpireStyles')">
               <el-select
                 v-model="exForm.upload_ex.allowed_expire_styles"
@@ -220,12 +248,13 @@
 
             <el-form-item :label="t('admin.configPage.user.uploadLimit')">
               <el-input-number
-                v-model="configForm.user.useruploadsize"
-                :min="1048576"
-                :step="1048576"
+                v-model="userUploadSizeMb"
+                :min="0"
+                :max="1048576"
+                :step="1024"
                 controls-position="right"
               />
-              <span class="field-hint">{{ t('admin.configPage.user.bytesDefault') }}</span>
+              <span class="field-hint">{{ t('admin.configPage.user.uploadLimitHint') }}</span>
             </el-form-item>
 
             <el-form-item :label="t('admin.configPage.user.storageQuota')">
@@ -438,6 +467,8 @@ import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS } from '@/config/expireStyles
 import { adminApi } from '@/api/admin'
 import { useConfigStore } from '@/stores/config'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { uploadCapMismatch, alignedUploadCap } from '@/utils/uploadCap'
+import { formatFileSize } from '@/utils/format'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -500,7 +531,9 @@ const configForm = reactive({
   },
   user: {
     allowuserregistration: 0,
-    useruploadsize: 52428800,
+    // 单次发送总量上限（字节，0 = 不限）：2026-10-30 起出厂默认即为不限
+    // （此前默认 50MB，与单文件上限默认「不限」自相矛盾）。
+    useruploadsize: 0,
     userstoragequota: 1073741824,
     sessionexpiryhours: 168
   }
@@ -543,7 +576,9 @@ const fetchUserSettings = async () => {
     if ((res.code === 200) && res.data) {
       const d = res.data as Record<string, unknown>
       configForm.user.allowuserregistration = Number(d.allowuserregistration === true || d.allowuserregistration === 1)
-      if (typeof d.useruploadsize === 'number' && d.useruploadsize > 0) configForm.user.useruploadsize = d.useruploadsize
+      // ⚠️ 0 是合法值（不限）——此前用 `> 0` 过滤 ⇒ 0 被当成「没值」而跳过，
+      // 表单永远停在默认的 52428800 ⇒ **管理员根本表达不了「不限」**。
+      if (typeof d.useruploadsize === 'number' && d.useruploadsize >= 0) configForm.user.useruploadsize = d.useruploadsize
       if (typeof d.userstoragequota === 'number' && d.userstoragequota > 0) configForm.user.userstoragequota = d.userstoragequota
       if (typeof d.sessionexpiryhours === 'number' && d.sessionexpiryhours > 0) configForm.user.sessionexpiryhours = d.sessionexpiryhours
     }
@@ -614,6 +649,39 @@ const maxFileSizeMb = computed({
     const mb = Number(v) || 0
     exForm.upload_ex.max_file_size = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
   },
+})
+
+// 单次发送**总量**上限（user.user_upload_size）：配置以字节存储，界面以 MB 编辑（0 = 不限）。
+//
+// ⚠️ 2026-10-30 前该字段是「字节直填 + min=1MB + 表单把 0 当没值」⇒
+// 既显示 52428800 这种看不懂的数字，又**根本表达不了「不限」**（0）。
+const userUploadSizeMb = computed({
+  get: () => {
+    const bytes = configForm.user.useruploadsize ?? 0
+    return bytes > 0 ? Math.round((bytes / 1024 / 1024) * 100) / 100 : 0
+  },
+  set: (v: number | undefined) => {
+    const mb = Number(v) || 0
+    configForm.user.useruploadsize = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
+  },
+})
+
+/**
+ * 两个上传闸口是否矛盾：「单次发送总量上限」低于「单文件上限」
+ * ⇒ 超过单文件上限的文件**永远发不出去**（先被总量闸拒）。
+ */
+const uploadCapConflict = computed(() =>
+  uploadCapMismatch(configForm.user.useruploadsize ?? 0, exForm.upload_ex.max_file_size ?? 0)
+)
+
+/** 展示用的上限文本（不限时给「不限」二字，而不是 0 字节） */
+const batchCapText = computed(() => {
+  const bytes = configForm.user.useruploadsize ?? 0
+  return bytes > 0 ? formatFileSize(bytes) : t('admin.configPage.upload.batchCapUnlimited')
+})
+const maxFileSizeText = computed(() => {
+  const bytes = exForm.upload_ex.max_file_size ?? 0
+  return bytes > 0 ? formatFileSize(bytes) : t('admin.configPage.upload.batchCapUnlimited')
 })
 
 // 联邦管理台入口（Wave B'：直传操作页已退役，/admin/p2p 现指联邦页）
@@ -687,6 +755,28 @@ const putUserSettings = async () => {
   })
   if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
+  }
+}
+
+// ==================== 一键对齐「单次发送总量上限」（2026-10-30） ====================
+// 矛盾态：单次发送总量上限 < 单文件上限 ⇒ 超过单文件上限的文件永远发不出去。
+// 对齐动作 = 把总量上限抬到与单文件上限一致（即「允许发一个最大文件」）。
+// ⚠️ 写在 **user 段**（PUT /admin/config/user），与本分区保存的 upload_ex 段
+// 是两个端点 ⇒ 独立动作，不随本分区「保存」一起提交。
+const aligningCap = ref(false)
+const alignUploadCap = async () => {
+  const target = alignedUploadCap(exForm.upload_ex.max_file_size ?? 0)
+  if (target <= 0) return
+  aligningCap.value = true
+  try {
+    configForm.user.useruploadsize = target
+    await putUserSettings()
+    ElMessage.success(t('admin.configPage.upload.capAligned'))
+    await fetchUserSettings()
+  } catch (e) {
+    handleError(e)
+  } finally {
+    aligningCap.value = false
   }
 }
 

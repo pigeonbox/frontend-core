@@ -330,3 +330,46 @@ describe('useUploadQueue — 单文件上限预检', () => {
     expect(q.tasks.value[0]!.status).toBe('blocked')
   })
 })
+
+// ---- 单次发送**总量**上限（2026-10-30） ----
+// 与「单文件上限」是两个不同的闸：单文件闸管单个文件，总量闸管一次发送的合计体积
+// （只约束登录用户；匿名走访客日配额）。
+// ⚠️ 前端只**提示**、不阻断：站点级默认可能比用户的**用户级**上限宽松
+// （users.max_upload_size）⇒ 硬拦会误杀合法上传；服务端 413 才是权威。
+describe('单次发送总量上限', () => {
+  it('cap=0（不限）⇒ 合计照算，但不提示', () => {
+    const q = useUploadQueue({ settings: baseSettings(), t, batchSizeCap: () => 0 })
+    q.addFiles([mkFile('a.txt', 100 * MB), mkFile('b.txt', 100 * MB)])
+    expect(q.totalSize.value).toBe(200 * MB)
+    expect(q.batchOverLimit.value).toBe(false)
+  })
+
+  it('合计未超上限 ⇒ 不提示', () => {
+    const q = useUploadQueue({ settings: baseSettings(), t, batchSizeCap: () => 300 * MB })
+    q.addFiles([mkFile('a.txt', 100 * MB), mkFile('b.txt', 100 * MB)])
+    expect(q.totalSize.value).toBe(200 * MB)
+    expect(q.batchOverLimit.value).toBe(false)
+  })
+
+  it('合计超上限 ⇒ 提示，但**不阻断**（canStart 仍为 true）', () => {
+    const q = useUploadQueue({ settings: baseSettings(), t, batchSizeCap: () => 50 * MB })
+    q.addFiles([mkFile('a.txt', 30 * MB), mkFile('b.txt', 30 * MB)])
+    expect(q.totalSize.value).toBe(60 * MB)
+    expect(q.batchOverLimit.value).toBe(true)
+    // 用户级上限可能更宽松 ⇒ 不硬拦（服务端 413 才是权威）
+    expect(q.canStart.value).toBe(true)
+  })
+
+  it('被单文件上限拦下的文件（blocked）不进合计（它不参与发送）', () => {
+    const q = useUploadQueue({
+      settings: baseSettings(),
+      t,
+      maxFileSize: () => 50 * MB,
+      batchSizeCap: () => 100 * MB,
+    })
+    q.addFiles([mkFile('ok.txt', 10 * MB), mkFile('too-big.txt', 80 * MB)])
+    expect(q.blockedCount.value).toBe(1)
+    expect(q.totalSize.value).toBe(10 * MB)
+    expect(q.batchOverLimit.value).toBe(false)
+  })
+})
