@@ -53,3 +53,29 @@ export async function probeBeamEntry(
     return 'absent'
   }
 }
+
+/**
+ * 投递路径的**可见集合**（唯一判定口径）。
+ *
+ * 「到柜」恒可见；「直连设备」需同时满足两条：
+ *   ① 本机确实挂了 /beam（客户端探测，status ≠ absent）；
+ *   ② **不是**多副本拓扑（服务端明确说 deployment_mode ∈ {public, admin}）。
+ *
+ * ② 的依据：多副本下直传在架构上不可用（core 的 deployment.go 把联邦强制降级关闭，
+ * 节点身份是进程级的 Ed25519，多副本语义未定义）⇒ 此时给出入口只会落到坏路径。
+ *
+ * ⚠️ 「缺字段 = 未知，不是多副本」：老后端不下发 capabilities 段 ⇒ multiReplica=false
+ * ⇒ 入口照常可见（宁可多给入口，也别给坏入口）。
+ *
+ * 抽成纯函数是为了**能单测**（本仓无组件测试基建）——组件里的显隐判据必须与本函数一致。
+ */
+export function visibleDeliveryPaths(
+  status: BeamEntryStatus,
+  multiReplica: boolean,
+): DeliveryPath[] {
+  const list: DeliveryPath[] = ['box']
+  if (status !== 'absent' && !multiReplica) {
+    list.push('p2p')
+  }
+  return list
+}
