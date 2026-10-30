@@ -57,6 +57,25 @@ export function isMultiReplica(cfg: CapabilitiesCarrier | null | undefined): boo
 }
 
 /**
+ * 服务端**明确**告知「本实例是多副本部署」。
+ *
+ * 与 isMultiReplica 的区别：isMultiReplica 在「未知」时返回 false（按单站处理），
+ * 而本函数只认服务端**明确**说出来的多副本（deployment_mode ∈ {public, admin}）。
+ *
+ * 为什么需要这个更严的版本：直传（/beam）入口的显隐是**安全面**上的判断——
+ * 多副本拓扑下直传在架构上不可用（core 的 deployment.go 会把联邦强制降级关闭，
+ * 节点身份是进程级的 Ed25519，多副本语义未定义），此时若仍给出直传入口，
+ * 用户点了只会落到一个坏路径。而老后端（不下发 capabilities 段）属于**未知**，
+ * 不能据此把功能藏没 ⇒ 未知时一律当「不是多副本」，保持入口可见。
+ *
+ * ⇒ 只有服务端明确说多副本时才收起用不上的入口。
+ */
+export function multiReplicaDeclared(cfg: CapabilitiesCarrier | null | undefined): boolean {
+  const mode = deploymentMode(cfg)
+  return mode === 'public' || mode === 'admin'
+}
+
+/**
  * 站点公网地址是否已配置。
  *
  * 未配置 ⇒ 分享链接按**请求来源**拼 ⇒ NAS 内网部署会把内网 IP 发给外部用户
