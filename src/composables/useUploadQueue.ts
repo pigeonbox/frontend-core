@@ -63,6 +63,15 @@ export function useUploadQueue(opts: {
    * （错误码 30008），但那时已经浪费了一次往返和用户等待。
    */
   maxFileSize?: () => number
+  /**
+   * 站点默认「单次发送**总量**上限」（字节，0=不限；user.user_upload_size 经
+   * /api/config 下发）。与 maxFileSize（**单文件**上限）是两个不同的闸。
+   *
+   * ⚠️ **只提示、不阻断**：本值是**站点级默认**，登录用户的用户级上限可能更宽松
+   * （users.max_upload_size）⇒ 硬拦会误杀合法上传。服务端 413 才是权威，
+   * 本地预检的价值是「选文件时就看见」，不是替服务端做决定。
+   */
+  batchSizeCap?: () => number
 }) {
   const { settings, t } = opts
 
@@ -103,6 +112,31 @@ export function useUploadQueue(opts: {
 
   /** 单文件上限（字节，0=不限）。注意命名勿与 start() 内「本批最大文件」的局部量撞名 */
   const maxFileSizeLimit = () => opts.maxFileSize?.() ?? 0
+
+  /** 单次发送总量上限（字节，0=不限）：站点级默认，仅用于**提示**（不阻断） */
+  const batchSizeCapLimit = () => opts.batchSizeCap?.() ?? 0
+
+  /**
+   * 本批合计体积（字节）：blocked 的文件不参与发送（不进合计），其余都算。
+   *
+   * 取 **file.size**（原始体积）而非 payload.size——服务端按**申报**体积
+   * （init 的 file_size = 原始文件大小）判总量，E2E 密文略大，用 payload 会
+   * 把合计算高、误报超限。
+   */
+  const totalSize = computed(() =>
+    tasks.value
+      .filter((f) => f.status !== 'blocked')
+      .reduce((sum, f) => sum + (f.file?.size ?? 0), 0)
+  )
+
+  /**
+   * 本批合计是否超过站点默认的总量上限（提示用，**不阻断**）。
+   * 见 batchSizeCap 的说明：用户级上限可能更宽松 ⇒ 只提示，服务端 413 才是权威。
+   */
+  const batchOverLimit = computed(() => {
+    const cap = batchSizeCapLimit()
+    return cap > 0 && totalSize.value > cap
+  })
 
   /** 超限提示文案（统一口径：实际大小 + 上限） */
   const overLimitMsg = (size: number, limit: number) =>
@@ -515,6 +549,10 @@ export function useUploadQueue(opts: {
     isUploading: isUploading as ComputedRef<boolean>,
     canStart: canStart as ComputedRef<boolean>,
     blockedCount: blockedCount as ComputedRef<number>,
+    /** 本批合计体积（字节）——UI 用它说明「这次一共多大」 */
+    totalSize: totalSize as ComputedRef<number>,
+    /** 本批合计是否超过站点默认的单次发送总量上限（提示用，不阻断） */
+    batchOverLimit: batchOverLimit as ComputedRef<boolean>,
     addFiles,
     remove,
     cancel,

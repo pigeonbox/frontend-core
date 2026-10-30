@@ -30,6 +30,22 @@ export interface PublicConfig {
   uploadSize: number
   /** 站点级单文件上限（upload.max_file_size，字节，0=不限）；上传提示动态化数据源 */
   maxFileSize?: number
+  /**
+   * 站点默认「单次发送**总量**上限」（user.user_upload_size，字节，0=不限）。
+   *
+   * ⚠️ 与 maxFileSize（**单文件**上限）是两个不同的闸：
+   *   · maxFileSize：单个文件的体积上限
+   *   · maxBatchSize：一次发送（多文件合计）的体积上限，**只约束登录用户**
+   *     （匿名走访客日配额 upload.anonymous_daily_bytes）
+   *
+   * 2026-10-30 事故：此前前端只显示 maxFileSize ⇒ UI 说「单文件最大 4 GB」，
+   * 登录用户却被总量闸（出厂默认 50MB）拒（413「上传总大小超过限制」）⇒ 两个闸
+   * 必须一起可见，否则 UI 与真实限制必然对不上。
+   *
+   * ⚠️ 这是**站点级默认**：登录用户的**用户级**上限可能更宽松
+   * （users.max_upload_size）⇒ 前端只据此**提示**，不得硬拦截；服务端 413 才是权威。
+   */
+  maxBatchSize?: number
   enableChunk: number
   openUpload: boolean
   /** 匿名上传需登录（upload.require_login）；缺省=false */
