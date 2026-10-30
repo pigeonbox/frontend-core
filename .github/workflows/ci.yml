@@ -55,5 +55,10 @@ jobs:
       # 被挡；而库自己因为锁在 3.2.5 **CI 假绿** ⇒ 这类漂移永远由消费方先发现。
       # ⇒ 本 job 用**最新 vue-tsc** 跑一遍库自己的类型检查：上游工具链一出回归，
       #    **库这边先红**，而不是等消费方红（钉版只是止血，探针才是防线）。
-      - name: 用最新 vue-tsc 跑类型检查
-        run: npx --yes vue-tsc@latest --noEmit -p tsconfig.app.json
+      # ⚠️ typescript **钉在本仓地板**（5.9.3）：探针的信号要**只**来自 vue-tsc。
+      #    若让它浮动，TS 6 的新弃用项（如 baseUrl）会把信号淹在噪声里
+      #    ——2026-10-30 首跑就踩到：npx 自带的 TS 6 报 TS5101（baseUrl 废弃），
+      #    而那**不是**代码问题。本仓已顺手去掉 baseUrl（paths 改相对写法），
+      #    等 TS 抬地板时零改动。
+      - name: 用最新 vue-tsc 跑类型检查（TS 钉本仓地板）
+        run: npx --yes -p vue-tsc@latest -p typescript@5.9.3 vue-tsc --noEmit -p tsconfig.app.json
