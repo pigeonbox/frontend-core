@@ -26,8 +26,8 @@
           </div>
           <div class="card-pane"><GetShare ref="getShareRef" :deep-code="deepCode" /></div>
 
-          <!-- 跨站提示：仅联邦启用时出现（单站部署不该出现联邦词汇） -->
-          <p v-if="federationEnabled" class="federation-hint">{{ t('home.federationHint') }}</p>
+          <!-- 跨站提示：仅在「跨站取件确实可用」时出现（单站/多副本部署不该出现联邦词汇） -->
+          <p v-if="federationUsable" class="federation-hint">{{ t('home.federationHint') }}</p>
           <!-- 未接入联邦时也说明（2026-10-22 审计 S3）：原先只在**开启时**显示，
                导致用户拿别的站点的码来取、只得到一句「取件码不存在」，
                完全不知道本站不做跨站路由。 -->
@@ -100,8 +100,10 @@ const localeStore = useLocaleStore()
 const { t, locale } = useI18n()
 // 宿主可用性(页脚「应用设置」入口显隐;default 适配器恒 false)
 const hostAppSettings = computed(() => host.capabilities.appSettings)
-// 联邦启用（多副本部署下后端强制降级为 false）→ 取件台显式提示跨站取件能力
-const federationEnabled = computed(() => configStore.federationEnabled)
+// 跨站取件是否**可用**（服务端声明 且 非多副本拓扑）→ 取件台据此显式提示跨站取件能力。
+// ⚠️ 不能直接用 configStore.federationEnabled：多副本下联邦架构上不可用，
+// 只看服务端声明会在降级被复活时承诺一个用不了的能力（见 utils/capabilities.federationUsable）。
+const federationUsable = computed(() => configStore.federationUsable)
 
 // 取件专属页（2026-10-07 拆分：文件/文本分享迁往 /send,避免 tab 切换
 // 撑高卡片使取件失焦）。

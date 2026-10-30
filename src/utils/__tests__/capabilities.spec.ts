@@ -7,6 +7,7 @@ import {
   multiReplicaDeclared,
   publicUrlConfigured,
   publicUrlMissing,
+  federationUsable,
 } from '@/utils/capabilities'
 import { visibleDeliveryPaths } from '@/components/share/deliveryPath'
 
@@ -101,5 +102,33 @@ describe('投递路径显隐（frontend-core#21 验收）', () => {
   it('老后端（能力位未知 ⇒ multiReplica=false）不得把直传入口藏没', () => {
     // 未知 ⇒ 按单站处理 ⇒ 探测到就显示
     expect(visibleDeliveryPaths('ready', multiReplicaDeclared({}))).toEqual(['box', 'p2p'])
+  })
+})
+
+describe('跨站取件（联邦）可用性（core#12 验收）', () => {
+  // 验收：多副本拓扑下前端**不出现**联邦入口（不承诺用不了的跨站取件）
+  it('多副本 + 服务端说启用 ⇒ 仍按不可用处理（前端兜底，不信服务端单点声明）', () => {
+    expect(federationUsable({ capabilities: { deployment_mode: 'public' } }, true)).toBe(false)
+    expect(federationUsable({ capabilities: { deployment_mode: 'admin' } }, true)).toBe(false)
+  })
+
+  it('多副本 + 服务端说未启用 ⇒ 不可用', () => {
+    expect(federationUsable({ capabilities: { deployment_mode: 'public' } }, false)).toBe(false)
+    expect(federationUsable({ capabilities: { deployment_mode: 'admin' } }, false)).toBe(false)
+  })
+
+  // 负对照：单站 + 服务端说启用 ⇒ 可用（不得把功能也收了）
+  it('单站 + 服务端说启用 ⇒ 可用', () => {
+    expect(federationUsable({ capabilities: { deployment_mode: 'standalone' } }, true)).toBe(true)
+  })
+
+  it('单站 + 服务端说未启用 ⇒ 不可用', () => {
+    expect(federationUsable({ capabilities: { deployment_mode: 'standalone' } }, false)).toBe(false)
+  })
+
+  it('老后端（能力位未知）⇒ 保持服务端声明，不得把功能藏没', () => {
+    expect(federationUsable({}, true)).toBe(true)
+    expect(federationUsable(null, true)).toBe(true)
+    expect(federationUsable({}, false)).toBe(false)
   })
 })
