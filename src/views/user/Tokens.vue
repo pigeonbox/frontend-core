@@ -51,6 +51,13 @@
           >
             {{ tag.label }}
           </el-tag>
+          <!-- 吊销时间（contracts v0.20.7 补齐）：撤销是**软撤销 + 审计留痕**
+               （列表含已撤销项）⇒「什么时候被吊销的」是审计的关键信息。
+               此前服务端只落库不回传 ⇒ 前端根本拿不到 ⇒ 做成**第二行小字**，
+               不藏进 tooltip（审计信息不该靠 hover 才看得到）。 -->
+          <div v-if="row.revoked && row.revoked_at" class="revoked-at">
+            {{ t('user.tokens.revokedAt') }}: {{ row.revoked_at }}
+          </div>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.tokens.lastUsed')" width="180">
@@ -112,6 +119,9 @@
         >
           {{ tag.label }}
         </el-tag>
+        <div v-if="row.revoked && row.revoked_at" class="revoked-at">
+          {{ t('user.tokens.revokedAt') }}: {{ row.revoked_at }}
+        </div>
       </template>
       <template #last_used_at="{ row }">
         {{ formatTime(row.last_used_at, t('user.tokens.neverUsed')) }}
@@ -432,5 +442,12 @@ onMounted(loadList)
   margin: 10px 0 0;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+/* 吊销时间（审计信息）：弱化但**始终可见**（不做成 tooltip） */
+.revoked-at {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>

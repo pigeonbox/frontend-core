@@ -117,6 +117,13 @@ export interface ApiKeyItem {
   created_at: string | null
   revoked: boolean
   /**
+   * 撤销时间（contracts v0.20.7 补齐）。
+   * 撤销是**软撤销 + 审计留痕**（列表**含**已撤销项）；此前服务端只落库不回传
+   * ⇒ 前端拿不到「这把 Key 是什么时候被撤销的」⇒ 审计信息断在回传面。
+   * 空/缺省 = 未撤销（服务端在未撤销时不回该字段）。
+   */
+  revoked_at?: string | null
+  /**
    * 权限范围（contracts v0.20.5）：该 Key 被允许的能力面。
    * **空/缺省 = 全量**（与 scopes 机制引入前一致 ⇒ 老 Key 零影响）。
    */
