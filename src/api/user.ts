@@ -81,7 +81,7 @@ export const userApi = {
   },
 
   // 创建 API Key（明文 key 仅本次响应返回一次）
-  createApiKey: (data: { name?: string; expires_in_days?: number }) => {
+  createApiKey: (data: { name?: string; expires_in_days?: number; scopes?: string[] }) => {
     return request<ApiResponse<{ key: string; api_key: ApiKeyItem }>>({
       url: '/user/api-keys',
       method: 'POST',
@@ -116,4 +116,9 @@ export interface ApiKeyItem {
   expires_at: string | null
   created_at: string | null
   revoked: boolean
+  /**
+   * 权限范围（contracts v0.20.5）：该 Key 被允许的能力面。
+   * **空/缺省 = 全量**（与 scopes 机制引入前一致 ⇒ 老 Key 零影响）。
+   */
+  scopes?: string[]
 }
