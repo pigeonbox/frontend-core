@@ -562,6 +562,7 @@ export default {
       status: '状态',
       active: '有效',
       revoked: '已吊销',
+      revokedAt: '吊销时间',
       expired: '已过期',
       lastUsed: '最后使用',
       lastIP: '来源 IP',

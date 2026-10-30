@@ -563,6 +563,7 @@ export default {
       status: 'Status',
       active: 'Active',
       revoked: 'Revoked',
+      revokedAt: 'Revoked At',
       expired: 'Expired',
       lastUsed: 'Last Used',
       lastIP: 'Source IP',
