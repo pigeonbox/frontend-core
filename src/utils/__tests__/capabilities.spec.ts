@@ -8,6 +8,7 @@ import {
   publicUrlConfigured,
   publicUrlMissing,
   federationUsable,
+  federationDeliveryAvailable,
 } from '@/utils/capabilities'
 import { visibleDeliveryPaths } from '@/components/share/deliveryPath'
 
@@ -83,25 +84,71 @@ describe('capabilities 消费（2026-10-30）', () => {
 describe('投递路径显隐（frontend-core#21 验收）', () => {
   // 验收：多副本拓扑下前端**不出现**直传入口
   it('多副本 + 探测到 /beam ⇒ 直传入口收起（不给点不动的按钮）', () => {
-    expect(visibleDeliveryPaths('ready', true)).toEqual(['box'])
-    expect(visibleDeliveryPaths('auth', true)).toEqual(['box'])
-    expect(visibleDeliveryPaths('unready', true)).toEqual(['box'])
+    expect(visibleDeliveryPaths('ready', true, false)).toEqual(['box'])
+    expect(visibleDeliveryPaths('auth', true, false)).toEqual(['box'])
+    expect(visibleDeliveryPaths('unready', true, false)).toEqual(['box'])
   })
 
   // 负对照：关掉能力位 ⇒ 入口必须收起（而不是给一个点不动的按钮）
   it('单站 + 探测到 /beam ⇒ 直传入口出现', () => {
-    expect(visibleDeliveryPaths('ready', false)).toEqual(['box', 'p2p'])
-    expect(visibleDeliveryPaths('auth', false)).toEqual(['box', 'p2p'])
+    expect(visibleDeliveryPaths('ready', false, false)).toEqual(['box', 'p2p'])
+    expect(visibleDeliveryPaths('auth', false, false)).toEqual(['box', 'p2p'])
   })
 
   it('没挂 /beam ⇒ 直传入口永不出现（与部署模式无关）', () => {
-    expect(visibleDeliveryPaths('absent', false)).toEqual(['box'])
-    expect(visibleDeliveryPaths('absent', true)).toEqual(['box'])
+    expect(visibleDeliveryPaths('absent', false, false)).toEqual(['box'])
+    expect(visibleDeliveryPaths('absent', true, false)).toEqual(['box'])
   })
 
   it('老后端（能力位未知 ⇒ multiReplica=false）不得把直传入口藏没', () => {
     // 未知 ⇒ 按单站处理 ⇒ 探测到就显示
-    expect(visibleDeliveryPaths('ready', multiReplicaDeclared({}))).toEqual(['box', 'p2p'])
+    expect(visibleDeliveryPaths('ready', multiReplicaDeclared({}), false)).toEqual(['box', 'p2p'])
+  })
+})
+
+describe('跨站投递（联邦前台化，2026-11-01）入口显隐', () => {
+  // 位语义（core 公开能力段）：联邦启用 且 已登记至少一个可投递对端 ⇒ true；
+  // 两者缺一 ⇒ false。
+  it('服务端明确说可用 ⇒ 入口出现', () => {
+    expect(federationDeliveryAvailable({ capabilities: { federation_delivery: true } })).toBe(true)
+  })
+
+  // ⚠️ 明确 false（联邦关闭 / 没登记对端）⇒ 入口必须收起
+  // （不给一个必然被服务端拒绝的入口）。
+  it('服务端明确说不可用 ⇒ 入口收起', () => {
+    expect(federationDeliveryAvailable({ capabilities: { federation_delivery: false } })).toBe(false)
+  })
+
+  // ⚠️ 缺字段 = **未知** ⇒ **显示**入口（老后端不下发 capabilities 段）。
+  // 理由：服务端会明确回「对方柜不在可投递名单」⇒ 是有明确错误面的合法入口，
+  // 不是「点了没反应」的坏入口 ⇒ 不得据此隐藏功能（宁可多给入口）。
+  it('缺字段（老后端）⇒ 入口仍然显示', () => {
+    expect(federationDeliveryAvailable({})).toBe(true)
+    expect(federationDeliveryAvailable({ capabilities: {} })).toBe(true)
+    expect(federationDeliveryAvailable(null)).toBe(true)
+    expect(federationDeliveryAvailable(undefined)).toBe(true)
+  })
+
+  it('判据只有一个：缺字段 ⇒ 显示、明确 false ⇒ 隐藏', () => {
+    // 正面 + 负面成对：把「缺字段」与「false」混为一谈就会把功能藏没（或给出坏入口）
+    expect(federationDeliveryAvailable({})).not.toBe(
+      federationDeliveryAvailable({ capabilities: { federation_delivery: false } }),
+    )
+  })
+
+  // 路径集合：能力位为真时，「投递到别人的柜」进入可见路径集合。
+  it('能力位为真 ⇒ 路径集合含 federation；为假 ⇒ 不含', () => {
+    expect(visibleDeliveryPaths('absent', false, true)).toEqual(['box', 'federation'])
+    expect(visibleDeliveryPaths('absent', false, false)).toEqual(['box'])
+    // 与直传路径互不影响（三条路径可同时出现）
+    expect(visibleDeliveryPaths('ready', false, true)).toEqual(['box', 'p2p', 'federation'])
+  })
+
+  // ⚠️ 别用管理面的 `federation` 位做这件事：公开面拿不到 ⇒ 恒 undefined。
+  it('公开能力段里没有 federation 位 ⇒ 不得据此判定', () => {
+    // 只认 federation_delivery；ServerCapabilities 上根本没有 federation 字段
+    const caps = { deployment_mode: 'standalone', public_url_set: true, setup_token_required: false }
+    expect(federationDeliveryAvailable({ capabilities: caps })).toBe(true)
   })
 })
 

@@ -73,6 +73,7 @@ declare module 'vue' {
     ElUpload: typeof import('element-plus/es')['ElUpload']
     ErrorToast: typeof import('./components/ErrorToast.vue')['default']
     ExpireText: typeof import('./components/data/ExpireText.vue')['default']
+    FederationDeliveryForm: typeof import('./components/share/FederationDeliveryForm.vue')['default']
     FileItemRow: typeof import('./components/upload/FileItemRow.vue')['default']
     FileUpload: typeof import('./components/upload/FileUpload.vue')['default']
     GetShare: typeof import('./components/upload/GetShare.vue')['default']

@@ -128,3 +128,27 @@ export function federationUsable(
   if (multiReplicaDeclared(cfg)) return false
   return federationEnabled
 }
+
+/**
+ * 跨站投递（联邦前台化，2026-11-01）是否可用——寄件台「投递到别人的柜」入口的
+ * **唯一**显隐判据（组件里不再各写一份 if）。
+ *
+ * 位名 `federation_delivery`（core 公开能力段）：服务端按**运行时真实状态**计算
+ * —— **联邦启用** 且 **已登记至少一个可投递对端** ⇒ 两者缺一即 false。
+ *
+ * ## 缺字段 = 未知 ⇒ **显示**入口
+ *
+ * 老后端（不下发 capabilities 段）按「未知」处理 ⇒ **不据此隐藏功能**
+ * （宁可多给入口，也别给坏入口）。这不是「给坏入口」：服务端会明确回
+ * 「对方柜不在可投递名单」⇒ 是**有明确错误面的合法入口**，而不是点了没反应。
+ *
+ * ⚠️ 只有服务端**明确**说 false（联邦关闭 / 没登记对端）时才收起用不上的入口。
+ *
+ * ⚠️ 别拿 `federation` 位做这件事：那个位只在**管理面**（/admin/diagnostics）
+ * 下发 ⇒ 公开面 /api/config 永远拿不到 ⇒ 恒 undefined ⇒ 入口会凭空消失。
+ */
+export function federationDeliveryAvailable(
+  cfg: CapabilitiesCarrier | null | undefined,
+): boolean {
+  return readCapabilities(cfg).federation_delivery !== false
+}

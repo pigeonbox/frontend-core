@@ -22,6 +22,13 @@ export interface ServerCapabilities {
   public_url_set?: boolean
   /** 首启建号是否需要令牌（服务端自动生成的一次性令牌或 PB_SETUP_TOKEN） */
   setup_token_required?: boolean
+  /**
+   * 跨站投递（联邦前台化，2026-11-01）是否可用：**联邦启用** 且 **已登记至少一个
+   * 可投递对端** ⇒ 两者缺一即 false（服务端按运行时真实状态计算）。
+   *
+   * ⚠️ 缺字段 = **未知**（老后端不下发）⇒ 不得据此隐藏功能。
+   */
+  federation_delivery?: boolean
 }
 
 export interface PublicConfig {
