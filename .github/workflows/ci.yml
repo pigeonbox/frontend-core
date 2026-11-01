@@ -62,3 +62,34 @@ jobs:
       #    等 TS 抬地板时零改动。
       - name: 用最新 vue-tsc 跑类型检查（TS 钉本仓地板）
         run: npx --yes -p vue-tsc@latest -p typescript@5.9.3 vue-tsc --noEmit -p tsconfig.app.json
+
+  e2e:
+    name: 浏览器级 E2E（Playwright）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - run: npm ci
+      # 浏览器本体（含系统依赖）单独一步：Playwright 的浏览器不进 npm 依赖树，
+      # 必须显式下载；`--with-deps` 补 ubuntu 上的共享库（否则 chromium 起不来，
+      # 报错长在「缺 libnss3.so」而不是「少装浏览器」，很难一眼看出真因）。
+      - name: 安装 Playwright 浏览器
+        run: npx playwright install --with-deps chromium
+      # E2E 跑**构建产物**（vite preview）而不是 dev server：
+      # base './' + hash 路由的发布形态才是用户拿到的形态，dev server 会掩盖
+      # 产物级问题（资源路径、构建期注入的版本号等）。
+      - name: 构建产物
+        run: npx vite build
+      - name: 跑浏览器级 E2E
+        run: npx playwright test
+      - name: 上传失败现场（trace + 截图）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

@@ -5,5 +5,11 @@ dist/
 /data/
 *.tgz
 
+# Playwright 运行时产物(报告/trace/截图——失败现场，不入库)
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
 # 工具运行时目录(外部插件落点,勿提交)
 .video_agent/
