@@ -1,12 +1,11 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
-import type { WrappedKeyFields } from '@/types/share'
 import type { share as shareContract } from '@pigeonbox/contracts'
 
 export const shareApi = {
   // 分享文本(请求契约 = contracts IDL 生成;此前手写类型漏 custom_code/encrypted)
-  shareText: (data: shareContract.ShareTextReq & Pick<WrappedKeyFields, 'wrapped_key'>) => {
+  shareText: (data: shareContract.ShareTextReq) => {
     const formData = new FormData()
     formData.append('text', data.text)
     formData.append('expire_value', String(data.expire_value))
@@ -53,8 +52,7 @@ export const shareApi = {
   // 取件密码经 X-Share-Password 请求头(2026-10-16 拍板;query 形态有访问日志/
   // Referer 泄漏面,与下载端点停收 ?password= 同批收敛;IDL GetShareReq api.header)
   getShare: (code: string, password?: string) => {
-    // WrappedKeyFields = 口令型 E2E 垫片（contracts v0.20.10 抬钉版后移除组合）
-    return request<ApiResponse<shareContract.ShareDetail & WrappedKeyFields>>({
+    return request<ApiResponse<shareContract.ShareDetail>>({
       url: '/share/select/',
       method: 'GET',
       params: { code },

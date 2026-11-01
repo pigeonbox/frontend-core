@@ -1,18 +1,3 @@
-/**
- * 契约 v0.20.10 口令型 E2E 字段垫片（contracts 钉版抬升后移除，改用 share.ShareDetail 原生字段）。
- *
- * 2026-11-01 core#30 / frontend-core#38：内容密钥不再进分享链接，改由口令包装成
- * wrapped_key（base64 信封，见 utils/e2e.ts）随分享创建提交、落服务端。contracts
- * 钉版（v0.20.9 的 tgz）还没有这两个字段 ⇒ 先在此垫片，组合类型接住：
- *   - wrapped_key：取件侧解包用（ShareDetail 下发）；
- *   - has_wrapped_key：metadata 端点的提前渲染标志——**缺字段 ≠ false**，
- *     老后端不下发时不得据此隐藏口令输入（以 detail.wrapped_key 为准）。
- */
-export interface WrappedKeyFields {
-  wrapped_key?: string
-  has_wrapped_key?: boolean
-}
-
 /** 分享详情（/share/select 响应载荷） */
 export interface ShareInfo {
   code: string

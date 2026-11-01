@@ -8,7 +8,6 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
-import type { WrappedKeyFields } from '@/types/share'
 import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 
 /**
@@ -19,11 +18,10 @@ import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
  * 这两项是**表单必填**且直接进 FormData（`String(undefined)` 会发出字面量
  * "undefined"）⇒ 这里收紧为 required，其余字段跟契约走。
  */
-export type MultiShareOptions = publicapiContract.MultiShareDirectReq &
-  Pick<WrappedKeyFields, 'wrapped_key'> & {
-    expire_value: number
-    expire_style: string
-  }
+export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
+  expire_value: number
+  expire_style: string
+}
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
 export type MultiShareResult = publicapiContract.MultiShareData
@@ -44,10 +42,9 @@ export type MultiShareBindEntryInput = Omit<publicapiContract.MultiShareBindEntr
 }
 
 /** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
-export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> &
-  Pick<WrappedKeyFields, 'wrapped_key'> & {
-    entries: MultiShareBindEntryInput[]
-  }
+export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> & {
+  entries: MultiShareBindEntryInput[]
+}
 
 export const isOkCode = (code?: number) => code === 0 || code === 200
 
