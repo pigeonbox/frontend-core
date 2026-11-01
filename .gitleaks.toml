@@ -1,0 +1,20 @@
+# gitleaks 配置（CI Security Scan 与本地 `gitleaks detect` 自动读取）。
+# 默认规则全量继承，仅豁免已核实误报——豁免必须写明理由，禁止无说明扩条。
+[extend]
+useDefault = true
+
+# E2E 兼容性的**固定测试向量**（src/utils/__tests__/e2e.spec.ts）：
+#   - LEGACY_KEY_B64URL / LEGACY_PAYLOAD_B64URL 是由 node:crypto 的 WebCrypto
+#     生成的 AES-256-GCM 固定向量（key = (i*7+3)&0xff, iv = (i*5+1)&0xff），
+#     用来证明「换纯 JS 实现后旧载荷仍逐字节可解」——**不是任何真实凭据**，
+#     也不对应任何可用的部署密钥；
+#   - 同文件的 PBKDF2 固定向量（expectKek）同理，是算法确定性断言的常量。
+#
+# 为什么需要这条：CI 的 actions/checkout 在 fetch-depth: 0 下会执行
+#   `fetch +refs/heads/*:refs/remotes/origin/*`
+# ⇒ **拉取该仓所有分支** ⇒ gitleaks 的全历史扫描会扫到**其它分支**上的
+#   测试夹具 ⇒ 任何 PR 的 Security Scan 都会因此报红（与本 PR 的改动无关）。
+#   ⇒ 豁免按**路径**限定到测试文件，不按内容放宽（内容变了仍会被扫）。
+[[allowlists]]
+description = "E2E 兼容性固定测试向量（WebCrypto 生成的公开向量，非真实凭据）"
+paths = ['''^src/utils/__tests__/e2e\.spec\.ts$''']
