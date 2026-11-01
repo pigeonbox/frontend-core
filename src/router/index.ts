@@ -200,10 +200,12 @@ function adminRoutes(base: string): RouteRecordRaw[] {
         meta: { title: 'route.adminModeration' },
       },
       {
+        // 跨站联邦管理台（Wave B'：设备直传控制台整体退役，本路径改指联邦页）。
+        // 路径保持 /admin/p2p 不变——既有书签/外链不失效；语义只体现在 name 与标题。
         path: 'p2p',
-        name: 'AdminP2pTransfer',
-        component: () => import('@/views/admin/P2pTransfer.vue'),
-        meta: { title: 'route.adminP2p' },
+        name: 'AdminFederation',
+        component: () => import('@/views/admin/Federation.vue'),
+        meta: { title: 'route.adminFederation' },
       },
       {
         path: 'activities',
@@ -277,8 +279,14 @@ router.beforeEach(async (to, _from, next) => {
     }
     for (const r of adminRoutes(adminBase)) router.addRoute(r)
     if (to.path === adminBase || to.path.startsWith(adminBase + '/')) {
-      // 动态路由注册前本导航已按 404 兜底解析，重新解析以匹配新路由
-      next({ ...to, replace: true })
+      // 动态路由注册前本导航已按 404 兜底解析，重新解析以匹配新路由。
+      //
+      // ⚠️ 必须**按 path** 重新解析，不能 `next({ ...to })`（2026-10-22 真机实测）：
+      // `to` 是 RouteLocationNormalized，带 `name: 'NotFound'` 与 `matched`；
+      // vue-router 解析时 **name 优先于 path** ⇒ 展开 `...to` 等于拿着 NotFound
+      // 的名字去重新解析 ⇒ 仍落 404 ⇒ **直接打开/刷新管理台链接恒 404**
+      // （从首页点进去是好的——那时路由已注册，掩盖了这个坑）。
+      next({ path: to.path, query: to.query, hash: to.hash, replace: true })
       return
     }
   }

@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   PICKUP_LEN,
   isPickupCode,
+  normalizePickup,
   planPaste,
   resolveDispatch,
   splitTyping,
+  stripSeparators,
 } from '../codeInput'
 
 describe('isPickupCode', () => {
@@ -17,6 +19,25 @@ describe('isPickupCode', () => {
     expect(isPickupCode('ABC12')).toBe(false)
     expect(isPickupCode('ABC-12')).toBe(false)
     expect(isPickupCode('')).toBe(false)
+  })
+})
+
+describe('归一化（取件码字符表全大写 → 输入大小写不敏感）', () => {
+  it('去空格/横杠 + 转大写', () => {
+    expect(normalizePickup('vnxt 8s')).toBe('VNXT8S')
+    expect(normalizePickup('VNXT-8S')).toBe('VNXT8S')
+    expect(normalizePickup(' vnxt-8s ')).toBe('VNXT8S')
+  })
+  it('stripSeparators 只去分隔符、保留大小写（分享码区分大小写）', () => {
+    expect(stripSeparators('aB3 xK-9mQ')).toBe('aB3xK9mQ')
+  })
+  it('resolveDispatch：空格/横杠/小写都命中同一取件码', () => {
+    expect(resolveDispatch('vnxt 8s')).toEqual({ kind: 'retrieve', auto: true, code: 'VNXT8S' })
+    expect(resolveDispatch('VNXT-8S')).toEqual({ kind: 'retrieve', auto: true, code: 'VNXT8S' })
+    expect(resolveDispatch('vnxt8s')).toEqual({ kind: 'retrieve', auto: true, code: 'VNXT8S' })
+  })
+  it('resolveDispatch：8 位分享码保持原样（区分大小写，不做归一）', () => {
+    expect(resolveDispatch('aB3xK9mQ')).toEqual({ kind: 'share', auto: false, code: 'aB3xK9mQ' })
   })
 })
 
@@ -76,7 +97,7 @@ describe('planPaste（粘贴整段分派）', () => {
   it('≤6 位散串 → 回显等按钮', () => {
     expect(planPaste('ABC12')).toEqual({ display: 'ABC12', target: null })
   })
-  it('7 位 → 回显前 6 位、整串立即走分享详情兜底', () => {
+  it('7 位 → 整串走分享详情（不是取件码；自定义口令合法）', () => {
     expect(planPaste('ABC1234')).toEqual({
       display: 'ABC123',
       target: { kind: 'share', auto: false, code: 'ABC1234' },
@@ -88,11 +109,26 @@ describe('planPaste（粘贴整段分派）', () => {
       target: { kind: 'share', auto: false, code: 'aB3xK9mQ' },
     })
   })
-  it('>8 位口令：回显前 6 位、按整串分派', () => {
+  it('9+ 位自定义口令（3-64 位合法）：整串走分享详情，不报错', () => {
+    // 22 位自定义口令：upload.customCodePlaceholder 允许 3-32 位，
+    // 与 /share/select 查库口径一致 —— 按长度白名单过滤会判死合法口令。
     const long = 'fede2e-Zzk2C6ZfSmVrTXOs'
     expect(planPaste(long)).toEqual({
-      display: long.slice(0, PICKUP_LEN),
+      display: long.slice(0, 6),
       target: { kind: 'share', auto: false, code: long },
+    })
+  })
+  it('超出 64 位上限 → 明确报错（不是合法口令形态，不拿去查库）', () => {
+    expect(planPaste('a'.repeat(65))).toEqual({ display: '', target: null, invalid: true })
+  })
+  it('归一化：空格/横杠/小写都命中同一取件码', () => {
+    expect(planPaste('vnxt 8s')).toEqual({
+      display: 'VNXT8S',
+      target: { kind: 'retrieve', auto: true, code: 'VNXT8S' },
+    })
+    expect(planPaste('VNXT-8S')).toEqual({
+      display: 'VNXT8S',
+      target: { kind: 'retrieve', auto: true, code: 'VNXT8S' },
     })
   })
   it('空白输入无动作', () => {

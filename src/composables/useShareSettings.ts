@@ -1,6 +1,17 @@
 import { reactive } from 'vue'
 
-export type ShareExpireStyle = 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year' | 'forever'
+// 过期样式全集。'count' = 「按取件次数」：对方最多只能取 N 次（次数用尽即失效），
+// 2026-10-22 补入 —— 此前类型联合里没有它 ⇒ 日常发件流**根本选不到**这道护栏
+// （只有首启向导的站点白名单里有），后端却一直支持（pkg/utils/expire.go）。
+export type ShareExpireStyle =
+  | 'minute'
+  | 'hour'
+  | 'day'
+  | 'week'
+  | 'month'
+  | 'year'
+  | 'forever'
+  | 'count'
 
 export interface ShareSettings {
   expire_value: number

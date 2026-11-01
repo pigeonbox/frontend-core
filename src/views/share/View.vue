@@ -68,7 +68,7 @@
               </div>
               <div class="logo-text">
                 <h1>{{ t('share.contentTitle') }}</h1>
-                <p>{{ t('share.codeWithLabel', { code: shareCode }) }}</p>
+                <p>{{ t(codeIdentity.labelWithCodeKey, { code: codeIdentity.display }) }}</p>
               </div>
             </div>
             <el-button class="home-btn" @click="$router.push('/')">
@@ -82,6 +82,15 @@
           <!-- 文件分享（回归：select 响应恒带 url/download_url，不能作文件判据；
                文本分享 = 有 text 且无 file_name/files，否则文本被当文件渲染） -->
           <div v-if="hasFileContent" class="file-share-content">
+            <!-- 密码保护且无服务端直链：无可用下载地址（2026-10-22） -->
+            <el-alert
+              v-if="downloadBlocked"
+              type="warning"
+              :title="t('share.passwordDownloadHint')"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+            />
             <!-- 文件备注（发送者随文件投递的附言） -->
             <div v-if="shareData.note" class="note-box">
               <div class="note-label">
@@ -100,7 +109,7 @@
                   <el-tag v-if="shareData.encrypted" type="warning" size="small">{{ t('share.e2eTag') }}</el-tag>
                 </div>
                 <el-button
-                  v-if="!shareData.encrypted"
+                  v-if="!shareData.encrypted && !downloadBlocked"
                   type="primary"
                   class="download-btn"
                   @click="downloadAll"
@@ -114,7 +123,7 @@
                   <el-icon class="icon-secondary"><Document /></el-icon>
                   <span class="m-name" :title="f.name">{{ f.name }}</span>
                   <span class="m-size">{{ formatFileSize(f.size) }}</span>
-                  <el-button size="small" text type="primary" :loading="e2eBusy" @click="downloadFile(f.id, f.name)">
+                  <el-button v-if="!downloadBlocked" size="small" text type="primary" :loading="e2eBusy" @click="downloadFile(f.id, f.name)">
                     <el-icon><Download /></el-icon>
                     {{ t('common.download') }}
                   </el-button>
@@ -128,17 +137,14 @@
                 <el-icon :size="80" class="icon-primary"><Folder /></el-icon>
               </div>
               <div class="file-info">
-                <h3 class="file-name">{{ shareData.name || shareData.file_name || shareData.text }}</h3>
+                <h3 class="file-name">{{ shareData.file_name || shareData.text }}</h3>
                 <div class="file-meta">
                   <el-tag type="info" size="large">
-                    {{ formatFileSize(shareData.size || shareData.file_size || 0) }}
-                  </el-tag>
-                  <el-tag v-if="shareData.upload_type" type="success" size="large">
-                    {{ shareData.upload_type === 'text' ? t('share.textShare') : t('share.fileShare') }}
+                    {{ formatFileSize(shareData.file_size || 0) }}
                   </el-tag>
                 </div>
               </div>
-              <el-button type="primary" size="large" class="download-btn" @click="downloadFile()">
+              <el-button v-if="!downloadBlocked" type="primary" size="large" class="download-btn" @click="downloadFile()">
                 <el-icon><Download /></el-icon>
                 {{ t('share.downloadFile') }}
               </el-button>
@@ -166,8 +172,8 @@
           <!-- 分享信息 -->
           <div class="share-info">
             <el-descriptions :column="2" border>
-              <el-descriptions-item :label="t('share.codeLabel')">
-                <el-tag>{{ shareCode }}</el-tag>
+              <el-descriptions-item :label="t(codeIdentity.labelKey)">
+                <el-tag>{{ codeIdentity.display }}</el-tag>
               </el-descriptions-item>
               <el-descriptions-item :label="t('share.typeLabel')">
                 <el-tag :type="hasFileContent ? 'primary' : 'success'">
@@ -184,7 +190,7 @@
 
 <script setup lang="ts">
 import { formatFileSize } from '@/utils/format'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
@@ -194,9 +200,18 @@ import {
 import { shareApi } from '@/api/share'
 import { decryptBytes, decryptText } from '@/utils/e2e'
 import { copyToClipboard } from '@/utils/clipboard'
+import { translateError } from '@/utils/api-interceptor'
+import { isPasswordFamilyError, isPasswordMissingOnly } from '@/utils/password-error'
+import { useRouteParam } from '@/composables/useRouteParam'
+import { useLatestRequest } from '@/composables/useLatestRequest'
+import { identifyShareCode } from './codeIdentity'
+import { shareRouteKey } from './shareRouteKey'
 
 const route = useRoute()
-const { t } = useI18n()
+const { t, te } = useI18n()
+
+// 取数竞态守卫（2026-10-26）：旧响应不得覆盖新码的内容
+const latest = useLatestRequest()
 
 const shareCode = ref('')
 const loading = ref(false)
@@ -204,6 +219,24 @@ const error = ref('')
 const needPassword = ref(false)
 const password = ref('')
 const shareData = ref<any>(null)
+
+/**
+ * 页面上的「码」是什么身份（分享码 / 取件码）。
+ *
+ * 分享域认两种码（后端 pkg/codex）：分享码在 code 列，取件码在 pickup_code 列
+ * 是别名 ⇒ 用取件码打开的链接，此前界面一律标「分享码」= 标签错位（用户照抄的
+ * 其实是取件口令）。判定见 ./codeIdentity（不靠长度，靠与后端规范码比对）。
+ */
+const codeIdentity = computed(() =>
+  identifyShareCode(shareCode.value, shareData.value?.code as string | undefined)
+)
+
+/**
+ * 规范分享码（后端下发）。下载直链的令牌是**按规范码**签发的
+ * （core: GenerateDownloadToken(fileCode.Code)）⇒ 手工拼兜底直链时必须用规范码，
+ * 用取件码拼出来的直链即便带上令牌也验不过（令牌主体对不上）。
+ */
+const canonicalCode = computed(() => ((shareData.value?.code as string) || '').trim())
 
 // 多文件列表（后端 /share/select 的 files 数组；旧单文件分享为空 → 走单文件卡片）
 const shareFiles = computed<any[]>(() =>
@@ -213,16 +246,43 @@ const totalShareSize = computed(() =>
   shareFiles.value.reduce((s, f) => s + (Number(f.size) || 0), 0)
 )
 
+// 分享受密码保护？（契约 ShareDetail.has_password）
+const shareHasPassword = computed(() => !!shareData.value?.has_password)
+// 服务端下发的令牌化直链（缺失 = 旧后端或该分享未下发）
+const serverDownloadUrl = computed(
+  () => (shareData.value as Record<string, unknown> | null)?.download_url as string | undefined
+)
+/**
+ * 密码保护 + 无服务端直链 = 无可用下载地址（2026-10-22）：
+ * 手工拼的 /share/download?code= 既无令牌也无法带密码请求头，必然 401/失败。
+ * 此种情形不渲染可点击下载按钮，改为提示走取件流程。
+ */
+const downloadBlocked = computed(() => shareHasPassword.value && !serverDownloadUrl.value)
+
 
 const fetchShare = async (pwd?: string) => {
+  // ⚠️ 2026-10-26 审计修复：加**请求序号**（竞态守卫）。
+  // 此前无任何序号 ⇒ 两次取数重叠时（密码重试 A、随即切码 B）**后到的旧响应
+  // 会覆盖新数据** ⇒ 地址栏是 B 码、页面渲染 A 码的内容（正是本仓已复发三次的
+  // 「内容挂在别的地址下」那类缺陷）。与 useTableQuery 的 seq 丢弃同款。
+  const mySeq = latest.begin()
   loading.value = true
   error.value = ''
   needPassword.value = false
+  // 旧的解密结果必须清掉：key 变了（或分享换了）时留着上一次的明文 ⇒
+  // 页面会一边提示「缺少密钥」一边仍显示旧明文（2026-10-24 实测）。
+  decryptedText.value = ''
+  e2eError.value = ''
+  // 切分享时先清掉上一份内容：否则 A 的内容会挂在 B 的地址/加载态里残留
+  // （2026-10-23 浏览器实测：A→B 切换时页面一直显示 A）。
+  shareData.value = null
 
   try {
     const res = await shareApi.getShare(shareCode.value, pwd)
+    // 已有更新的请求发出 ⇒ 丢弃本次（旧响应不得覆盖新码的内容）
+    if (latest.isStale(mySeq)) return
 
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       shareData.value = res.data
       // E2E 文本解密（密文 base64 存于 text 字段）
       if (res.data?.encrypted && res.data?.text && e2eKey.value) {
@@ -236,26 +296,38 @@ const fetchShare = async (pwd?: string) => {
     } else if (res.code === 403 || res.code === 10003 || res.data?.has_password) {
       needPassword.value = true
     } else if (res.code === 404 || res.code === 10004) {
-      error.value = res.message || t('share.not_found')
+      error.value = t('share.not_found')
     } else {
-      error.value = res.message || t('share.not_found')
+      error.value = t('share.not_found')
     }
   } catch (err: any) {
+    // 竞态守卫：错误分支同样不得让旧请求覆盖新状态
+    if (latest.isStale(mySeq)) return
     // /share/select 的密码族错误（需要密码/密码错误）返回 HTTP 401，经响应
     // 拦截器包装后 reject 到这里——一律回到密码输入分支并提示，而非错误页
     // （2026-10-05 浏览器 E2E 发现的历史 bug：此前密码框永远不出现，输错密码
     // 还会困死在错误页无法重试）
-    const status = err?.response?.status
-    if (err?.code === 403 || status === 401) {
+    if (isPasswordFamilyError(err)) {
       needPassword.value = true
-      if (err?.message && err.message !== '需要密码') {
+      // 「只是缺密码」与「密码填错了」是两种语义，后端用 data.has_password 区分
+      // （20003 + {has_password:true} = 需要密码；20003 无 data = 密码错误）。
+      // 此前靠硬编码中文串 '需要密码' 比较——后端措辞一变就会在"只缺密码"时
+      // 误弹一个错误提示（2026-10-22 改为结构化判据，见 utils/password-error.ts）。
+      if (!isPasswordMissingOnly(err) && err?.message) {
         ElMessage.error(err.message)
       }
       return
     }
-    error.value = err.message || t('share.fetchFailed')
+    // 走统一错误映射：否则英文界面会直接显示后端中文原文
+    // （2026-10-22 审计：取件页是英文界面夹中文的重灾区）
+    // ⚠️ `t(k) || fallback` 是死代码（vue-i18n 缺键返回键名本身）⇒ 用 te() 判存在性
+    const translated = translateError(err)
+    error.value = translated.i18nKey
+      ? (te(translated.i18nKey) ? t(translated.i18nKey) : translated.fallback)
+      : translated.fallback
   } finally {
-    loading.value = false
+    // 只有「仍是最新的一次请求」才收尾 loading；旧的请求不得把新请求的加载态关掉
+    if (!latest.isStale(mySeq)) loading.value = false
   }
 }
 
@@ -280,7 +352,14 @@ const buildDownloadUrl = (fileId?: number): string => {
   // 优先使用取件接口下发的带令牌 download_url（security.download_token.enabled 时必需）；
   // 旧后端无此字段时回退到手工拼接
   const data = shareData.value as Record<string, unknown> | null
-  let url = (data?.download_url as string | undefined) || `/share/download?code=${encodeURIComponent(shareCode.value)}`
+  const serverUrl = (data?.download_url as string | undefined) || ''
+  // 密码保护分享拿不到服务端令牌化直链时，手工拼的 /share/download?code= 必然失败
+  // （既无令牌也无法带 X-Share-Password 请求头）——不生成可点击链接（2026-10-22）
+  if (!serverUrl && shareHasPassword.value) return ''
+  // 兜底直链用**规范分享码**：下载令牌是按规范码签发的（core:
+  // GenerateDownloadToken(fileCode.Code)）⇒ 用 URL 里的取件码拼出来的直链
+  // 即便带令牌也验不过（令牌主体对不上）。
+  let url = serverUrl || `/share/download?code=${encodeURIComponent(canonicalCode.value || shareCode.value)}`
   // 口令绝不入 URL：core v0.24.0 起取件端点停收 ?password=，取件密码走
   // X-Share-Password 请求头（见 shareApi.getShare），下载地址一律用服务端下发的
   // 令牌化 download_url；拼 query 会把明文口令泄进浏览器历史/Referer/代理日志
@@ -336,8 +415,14 @@ const fetchDecryptSave = async (url: string, name: string) => {
 
 const downloadFile = (fileId?: number, name?: string) => {
   if (!shareCode.value) return
+  const url = buildDownloadUrl(fileId)
+  if (!url) {
+    // 密码保护且无服务端直链：无可用下载地址（2026-10-22）
+    ElMessage.warning(t('share.passwordDownloadHint'))
+    return
+  }
   // 文件分享的原始名存 text 字段（E2E 文本分享的 text 是密文，但文本分支不走下载）
-  const fallbackName = name || shareData.value?.file_name || shareData.value?.name
+  const fallbackName = name || shareData.value?.file_name
     || (shareData.value?.encrypted && shareFiles.value.length === 0 ? '' : shareData.value?.text)
     || `${shareCode.value}.bin`
   if (isEncrypted.value) {
@@ -345,27 +430,49 @@ const downloadFile = (fileId?: number, name?: string) => {
       e2eError.value = t('share.keyMissingParam')
       return
     }
-    void fetchDecryptSave(buildDownloadUrl(fileId), fallbackName)
+    void fetchDecryptSave(url, fallbackName)
     return
   }
-  window.open(buildDownloadUrl(fileId), '_blank')
+  window.open(url, '_blank')
 }
 
 // 打包下载（多文件分享；服务端流式 zip。E2E 分享服务端无法打包，按钮已隐藏）
 const downloadAll = () => {
   if (!shareCode.value) return
-  window.open(buildDownloadUrl(), '_blank')
+  const url = buildDownloadUrl()
+  if (!url) {
+    ElMessage.warning(t('share.passwordDownloadHint'))
+    return
+  }
+  window.open(url, '_blank')
 }
 
-onMounted(() => {
-  const code = route.params.code as string
-  if (code) {
+// 路由参数（分享码）驱动取数：**参数变化即重取**。
+//
+// 此前只在 onMounted 读一次 route.params.code ⇒ hash 路由下同一路由记录
+// （/share/:code）参数变化时组件被复用、onMounted 不再触发 ⇒ 页面一直显示上一个
+// 分享的内容（A 的正文/下载按钮挂在 B 的地址下，B 的 20001 错误态不出现）。
+// 2026-10-23 浏览器实测实录；本仓同类坑第三处复发（useSendTab / admin-Config）。
+useRouteParam(
+  () =>
+    shareRouteKey(
+      route.params.code as string | undefined,
+      route.query.key as string | undefined
+    ),
+  () => {
+    // 触发键含解密密钥（?key=）⇒ 只改 key 也会重新取数（否则旧明文滞留，
+    // 页面一边警告「缺少密钥」一边仍显示明文——2026-10-24 实测）。
+    const code = route.params.code as string | undefined
+    if (!code) {
+      shareData.value = null
+      needPassword.value = false
+      error.value = t('share.codeRequired')
+      return
+    }
     shareCode.value = code
-    fetchShare()
-  } else {
-    error.value = t('share.codeRequired')
+    void fetchShare()
   }
-})
+)
 </script>
 
 <style scoped>

@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { anonymousApi } from '@/api/anonymous'
 import { federationApi } from '@/api/federation'
 import { useErrorHandler } from '@/composables/useErrorHandler'
-import { localHistory } from '@/utils/localHistory'
+import { localHistory, newSessionKey, putSession } from '@/utils/localHistory'
 
 /**
  * 匿名取件状态机（2026-10-09 自 /retrieve 页融合进首页输入组件）：
@@ -89,7 +89,7 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
     try {
       const res = await federationApi.resolve(code)
       const data = res.data
-      if ((res.code === 200 || res.code === 0) && data?.available && data.url) {
+      if ((res.code === 200) && data?.available && data.url) {
         // 设备直传节点(p2pc 占位 url)不可网页取件:提示到设备端接收
         if (isDeviceNodeUrl(data.url)) {
           try {
@@ -152,7 +152,7 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
         password: pwd || undefined,
       })
       // 后端成功码两代约定并存：200（旧 handler）/ 0（resp.Success）
-      if ((res.code === 200 || res.code === 0) && res.data) {
+      if ((res.code === 200) && res.data) {
         // 记入本机取件记录（仅 code+文件名+大小，不含密码），再跳结果页
         recordPickup({
           code,
@@ -167,9 +167,15 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
           router.push({ path: `/share/${encodeURIComponent(shareCode)}` })
           return
         }
+        // 结果数据走 sessionStorage + URL 只带一个不透明 key（2026-10-22）：
+        // 结果元信息（文件名/大小/下载地址）不再进 URL —— 地址栏、浏览器历史、
+        // Referer 都不再留痕。此前把 JSON 塞进 ?data= 是把取件内容挂在
+        // URL 上（截图即泄露、转发即泄露）。
+        const sessionKey = newSessionKey()
+        putSession(sessionKey, res.data)
         router.push({
           path: '/retrieve/result',
-          query: { data: encodeURIComponent(JSON.stringify(res.data)) },
+          query: { k: sessionKey },
         })
       } else {
         // 本站未命中：仅「未命中」形态（404/20005）值得问联邦（竞速窗内命中
@@ -208,7 +214,7 @@ export function usePickup(deps: PickupDeps = {}): PickupController {
     try {
       try {
         const res = await anonymousApi.search(c)
-        if ((res.code === 200 || res.code === 0) && res.data?.require_password) {
+        if ((res.code === 200) && res.data?.require_password) {
           password.value = ''
           phase.value = 'needPassword'
           info(t('anonymous.needPasswordHint'))

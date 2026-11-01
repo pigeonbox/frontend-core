@@ -5,6 +5,7 @@
       uploading: isBusy,
       success: task.status === 'success',
       error: task.status === 'error',
+      blocked: task.status === 'blocked',
     }"
   >
     <div class="file-icon">
@@ -24,6 +25,11 @@
         <span v-else-if="task.status === 'error'" class="status error">
           <el-icon><CircleCloseFilled /></el-icon> {{ task.error || t('common.failed') }}
         </span>
+        <!-- blocked：因单文件上限被本地拦下（不是「上传失败」）——
+             与 error 分开展示，避免用户误以为重试就能发出去 -->
+        <span v-else-if="task.status === 'blocked'" class="status blocked">
+          <el-icon><WarningFilled /></el-icon> {{ task.error || t('upload.maxFileExceededShort') }}
+        </span>
         <span v-else class="status pending">
           {{ t('upload.pendingStatus') }}
         </span>
@@ -37,37 +43,54 @@
         class="file-progress"
       />
     </div>
-    <el-button
-      v-if="task.status === 'uploading' || task.status === 'encrypting' || task.status === 'binding'"
-      type="danger"
-      circle
-      size="small"
-      @click="emit('cancel', task.id)"
-    >
-      <el-icon><Close /></el-icon>
-    </el-button>
-    <el-button
-      v-else
-      type="info"
-      circle
-      size="small"
-      @click="emit('remove', task.id)"
-    >
-      <el-icon><Close /></el-icon>
-    </el-button>
+    <div class="row-actions">
+      <!-- 单文件重试（2026-10-22）：失败行可就地重试，不必整批重跑。
+           多文件批量语义下单文件重试不成立（批量分享需整批文件同时成享），
+           此种情形下不提供行内重试（批量重跑走底部主按钮）。
+           blocked（超限被拦）也给重试入口：重试 = 按**当前**上限重新判定，
+           管理员调大上限后用户就地重发即可，不必移除重加。 -->
+      <el-button
+        v-if="(task.status === 'error' || task.status === 'blocked') && !multiMode"
+        type="primary"
+        circle
+        size="small"
+        :title="t('upload.retry')"
+        @click="emit('retry', task.id)"
+      >
+        <el-icon><Refresh /></el-icon>
+      </el-button>
+      <el-button
+        v-if="isBusy"
+        type="danger"
+        circle
+        size="small"
+        @click="emit('cancel', task.id)"
+      >
+        <el-icon><Close /></el-icon>
+      </el-button>
+      <el-button
+        v-else
+        type="info"
+        circle
+        size="small"
+        @click="emit('remove', task.id)"
+      >
+        <el-icon><Close /></el-icon>
+      </el-button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Document, Close, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh, WarningFilled } from '@element-plus/icons-vue'
 import { formatFileSize } from '@/utils/format'
 import type { UploadTask } from '@/composables/useUploadQueue'
 
 /** 上传队列单文件行（2026-10-06 W2 自 FileUpload.vue 列表块抽出） */
-const props = defineProps<{ task: UploadTask }>()
-const emit = defineEmits<{ remove: [id: string]; cancel: [id: string] }>()
+const props = defineProps<{ task: UploadTask; multiMode?: boolean }>()
+const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string] }>()
 
 const { t } = useI18n()
 
@@ -159,10 +182,19 @@ const getFileType = (filename: string): string => {
 
 .status.success { color: var(--color-success); }
 .status.error { color: var(--color-danger); }
+/* blocked = 被单文件上限拦下：用警示色与「失败」区分（用户不该以为重试能发出去） */
+.status.blocked { color: var(--el-color-warning); }
 .status.uploading { color: var(--primary-color); }
 .status.pending { color: var(--color-text-secondary); }
 
 .file-progress {
   margin-top: 8px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 </style>

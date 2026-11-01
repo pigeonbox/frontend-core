@@ -50,6 +50,14 @@ instance.interceptors.request.use(
   }
 )
 
+// 只有**普通对象**载荷才做信封归一化；Blob / ArrayBuffer 等二进制载荷保持原样
+// （管理台文件下载走 responseType:'blob'，给它挂 trace_id / 改 code 会污染响应体）。
+function isPlainPayload(v: unknown): v is Record<string, unknown> {
+  if (!v || typeof v !== 'object') return false
+  const proto = Object.getPrototypeOf(v)
+  return proto === Object.prototype || proto === null
+}
+
 // 响应拦截器 — 不在这里弹 toast，由调用方 useErrorHandler 处理。
 // 401 自动刷新：token 过期时调 /user/refresh 换新，重放原请求；刷新失败跳登录。
 // 防并发：多个 401 共享同一次 refresh（refreshPromise）。
@@ -59,13 +67,13 @@ instance.interceptors.response.use(
   (response) => {
     // 提取 X-Trace-Id header（如果后端改了）
     const traceId = response.headers?.['x-trace-id'] as string | undefined
-    if (traceId && response.data && typeof response.data === 'object') {
+    if (traceId && isPlainPayload(response.data)) {
       ;(response.data as Record<string, unknown>).trace_id = traceId
     }
     // 成功码归一化：后端两代约定并存（旧 handler=200 / resp.Success=0），
     // 视图层普遍用 res.code===200 判成功；在这里把 0 统一改写成 200，
     // 避免每个调用方自己记忆约定差异（匿名取件/config 拉取曾因此误判失败）
-    const body = response.data as Record<string, unknown> | null
+    const body = isPlainPayload(response.data) ? response.data : null
     if (body && typeof body === 'object' && body.code === 0) {
       body.code = 200
     }
@@ -85,6 +93,10 @@ instance.interceptors.response.use(
       '/anonymous/download',
       '/share/download',
       '/preview',
+      // /setup（2026-10-22 首启门禁）：401 = **首启令牌缺失/错误**，与会话无关
+      // —— 首启时根本没有会话，触发刷新必然失败并把用户弹去登录页，令牌输入
+      // 框永远不出现。与上面几条同族：业务语义 401 不许触发刷新或跳登录。
+      '/setup',
     ].some((p) => url.includes(p))
     if (
       error.response?.status === 401 &&
@@ -117,7 +129,7 @@ instance.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    // 归一化错误对象 — 把 axios 错误包装成 {code, message, trace_id, response}
+    // 归一化错误对象 — 把 axios 错误包装成 {code, message, trace_id, response, data}
     if (error.response) {
       const data = error.response.data || {}
       const traceId = error.response.headers?.['x-trace-id'] || data.trace_id
@@ -126,6 +138,11 @@ instance.interceptors.response.use(
         message: data.message || error.message,
         trace_id: traceId,
         response: error.response,
+        // 业务载荷：保留后端响应体里的 data 字段（如密码分享的
+        // data.has_password——后端用它区分「需要密码」与「密码错误」两个同码
+        // 语义）。此前此处丢弃了它，调用方只能去比较 message 文本（取件页曾
+        // 硬编码中文串 '需要密码'，后端措辞一变就误弹提示，2026-10-22 修）。
+        data: (data as Record<string, unknown>).data,
       }
       return Promise.reject(wrapped)
     }

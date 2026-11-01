@@ -13,6 +13,8 @@ import App from './App.vue'
 import router from './router'
 import { i18n } from './i18n'
 import { useThemeStore } from './stores/theme'
+// 折叠屏/新形态机型适配的全局规则（安全区/动态视口/触控热区）——独立文件，避免与 main.scss 的并行改造冲突
+import './styles/foldable.css'
 import './styles/main.scss'
 
 const app = createApp(App)

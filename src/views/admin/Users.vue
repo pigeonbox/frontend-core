@@ -23,7 +23,7 @@
       <el-table
         :data="usersList"
         v-loading="loading"
-        class="users-table"
+        class="admin-table-wide users-table"
       >
         <el-table-column :label="t('admin.usersPage.colUserInfo')" min-width="200">
           <template #default="{ row }">
@@ -58,10 +58,10 @@
         <el-table-column :label="t('admin.usersPage.colStatus')" width="100" align="center">
           <template #default="{ row }">
             <el-tag
-              :type="row.status === 1 || row.status === 'active' ? 'success' : 'danger'"
+              :type="row.status === 1 ? 'success' : 'danger'"
               effect="light"
             >
-              {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
+              {{ row.status === 1 ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
             </el-tag>
           </template>
         </el-table-column>
@@ -85,21 +85,55 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('admin.usersPage.colActions')" width="240" align="center">
+        <el-table-column :label="t('admin.usersPage.colActions')" width="300" align="center" class-name="nowrap-actions">
           <template #default="{ row }">
             <el-button
               @click="toggleUserStatus(row)"
-              :type="row.status === 1 || row.status === 'active' ? 'warning' : 'success'"
+              :type="row.status === 1 ? 'warning' : 'success'"
               size="small"
               round
             >
-              {{ row.status === 1 || row.status === 'active' ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
+              {{ row.status === 1 ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
             </el-button>
             <el-button @click="openResetPassword(row)" size="small" round>{{ t('admin.usersPage.resetPassword') }}</el-button>
             <el-button @click="removeUser(row)" type="danger" size="small" round plain>{{ t('admin.usersPage.delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 窄屏（≤768px）卡片形态：本表 5 列合计 ~1040px ⇒ 390px 视口下内容列全被裁。
+           策展=用户名(头部) + 昵称/状态/存储/注册时间；操作按钮同桌面。 -->
+      <NarrowCardList :rows="usersList" :fields="cardFields">
+        <template #head="{ row }">
+          <div class="narrow-file-name">
+            {{ row.username }}
+            <el-tag v-if="row.role === 'admin'" type="danger" size="small" effect="dark">{{ t('admin.usersPage.roleAdmin') }}</el-tag>
+          </div>
+          <div class="narrow-text-preview">{{ row.email || t('admin.usersPage.noEmail') }}</div>
+        </template>
+        <template #status="{ row }">
+          <el-tag :type="row.status === 1 ? 'success' : 'danger'" effect="light">
+            {{ row.status === 1 ? t('admin.usersPage.statusActive') : t('admin.usersPage.statusDisabled') }}
+          </el-tag>
+        </template>
+        <template #storage="{ row }">
+          <el-progress :percentage="getStoragePercentage(row)" :stroke-width="8" :color="getStorageColor(row)" />
+          <div class="storage-text">{{ formatFileSize(row.quota_used || row.total_storage || 0) }}</div>
+        </template>
+        <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+        <template #actions="{ row }">
+          <el-button
+            @click="toggleUserStatus(row)"
+            :type="row.status === 1 ? 'warning' : 'success'"
+            size="small"
+            round
+          >
+            {{ row.status === 1 ? t('admin.usersPage.disable') : t('admin.usersPage.enable') }}
+          </el-button>
+          <el-button @click="openResetPassword(row)" size="small" round>{{ t('admin.usersPage.resetPassword') }}</el-button>
+          <el-button @click="removeUser(row)" type="danger" size="small" round plain>{{ t('admin.usersPage.delete') }}</el-button>
+        </template>
+      </NarrowCardList>
 
       <div class="pagination-wrapper">
         <el-pagination
@@ -171,13 +205,14 @@
 
 <script setup lang="ts">
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -225,7 +260,7 @@ const submitCreate = async () => {
       role: createForm.role,
       max_storage_quota: createForm.quotaUnit > 0 ? createForm.quotaUnit * 1024 * 1024 : 0
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.usersPage.created'))
       createVisible.value = false
       await fetchUsers()
@@ -253,7 +288,7 @@ const submitReset = async () => {
   saving.value = true
   try {
     const res = await adminApi.resetUserPassword(resetTarget.value.id, resetPassword.value)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.usersPage.passwordReset'))
       resetVisible.value = false
     } else {
@@ -278,7 +313,7 @@ const removeUser = async (user: any) => {
   }
   try {
     const res = await adminApi.deleteUser(user.id)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.usersPage.deleted'))
       await fetchUsers()
     } else {
@@ -302,6 +337,15 @@ const getStoragePercentage = (user: any): number => {
   return Math.round(Math.min(percentage, 100) * 100) / 100
 }
 
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const cardFields = computed(() => [
+  { key: 'nickname', label: t('admin.nickname') },
+  { key: 'status', label: t('admin.usersPage.colStatus') },
+  { key: 'storage', label: t('admin.usersPage.colStorage') },
+  { key: 'created_at', label: t('admin.registeredAt') },
+])
+
 const getStorageColor = (user: any): string => {
   const percentage = getStoragePercentage(user)
   if (percentage < 50) return '#67c23a'
@@ -318,16 +362,6 @@ const { list: usersList, total, page, pageSize, loading, reload, handleSizeChang
         if (res.data && Array.isArray(res.data.items)) {
           return { items: res.data.items, total: res.data.total ?? res.data.items.length }
         }
-        if (res.data && Array.isArray((res.data as Record<string, unknown>).users)) {
-          // 兼容历史响应结构
-          const legacy = res.data as Record<string, unknown>
-          const users = legacy.users as any[]
-          const pg = legacy.pagination as { total?: number } | undefined
-          return { items: users, total: pg?.total ?? users.length }
-        }
-        if (Array.isArray(res.data)) {
-          return { items: res.data, total: res.data.length }
-        }
       }
       return { items: [], total: 0 }
     } catch (error) {
@@ -341,7 +375,7 @@ const fetchUsers = () => reload()
 
 const toggleUserStatus = async (user: any) => {
   try {
-    const isActive = user.status === 1 || user.status === 'active'
+    const isActive = user.status === 1
     const newStatus = isActive ? 0 : 1
     await ElMessageBox.confirm(
       isActive

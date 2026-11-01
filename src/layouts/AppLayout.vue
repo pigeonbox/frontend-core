@@ -100,6 +100,7 @@ const handleCommand = (command: string) => {
 <style scoped>
 .app-layout {
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
 }
 
@@ -109,6 +110,7 @@ const handleCommand = (command: string) => {
   max-width: 1200px;
   margin: 0 auto;
   min-height: calc(100vh - 56px);
+  min-height: calc(100dvh - 56px);
 }
 
 .app-sidebar {

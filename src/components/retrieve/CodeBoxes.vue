@@ -8,7 +8,7 @@
       type="text"
       :value="chars[i] || ''"
       :disabled="disabled"
-      autocomplete="one-time-code"
+      autocomplete="off"
       :aria-label="`${ariaLabel} ${i + 1}`"
       @input="(e) => onInput(i, e as InputEvent)"
       @keydown="onKeydown(i, $event)"
@@ -28,7 +28,10 @@ import { splitTyping } from '@/utils/codeInput'
  * 填满 emit `complete`（不抢焦点，调用方可防抖分派或继续输入）；
  * 粘贴超长文本整段 emit `paste-code`、末格续输溢出 emit `expand`，
  * 均交由调用方分派（现役调用方锁 6 格：溢出丢弃，超长粘贴按整串跳转）。
- * 取件码区分大小写：不做任何大小写归一（回归 2026-10-03 教训）。
+ * 取件码字符表全大写（core/app/anonymous/anonymous.go:38）→ 输入大小写不敏感：
+ * 输入统一去空格/横杠并转大写（2026-10-22）。
+ * autocomplete 不得用 one-time-code：浏览器会把短信验证码自动灌进 6 格并触发
+ * 700ms 自动提交（2026-10-22 修正）。
  */
 const props = withDefaults(
   defineProps<{
@@ -54,7 +57,10 @@ const setInputRef = (i: number, el: unknown) => {
 
 const chars = computed(() => props.modelValue.split(''))
 
-const sanitize = (s: string) => s.replace(/[^A-Za-z0-9]/g, '')
+// 输入归一化（2026-10-22）：取件码字符表全大写 → 去空格/横杠 + 转大写，
+// 输入大小写不敏感（「vnxt 8s」/「VNXT-8S」都应命中「VNXT8S」）。
+const sanitize = (s: string) =>
+  s.replace(/[\s-]+/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 
 const focusAt = (i: number) => {
   inputs.value[Math.max(0, Math.min(props.length - 1, i))]?.focus()
@@ -118,11 +124,14 @@ const onKeydown = (i: number, e: KeyboardEvent) => {
 }
 
 const onPaste = (e: ClipboardEvent) => {
-  const text = sanitize(e.clipboardData?.getData('text') || '')
+  const raw = e.clipboardData?.getData('text') || ''
+  const text = sanitize(raw)
   if (!text) return
-  // 超长整段交给调用方分派（避免截断成前 6 位误触发匿名取件）
+  // 超长整段交给调用方分派（避免截断成前 6 位误触发匿名取件）；
+  // 传原始串而非归一化串——分享码/自定义口令区分大小写且可含 -/_，
+  // 由调用方的 planPaste 按码长决定归一化口径。
   if (text.length > props.length) {
-    emit('paste-code', text)
+    emit('paste-code', raw)
     return
   }
   emit('update:modelValue', text.slice(0, props.length))

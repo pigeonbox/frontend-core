@@ -18,7 +18,7 @@
       <main class="result-main">
         <div v-if="!data" class="result-card empty">
           <el-icon size="48" class="icon-secondary"><WarningFilled /></el-icon>
-          <h2 class="card-title">{{ t('anonymous.notFound') }}</h2>
+          <h2 class="card-title">{{ t('anonymous.resultExpired') }}</h2>
           <p class="card-subtitle">{{ t('anonymous.notFoundHint') }}</p>
           <el-button type="primary" size="large" @click="$router.push('/')">
             <el-icon><Back /></el-icon>
@@ -101,20 +101,25 @@ import {
   CircleCheckFilled, WarningFilled, Back
 } from '@element-plus/icons-vue'
 import { type RetrieveData } from '@/api/anonymous'
+import { getSession } from '@/utils/localHistory'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
 import ThemeSwitcher from '@/components/ThemeSwitcher.vue'
 
 const route = useRoute()
 const { t } = useI18n()
 
+/**
+ * 取件结果数据来源（2026-10-22）：
+ * 主路径 = sessionStorage + URL 只带一个不透明 key（?k=）——结果元信息
+ * （文件名/大小/下载地址）不再进 URL，地址栏/浏览器历史/Referer 不留痕。
+ * 旧链路的 ?data=<JSON> 兼容路径**已删**（2026-10-25 删除旧版本兼容）：写入端
+ * （composables/usePickup.ts）早已切到 sessionStorage + ?k=<不透明 key>，该形态
+ * 无生产方。
+ */
 const data = computed<RetrieveData | null>(() => {
-  const raw = route.query.data as string | undefined
-  if (!raw) return null
-  try {
-    return JSON.parse(decodeURIComponent(raw)) as RetrieveData
-  } catch {
-    return null
-  }
+  const key = typeof route.query.k === 'string' ? route.query.k : ''
+  if (!key) return null
+  return getSession<RetrieveData>(key)
 })
 
 const formatSize = (bytes: number): string => {
@@ -162,6 +167,7 @@ const handleDownload = () => {
 .result-container {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   background: var(--color-bg);
   overflow-x: hidden;
 }
@@ -173,6 +179,7 @@ const handleDownload = () => {
   margin: 0 auto;
   padding: 24px;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }

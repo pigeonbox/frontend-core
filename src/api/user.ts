@@ -1,6 +1,7 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
 import type { UserInfo, UserStats } from '@/types/user'
+import type { common as commonContract } from '@pigeonbox/contracts'
 
 export const userApi = {
   // 用户注册
@@ -80,7 +81,7 @@ export const userApi = {
   },
 
   // 创建 API Key（明文 key 仅本次响应返回一次）
-  createApiKey: (data: { name?: string; expires_in_days?: number }) => {
+  createApiKey: (data: { name?: string; expires_in_days?: number; scopes?: string[] }) => {
     return request<ApiResponse<{ key: string; api_key: ApiKeyItem }>>({
       url: '/user/api-keys',
       method: 'POST',
@@ -97,8 +98,9 @@ export const userApi = {
   },
 
   // 一键吊销全部有效 API Key（应急止损，返回吊销数量）
+  // 契约派生（contracts v0.20.0：UserAPIKeysRevokeAllData）
   revokeAllApiKeys: () => {
-    return request<ApiResponse<{ revoked: number }>>({
+    return request<ApiResponse<commonContract.UserAPIKeysRevokeAllData>>({
       url: '/user/api-keys/revoke-all',
       method: 'POST',
     })
@@ -114,4 +116,16 @@ export interface ApiKeyItem {
   expires_at: string | null
   created_at: string | null
   revoked: boolean
+  /**
+   * 撤销时间（contracts v0.20.7 补齐）。
+   * 撤销是**软撤销 + 审计留痕**（列表**含**已撤销项）；此前服务端只落库不回传
+   * ⇒ 前端拿不到「这把 Key 是什么时候被撤销的」⇒ 审计信息断在回传面。
+   * 空/缺省 = 未撤销（服务端在未撤销时不回该字段）。
+   */
+  revoked_at?: string | null
+  /**
+   * 权限范围（contracts v0.20.5）：该 Key 被允许的能力面。
+   * **空/缺省 = 全量**（与 scopes 机制引入前一致 ⇒ 老 Key 零影响）。
+   */
+  scopes?: string[]
 }

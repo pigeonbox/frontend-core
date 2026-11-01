@@ -14,8 +14,9 @@ export interface UploadPlanInput {
   bodyCap: number
   /** 预签名直传阈值（默认 100MB） */
   presignThreshold: number
-  /** 匿名直传是否开放（后端下发；false 时 presign 通道不参与决策）。
-   * 缺省视为 true——兼容未下发该字段的旧后端 */
+  /** 匿名直传是否开放（由调用方从后端下发的 presignPolicy 推导；false 时 presign
+   * 通道不参与决策）。缺省视为 true —— **本地调用方未提供该能力**时的默认，
+   * 与「旧后端」无关（旧后端兼容已删，见 api/public.ts 已无 presignEnabled）。 */
   presignAllowed?: boolean
 }
 

@@ -27,5 +27,12 @@ export interface ShareResult {
   has_password?: boolean
   /** 6 位取件码（文件分享铸造；前端成功弹窗据此展示快捷取件卡） */
   pickup_code?: string
+  /**
+   * 本次选择的过期样式与数值（2026-10-22）。
+   * 弹窗的过期回显真相源仍是服务端 metadata 的 expired_at；但「按取件次数」
+   * (count) 的语义是"对方最多取 N 次"，服务端只给时间 ⇒ 需要本地值才能说清。
+   */
+  expire_style?: string
+  expire_value?: number
 }
 
