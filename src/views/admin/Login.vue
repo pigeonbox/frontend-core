@@ -223,6 +223,7 @@ const handleLogin = async () => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
+  min-height: 100dvh;
   /* 品牌色微光晕：primary-bg 随主题变量走，明暗两态都协调 */
   background:
     radial-gradient(1100px 520px at 50% -12%, var(--primary-bg), transparent 62%),

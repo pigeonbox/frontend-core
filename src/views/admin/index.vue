@@ -2,7 +2,7 @@
   <div class="admin-layout">
     <el-container>
       <!-- 侧边栏 -->
-      <el-aside width="240px" class="admin-aside">
+      <el-aside width="240px" class="admin-aside" :class="{ open: navOpen }">
         <div class="admin-logo">
           <div class="logo-icon">
             <BrandLogo class="logo-img" />
@@ -18,65 +18,87 @@
           class="admin-menu"
           router
         >
+          <!-- 管理台 IA 三组化（2026-10-22）：此前 12 个平铺项，自托管用户
+               每天只碰其中 2-3 个（文件管理/系统配置/用户），其余靠滚动找。
+               分组后「投递与文件」是日常面，「系统」是低频面。
+               仪表盘留顶层 —— 它是管理台落地页，藏进分组会让首屏是三个折叠组。 -->
           <el-menu-item :index="adminBase + '/dashboard'">
             <el-icon><Monitor /></el-icon>
             <span>{{ t('admin.dashboard') }}</span>
           </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/files'">
-            <el-icon><Folder /></el-icon>
-            <span>{{ t('admin.files') }}</span>
-          </el-menu-item>
+          <el-sub-menu :index="adminBase + '/g-delivery'">
+            <template #title>
+              <el-icon><Box /></el-icon>
+              <span>{{ t('admin.group.delivery') }}</span>
+            </template>
+            <el-menu-item :index="adminBase + '/files'">
+              <el-icon><Folder /></el-icon>
+              <span>{{ t('admin.files') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/local-files'">
-            <el-icon><FolderOpened /></el-icon>
-            <span>{{ t('admin.localFiles') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/local-files'">
+              <el-icon><FolderOpened /></el-icon>
+              <span>{{ t('admin.localFiles') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/users'">
-            <el-icon><User /></el-icon>
-            <span>{{ t('admin.users') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/moderation'">
+              <el-icon><View /></el-icon>
+              <span>{{ t('admin.moderationTitle') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/storage'">
-            <el-icon><Box /></el-icon>
-            <span>{{ t('admin.storage') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/logs'">
+              <el-icon><Document /></el-icon>
+              <span>{{ t('admin.logs') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/logs'">
-            <el-icon><Document /></el-icon>
-            <span>{{ t('admin.logs') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/p2p'">
+              <el-icon><Connection /></el-icon>
+              <span>{{ t('admin.federationTitle') }}</span>
+            </el-menu-item>
+          </el-sub-menu>
 
-          <el-menu-item :index="adminBase + '/moderation'">
-            <el-icon><View /></el-icon>
-            <span>{{ t('admin.moderationTitle') }}</span>
-          </el-menu-item>
+          <el-sub-menu :index="adminBase + '/g-operations'">
+            <template #title>
+              <el-icon><User /></el-icon>
+              <span>{{ t('admin.group.operations') }}</span>
+            </template>
+            <el-menu-item :index="adminBase + '/users'">
+              <el-icon><User /></el-icon>
+              <span>{{ t('admin.users') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/p2p'">
-            <el-icon><Connection /></el-icon>
-            <span>{{ t('admin.p2pTitle') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/announcements'">
+              <el-icon><Bell /></el-icon>
+              <span>{{ t('admin.announcements') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/activities'">
-            <el-icon><List /></el-icon>
-            <span>{{ t('admin.activities') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/activities'">
+              <el-icon><List /></el-icon>
+              <span>{{ t('admin.activities') }}</span>
+            </el-menu-item>
+          </el-sub-menu>
 
-          <el-menu-item :index="adminBase + '/config'">
-            <el-icon><Setting /></el-icon>
-            <span>{{ t('admin.config') }}</span>
-          </el-menu-item>
+          <el-sub-menu :index="adminBase + '/g-system'">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              <span>{{ t('admin.group.system') }}</span>
+            </template>
+            <el-menu-item :index="adminBase + '/storage'">
+              <el-icon><Box /></el-icon>
+              <span>{{ t('admin.storage') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/maintenance'">
-            <el-icon><Tools /></el-icon>
-            <span>{{ t('admin.maintenance') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/config'">
+              <el-icon><Setting /></el-icon>
+              <span>{{ t('admin.config') }}</span>
+            </el-menu-item>
 
-          <el-menu-item :index="adminBase + '/announcements'">
-            <el-icon><Bell /></el-icon>
-            <span>{{ t('admin.announcements') }}</span>
-          </el-menu-item>
+            <el-menu-item :index="adminBase + '/maintenance'">
+              <el-icon><Tools /></el-icon>
+              <span>{{ t('admin.maintenance') }}</span>
+            </el-menu-item>
+          </el-sub-menu>
         </el-menu>
 
         <div class="sidebar-footer">
@@ -96,6 +118,17 @@
         <!-- 顶部导航 -->
         <el-header class="admin-header">
           <div class="header-left">
+            <!-- 汉堡：仅窄屏出现（宽屏侧栏常驻，见窄屏媒体查询）。
+                 用内联三线 SVG 而非 EP 的 Menu 图标——后者是 2×2 方格，读起来像
+                 「应用宫格」，不如下划线汉堡像「导航」。 -->
+            <button class="nav-toggle" type="button" :aria-label="t('admin.title')" @click="navOpen = !navOpen">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
             <h3>{{ pageTitle }}</h3>
           </div>
 
@@ -133,13 +166,16 @@
         </el-main>
       </el-container>
     </el-container>
+
+    <!-- 窄屏遮罩：点它收起抽屉式侧栏 -->
+    <div v-if="navOpen" class="nav-backdrop" @click="navOpen = false" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { getAdminBase } from '@/router'
 const adminBase = getAdminBase()
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
@@ -163,6 +199,14 @@ const pageTitle = computed(() => {
   const key = route.meta.title as string | undefined
   return key ? t(key) : t('admin.title')
 })
+
+// 窄屏抽屉式侧栏（2026-10-24）：宽屏侧栏常驻；窄屏（≤768px）侧栏改为
+// 汉堡唤出的浮层——此前侧栏 240px 固定占位，窄屏下内容区被压到 ~150px，
+// 配置表单的输入框**宽度为 0**（真机 390px 实测）⇒ 手机上进管理台基本没法用。
+const navOpen = ref(false)
+
+// 路由切换即收起抽屉（否则点了菜单项抽屉仍盖着内容）
+watch(() => route.fullPath, () => { navOpen.value = false })
 
 const goToUser = () => {
   window.open(withBase('/'), '_blank')
@@ -196,6 +240,9 @@ const handleCommand = async (command: string) => {
 <style scoped>
 .admin-layout {
   height: 100vh;
+  height: 100dvh;
+  /* 动态视口高度（移动端地址栏 / 折叠屏合上展开时 100vh 不变 ⇒ 内容被裁；
+     旧浏览器不认 dvh ⇒ 取上一行的 vh） */
   background: var(--color-bg);
 }
 
@@ -205,6 +252,29 @@ const handleCommand = async (command: string) => {
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
+}
+
+/* 汉堡：宽屏隐藏（侧栏常驻），窄屏由媒体查询点亮 */
+.nav-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+/* 窄屏抽屉遮罩 */
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1999;
+  background: rgba(0, 0, 0, 0.45);
 }
 
 .admin-logo {
@@ -301,8 +371,10 @@ const handleCommand = async (command: string) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 var(--spacing-xl);
+  padding: var(--safe-top, 0px) var(--spacing-xl) 0;
   height: 56px;
+  /* 安全区顶内缩 + 高度补偿（刘海/灵动岛/折叠屏外屏挖孔） */
+  height: calc(56px + var(--safe-top, 0px));
 }
 
 .header-left h3 {
@@ -359,15 +431,60 @@ const handleCommand = async (command: string) => {
   background: var(--color-bg);
   padding: var(--spacing-2xl);
   min-height: calc(100vh - 56px);
+  min-height: calc(100dvh - 56px);
 }
 
-@media (max-width: 768px) {
+/* 断点 1024px（不是 768px）：折叠屏展开态内屏 690~900 CSS px、平板竖屏、
+   桌面小窗分屏都落在 769~1024px ⇒ 侧栏若仍常驻 240px，内容区只剩 ~500~700px，
+   宽表（990~1600px）必被裁 ⇒ 与手机同型缺陷。断点提到 1024px 后侧栏改抽屉，
+   内容区拿到整幅宽度。 */
+@media (max-width: 1024px) {
   .user-details {
     display: none;
   }
 
   .admin-main {
     padding: var(--spacing-lg);
+  }
+
+  /* 窄屏：页头「标题 + 操作按钮」并排会把操作区挤成一条窄柱（按钮一行一个、
+     右侧对齐，视觉上像一列悬空的按钮）⇒ 改为竖排，操作区整行横向换行。
+     （:deep 必需 —— 页头的 .card-header/.header-actions 定义在**各页面组件**的
+     scoped 样式里，本组件的 scoped 选择器命中不到。） */
+  .admin-main :deep(.card-header) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+  }
+
+  .admin-main :deep(.header-actions) {
+    justify-content: flex-start;
+  }
+
+  /* 窄屏：侧栏改为汉堡唤出的浮层抽屉，不再占位。
+     此前侧栏 240px 固定占位 ⇒ 内容区被压到 ~150px（390px 视口实测），
+     配置表单输入框宽度为 0 ⇒ 手机上进管理台基本没法用。 */
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .admin-aside {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2000;
+    width: 240px;
+    /* 抽屉浮在最上层 ⇒ 安全区由它自己承担（刘海/圆角/底部指示条） */
+    padding-top: var(--safe-top, 0px);
+    padding-bottom: var(--safe-bottom, 0px);
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+    box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.28));
+  }
+
+  .admin-aside.open {
+    transform: translateX(0);
   }
 }
 </style>

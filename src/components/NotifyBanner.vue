@@ -28,11 +28,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { notifyApi, type NotifyItem } from '@/api/notify'
+import { notifyApi, type NotifyPublicItem } from '@/api/notify'
 
 const { t } = useI18n()
 
-const items = ref<NotifyItem[]>([])
+const items = ref<NotifyPublicItem[]>([])
 const dismissed = ref<Set<number>>(new Set())
 
 const DISMISSED_KEY = 'notify_banner_dismissed'
@@ -132,7 +132,7 @@ const handleClose = (id: number) => {
 const fetchActive = async () => {
   try {
     const res = await notifyApi.active()
-    if ((res.code === 0 || res.code === 200) && res.data?.items) {
+    if ((res.code === 200) && res.data?.items) {
       items.value = res.data.items
     }
   } catch (e) {

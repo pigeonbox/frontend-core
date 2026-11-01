@@ -70,9 +70,16 @@
       class="shares-table"
     >
       <el-table-column type="selection" width="46" :selectable="(row: UserShareItem) => !row.deleted_at || activeStatus === 'deleted'" />
-      <el-table-column :label="t('user.shares.code')" min-width="140">
+      <el-table-column :label="t('share.codeLabel')" min-width="140">
         <template #default="{ row }">
           <code class="mono code-cell">{{ row.code }}</code>
+        </template>
+      </el-table-column>
+      <!-- 6 位取件码（2026-10-22）：发件后找回的唯一凭据，此前列表不展示（双码断裂） -->
+      <el-table-column :label="t('user.shares.code')" width="110">
+        <template #default="{ row }">
+          <code v-if="row.pickup_code" class="mono code-cell code-primary">{{ row.pickup_code }}</code>
+          <span v-else class="muted">—</span>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.shares.type')" width="90">
@@ -85,7 +92,7 @@
         <template #default="{ row }">
           <span v-if="row.is_text_share" class="text-preview">{{ row.text || '—' }}</span>
           <template v-else>
-            <span>{{ row.file_name || row.prefix + row.suffix || '—' }}</span>
+            <span>{{ row.file_name || '—' }}</span>
             <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info" style="margin-left: 6px">
               {{ row.file_count }} {{ t('user.shares.filesUnit') }}
             </el-tag>
@@ -105,10 +112,14 @@
       </el-table-column>
       <el-table-column :label="t('user.shares.usedCount')" width="120">
         <template #default="{ row }">
-          <span v-if="row.expired_count === -1 || row.expired_count === 0 && !row.require_auth">
-            {{ row.used_count }} / {{ t('user.shares.unlimited') }}
+          <span v-if="shareQuotaDisplay(row).kind === 'unlimited'">
+            {{ shareQuotaDisplay(row).used }} / {{ t('user.shares.unlimited') }}
           </span>
-          <span v-else>{{ row.used_count }} / {{ row.expired_count + row.used_count }}</span>
+          <span v-else-if="shareQuotaDisplay(row).kind === 'exhausted'">
+            {{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}
+            · {{ t('user.shares.countExhausted') }}
+          </span>
+          <span v-else>{{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}</span>
           <el-tooltip
             v-if="row.viewer_count > 0 && activeStatus !== 'deleted'"
             :content="`${t('user.shares.lastViewerIP')}: ${row.viewer_ip || '-'} | ${t('user.shares.lastViewerAt')}: ${formatDate(row.viewer_at)}`"
@@ -120,15 +131,16 @@
       </el-table-column>
       <el-table-column :label="t('user.shares.status')" width="100">
         <template #default="{ row }">
-          <template v-if="row.deleted_at">
-            <el-tag size="small" type="info">{{ t('user.shares.statusDeleted') }}</el-tag>
-          </template>
-          <template v-else-if="row.is_expired">
-            <el-tag size="small" type="danger">{{ t('user.shares.statusExpired') }}</el-tag>
-          </template>
-          <template v-else>
-            <el-tag size="small" type="success">{{ t('user.shares.statusActive') }}</el-tag>
-          </template>
+          <el-tag v-if="shareStatusKind(row) === 'deleted'" size="small" type="info">
+            {{ t('user.shares.statusDeleted') }}
+          </el-tag>
+          <el-tag v-else-if="shareStatusKind(row) === 'exhausted'" size="small" type="warning">
+            {{ t('user.shares.countExhausted') }}
+          </el-tag>
+          <el-tag v-else-if="shareStatusKind(row) === 'expired'" size="small" type="danger">
+            {{ t('user.shares.statusExpired') }}
+          </el-tag>
+          <el-tag v-else size="small" type="success">{{ t('user.shares.statusActive') }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.shares.createdAt')" width="150">
@@ -136,7 +148,7 @@
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="280" fixed="right">
+      <el-table-column :label="t('common.actions')" width="380" fixed="right" class-name="nowrap-actions">
         <template #default="{ row }">
           <template v-if="row.deleted_at">
             <el-button size="small" type="success" link @click="confirmRestore(row)">
@@ -163,6 +175,100 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 窄屏 / 折叠屏卡片形态：本表 9 列合计 ~1400px（操作列 380px 还固定在右侧）
+         ⇒ ≤1024px（手机、折叠屏内屏 690~900 CSS px、平板竖屏、桌面小窗分屏）
+         放不下 ⇒ 内容列被裁、固定操作列**盖住**相邻列（与 History/Dashboard 同型缺陷）。
+         与 views/user/History.vue 同款：表格与卡片同时渲染、纯 CSS 互斥。 -->
+    <div class="shares-cards">
+      <div v-for="row in list" :key="row.code" class="share-card">
+        <div class="share-card-head">
+          <code class="mono code-cell">{{ row.code }}</code>
+          <code v-if="row.pickup_code" class="mono code-cell code-primary">{{ row.pickup_code }}</code>
+          <el-tag v-if="row.is_text_share" size="small" type="info">{{ t('user.shares.typeText') }}</el-tag>
+          <el-tag v-else size="small" type="success">{{ t('user.shares.typeFile') }}</el-tag>
+          <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info">
+            {{ row.file_count }} {{ t('user.shares.filesUnit') }}
+          </el-tag>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.fileName') }}</span>
+          <span class="share-card-value">
+            <span v-if="row.is_text_share" class="text-preview">{{ row.text || '—' }}</span>
+            <span v-else>{{ row.file_name || '—' }}</span>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.size') }}</span>
+          <span class="share-card-value">
+            <span v-if="row.is_text_share">—</span>
+            <span v-else>{{ formatSize(row.size) }}</span>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.expireAt') }}</span>
+          <span class="share-card-value">
+            <ExpireText :value="row.expired_at" :expired="row.is_expired" />
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.usedCount') }}</span>
+          <span class="share-card-value">
+            <span v-if="shareQuotaDisplay(row).kind === 'unlimited'">
+              {{ shareQuotaDisplay(row).used }} / {{ t('user.shares.unlimited') }}
+            </span>
+            <span v-else-if="shareQuotaDisplay(row).kind === 'exhausted'">
+              {{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}
+              · {{ t('user.shares.countExhausted') }}
+            </span>
+            <span v-else>{{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}</span>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.status') }}</span>
+          <span class="share-card-value">
+            <el-tag v-if="shareStatusKind(row) === 'deleted'" size="small" type="info">
+              {{ t('user.shares.statusDeleted') }}
+            </el-tag>
+            <el-tag v-else-if="shareStatusKind(row) === 'exhausted'" size="small" type="warning">
+              {{ t('user.shares.countExhausted') }}
+            </el-tag>
+            <el-tag v-else-if="shareStatusKind(row) === 'expired'" size="small" type="danger">
+              {{ t('user.shares.statusExpired') }}
+            </el-tag>
+            <el-tag v-else size="small" type="success">{{ t('user.shares.statusActive') }}</el-tag>
+          </span>
+        </div>
+        <div class="share-card-line">
+          <span class="share-card-label">{{ t('user.shares.createdAt') }}</span>
+          <span class="share-card-value">{{ formatDate(row.created_at) }}</span>
+        </div>
+        <div class="share-card-actions">
+          <template v-if="row.deleted_at">
+            <el-button size="small" type="success" @click="confirmRestore(row)">
+              <el-icon><RefreshLeft /></el-icon> {{ t('user.shares.restore') }}
+            </el-button>
+            <el-button size="small" type="danger" @click="confirmHardDelete(row)">
+              <el-icon><Delete /></el-icon> {{ t('user.shares.hardDelete') }}
+            </el-button>
+          </template>
+          <template v-else>
+            <el-button size="small" @click="copyLink(row)">
+              <el-icon><Link /></el-icon> {{ t('user.shares.copyLink') }}
+            </el-button>
+            <el-button size="small" @click="copyCode(row)">
+              <el-icon><Postcard /></el-icon> {{ t('user.shares.copyCode') }}
+            </el-button>
+            <el-button size="small" type="warning" @click="openExtendDialog(row)">
+              <el-icon><Clock /></el-icon> {{ t('user.shares.extend') }}
+            </el-button>
+            <el-button size="small" type="danger" @click="confirmDelete(row)">
+              <el-icon><Delete /></el-icon> {{ t('common.delete') }}
+            </el-button>
+          </template>
+        </div>
+      </div>
+    </div>
 
     <!-- 空状态 -->
     <el-empty v-if="!loading && list.length === 0" :description="t('user.shares.empty')">
@@ -221,7 +327,9 @@ import {
 } from '@element-plus/icons-vue'
 import { userSharesApi, type UserShareItem } from '@/api/userShares'
 import { copyToClipboard } from '@/utils/clipboard'
+import { withBase } from '@/utils/base'
 import { useTableQuery } from '@/composables/useTableQuery'
+import { shareQuotaDisplay, shareStatusKind } from '@/utils/pickupQuota'
 import PageHeader from '@/components/data/PageHeader.vue'
 import ExpireText from '@/components/data/ExpireText.vue'
 import { useErrorHandler } from '@/composables/useErrorHandler'
@@ -276,19 +384,32 @@ const { list, total, page, pageSize, loading, load, reload, handlePageChange, ha
 // 操作后刷新适配器：带参=跳页，无参=刷新当前页
 const loadList = (resetPage?: number) => (resetPage ? load(resetPage) : load())
 
+// 复制链接：优先用 6 位取件码深链（收件人凭此在首页取件，发件后找回的唯一凭据）；
+// 无取件码（E2E 密文分享/历史数据）时回退 8 位分享码链接。
+// withBase 补部署前缀（统一网关 /app/pigeonbox/ 部署下裸 origin+hash 会丢前缀）
 const copyLink = async (row: UserShareItem) => {
-  const url = `${window.location.origin}/#/share/${row.code}`
+  const path = row.pickup_code
+    ? `/#/?code=${encodeURIComponent(row.pickup_code)}`
+    : `/#/share/${row.code}`
+  const url = `${window.location.origin}${withBase(path)}`
   const ok = await copyToClipboard(url)
   if (ok) ElMessage.success(t('user.shares.linkCopied'))
   else ElMessage.error(t('common.failed'))
 }
 
+// 复制取件码：优先 6 位取件码（按钮文案即「复制取件码」），无则回退 8 位分享码
 const copyCode = async (row: UserShareItem) => {
-  const ok = await copyToClipboard(row.code)
+  const code = row.pickup_code || row.code
+  const ok = await copyToClipboard(code)
   if (ok) ElMessage.success(t('user.shares.codeCopied'))
   else ElMessage.error(t('common.failed'))
 }
 
+// ⚠️ 2026-10-26 审计修复：确认框与 API 调用**必须拆成两个 try**。
+// 此前五处操作（单删/批删/恢复/批恢复/彻底删除）把「用户取消确认框」与
+// 「接口调用失败」合进同一个 try ⇒ catch 把异常整个吃掉 ⇒ 请求层不弹 toast
+// ⇒ 页面**零反馈**：用户点「恢复」后确认框关闭但什么都没发生，
+// 无法区分「没反应」与「失败」。⇒ API 段统一走 useErrorHandler.handleError。
 const confirmDelete = async (row: UserShareItem) => {
   try {
     await ElMessageBox.confirm(
@@ -296,11 +417,15 @@ const confirmDelete = async (row: UserShareItem) => {
       t('user.deleteConfirmTitle'),
       { type: 'warning' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.batchDelete([row.code])
     ElMessage.success(t('user.deleteSuccess'))
     await loadList()
   } catch (e) {
-    // user cancel or error
+    handleError(e)
   }
 }
 
@@ -312,11 +437,17 @@ const confirmBatchDelete = async () => {
       t('user.deleteConfirmTitle'),
       { type: 'warning' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.batchDelete(selectedCodes.value)
     ElMessage.success(t('user.shares.batchDeleteSuccess', { n: selectedCodes.value.length }))
     selectedRows.value = []
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const confirmRestore = async (row: UserShareItem) => {
@@ -326,10 +457,16 @@ const confirmRestore = async (row: UserShareItem) => {
       t('user.shares.restore'),
       { type: 'info' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.restore(row.code)
     ElMessage.success(t('user.shares.restoreSuccess'))
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const confirmBatchRestore = async () => {
@@ -340,13 +477,19 @@ const confirmBatchRestore = async () => {
       t('user.shares.restore'),
       { type: 'info' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     for (const code of selectedCodes.value) {
       await userSharesApi.restore(code)
     }
     ElMessage.success(t('user.shares.batchRestoreSuccess', { n: selectedCodes.value.length }))
     selectedRows.value = []
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const confirmHardDelete = async (row: UserShareItem) => {
@@ -356,10 +499,16 @@ const confirmHardDelete = async (row: UserShareItem) => {
       t('user.shares.hardDelete'),
       { type: 'error' }
     )
+  } catch {
+    return // 用户取消
+  }
+  try {
     await userSharesApi.hardDelete(row.code)
     ElMessage.success(t('user.shares.hardDeleteSuccess'))
     await loadList()
-  } catch (e) { /* */ }
+  } catch (e) {
+    handleError(e)
+  }
 }
 
 const openExtendDialog = (row: UserShareItem) => {
@@ -415,6 +564,87 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 窄屏卡片形态（与 views/user/History.vue 同款）：
+   表格与卡片**同时渲染**、纯 CSS 互斥（不用 JS 媒体查询 ⇒ 无首帧时序问题）。 */
+.shares-cards {
+  display: none;
+}
+
+.share-card {
+  border: 1px solid var(--color-border, var(--el-border-color));
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+
+.share-card-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.share-card-line {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  color: var(--color-text-regular);
+}
+
+/* 标签列按内容自适应（下限 84px、上限 46%）——英文长标签不折行 */
+.share-card-label {
+  flex: 0 0 auto;
+  min-width: 84px;
+  max-width: 46%;
+  color: var(--color-text-secondary);
+}
+
+.share-card-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.share-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: 2px;
+}
+
+/* Element Plus 相邻按钮自带 margin-left，flex gap 下会叠出双倍间距 */
+.share-card-actions .el-button {
+  margin-left: 0;
+  /* 触控热区：size="small" 的按钮仅 24px 高 ⇒ 移动端/折叠屏命中率极差 */
+  min-height: 40px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+@media (max-width: 1024px) {
+  .shares-table {
+    display: none !important;
+  }
+
+  .shares-cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+}
+
+/* 展开态（600~1024px）：卡片多列网格（单列在 900px 宽下横跨全宽、标签与值
+   被拉到两端 ⇒ 难读） */
+@media (min-width: 600px) and (max-width: 1024px) {
+  .shares-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    align-items: start;
+  }
+}
 .shares-page {
   max-width: 100%;
 }
@@ -481,6 +711,12 @@ onMounted(() => {
   background: var(--color-muted);
   padding: 2px var(--spacing-sm);
   border-radius: var(--radius-sm);
+}
+
+/* 6 位取件码：主色高亮（与 8 位分享码区分，参照 user/History.vue） */
+.code-primary {
+  color: var(--primary-color);
+  font-weight: 600;
 }
 
 .text-preview {

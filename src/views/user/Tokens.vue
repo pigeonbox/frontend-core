@@ -23,7 +23,7 @@
       :data="list"
       style="width: 100%"
       empty-text=" "
-      class="tokens-table"
+      class="tokens-table admin-table-wide"
     >
       <el-table-column :label="t('user.tokens.name')" min-width="160">
         <template #default="{ row }">
@@ -35,11 +35,29 @@
           <code class="key-prefix">{{ row.prefix }}…</code>
         </template>
       </el-table-column>
-      <el-table-column :label="t('user.tokens.status')" width="100">
+      <el-table-column :label="t('user.tokens.status')" width="180">
         <template #default="{ row }">
           <el-tag v-if="row.revoked" size="small" type="danger">{{ t('user.tokens.revoked') }}</el-tag>
           <el-tag v-else-if="isExpired(row)" size="small" type="warning">{{ t('user.tokens.expired') }}</el-tag>
           <el-tag v-else size="small" type="success">{{ t('user.tokens.active') }}</el-tag>
+          <!-- 权限范围（contracts v0.20.5）：贴在状态列旁，不另开一列
+               （本表 8 列已 ~1210px，窄屏卡片形态才是主战场） -->
+          <el-tag
+            v-for="(tag, i) in scopeTagsOf(row)"
+            :key="`scope-${i}`"
+            size="small"
+            type="info"
+            class="scope-tag"
+          >
+            {{ tag.label }}
+          </el-tag>
+          <!-- 吊销时间（contracts v0.20.7 补齐）：撤销是**软撤销 + 审计留痕**
+               （列表含已撤销项）⇒「什么时候被吊销的」是审计的关键信息。
+               此前服务端只落库不回传 ⇒ 前端根本拿不到 ⇒ 做成**第二行小字**，
+               不藏进 tooltip（审计信息不该靠 hover 才看得到）。 -->
+          <div v-if="row.revoked && row.revoked_at" class="revoked-at">
+            {{ t('user.tokens.revokedAt') }}: {{ row.revoked_at }}
+          </div>
         </template>
       </el-table-column>
       <el-table-column :label="t('user.tokens.lastUsed')" width="180">
@@ -77,6 +95,53 @@
       </el-table-column>
     </el-table>
 
+    <!-- 窄屏（≤1024px）卡片形态：本表 8 列合计 ~1210px（操作列 110px 还
+         fixed="right"）⇒ 手机 / 折叠屏内屏 / 平板竖屏放不下 ⇒ 密钥名/前缀/状态
+         等内容列被裁（Element Plus 横向滚动条在手机上几乎看不见）。
+         表格与卡片**同时渲染**、纯 CSS 互斥（全局 .admin-table-wide / .narrow-cards）。 -->
+    <NarrowCardList :rows="list" :fields="cardFields" :row-key="(row: ApiKeyItem) => row.id">
+      <template #head="{ row }">
+        <span>{{ row.name }}</span>
+      </template>
+      <template #prefix="{ row }">
+        <code class="key-prefix">{{ row.prefix }}…</code>
+      </template>
+      <template #status="{ row }">
+        <el-tag v-if="row.revoked" size="small" type="danger">{{ t('user.tokens.revoked') }}</el-tag>
+        <el-tag v-else-if="isExpired(row)" size="small" type="warning">{{ t('user.tokens.expired') }}</el-tag>
+        <el-tag v-else size="small" type="success">{{ t('user.tokens.active') }}</el-tag>
+        <el-tag
+          v-for="(tag, i) in scopeTagsOf(row)"
+          :key="`scope-${i}`"
+          size="small"
+          type="info"
+          class="scope-tag"
+        >
+          {{ tag.label }}
+        </el-tag>
+        <div v-if="row.revoked && row.revoked_at" class="revoked-at">
+          {{ t('user.tokens.revokedAt') }}: {{ row.revoked_at }}
+        </div>
+      </template>
+      <template #last_used_at="{ row }">
+        {{ formatTime(row.last_used_at, t('user.tokens.neverUsed')) }}
+      </template>
+      <template #last_used_ip="{ row }">{{ row.last_used_ip || '-' }}</template>
+      <template #expires_at="{ row }">{{ formatTime(row.expires_at, t('user.tokens.never')) }}</template>
+      <template #created_at="{ row }">{{ formatTime(row.created_at, '-') }}</template>
+      <template #actions="{ row }">
+        <el-button
+          v-if="!row.revoked"
+          size="small"
+          type="danger"
+          plain
+          @click="revoke(row)"
+        >
+          {{ t('user.tokens.revoke') }}
+        </el-button>
+      </template>
+    </NarrowCardList>
+
     <!-- 签发对话框 -->
     <el-dialog
       v-model="createVisible"
@@ -100,8 +165,26 @@
             <el-option :label="t('user.tokens.days365')" :value="365" />
           </el-select>
         </el-form-item>
+        <el-form-item :label="t('user.tokens.scopeLabel')">
+          <el-select
+            v-model="createForm.scopes"
+            multiple
+            style="width: 100%"
+            :placeholder="t('user.tokens.scopePlaceholder')"
+          >
+            <el-option :label="t('user.tokens.scopeAdmin')" value="admin" />
+            <el-option :label="t('user.tokens.scopeUser')" value="user" />
+            <el-option :label="t('user.tokens.scopeShare')" value="share" />
+          </el-select>
+        </el-form-item>
         <el-alert
           :title="t('user.tokens.expiryHint')"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+        <el-alert
+          :title="t('user.tokens.scopeHint')"
           type="info"
           :closable="false"
           show-icon
@@ -154,22 +237,57 @@ import { Plus, CopyDocument, Delete } from '@element-plus/icons-vue'
 import { userApi, type ApiKeyItem } from '@/api/user'
 import { copyToClipboard } from '@/utils/clipboard'
 import PageHeader from '@/components/data/PageHeader.vue'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 
 const loading = ref(false)
 const list = ref<ApiKeyItem[]>([])
 
+// 窄屏卡片字段策展（标签复用表格列的同一批 i18n key ⇒ 宽窄两屏口径一致）
+const cardFields = computed(() => [
+  { key: 'prefix', label: t('user.tokens.prefix') },
+  { key: 'status', label: t('user.tokens.status') },
+  { key: 'last_used_at', label: t('user.tokens.lastUsed') },
+  { key: 'last_used_ip', label: t('user.tokens.lastIP') },
+  { key: 'expires_at', label: t('user.tokens.expiresAt') },
+  { key: 'created_at', label: t('user.tokens.createdAt') },
+])
+
 const activeCount = computed(() => list.value.filter((k) => !k.revoked && !isExpired(k)).length)
 
 const createVisible = ref(false)
 const creating = ref(false)
-const createForm = ref({ name: '', expiresInDays: 0 })
+const createForm = ref({ name: '', expiresInDays: 0, scopes: [] as string[] })
 
 const resultVisible = ref(false)
 const createdKey = ref('')
 const createdKeyId = ref(0)
 const copied = ref(false)
+
+// scopeOptions 权限范围取值（与服务端 pkg/middleware 的词汇表同款）。
+const scopeOptions = [
+  { value: 'admin', labelKey: 'user.tokens.scopeAdmin' },
+  { value: 'user', labelKey: 'user.tokens.scopeUser' },
+  { value: 'share', labelKey: 'user.tokens.scopeShare' },
+]
+
+/**
+ * 该 Key 的权限范围标签。
+ *
+ * **空范围 = 全量**（与服务端一致：老 Key 无需重建）⇒ 显式标一个「全量」标签，
+ * 否则用户看到空白会以为「没配范围 = 什么都不能干」。
+ */
+const scopeTagsOf = (row: ApiKeyItem) => {
+  const scopes = row.scopes ?? []
+  if (scopes.length === 0) {
+    return [{ label: t('user.tokens.scopeFull') }]
+  }
+  return scopes.map((v) => {
+    const opt = scopeOptions.find((o) => o.value === v)
+    return { label: opt ? t(opt.labelKey) : v }
+  })
+}
 
 const isExpired = (row: ApiKeyItem) =>
   !!row.expires_at && new Date(row.expires_at).getTime() < Date.now()
@@ -190,16 +308,20 @@ const loadList = async () => {
 }
 
 const openCreate = () => {
-  createForm.value = { name: '', expiresInDays: 0 }
+  // 每次打开都重置为「全量」（scopes 空数组 = 全量，与既有 Key 同口径）
+  createForm.value = { name: '', expiresInDays: 0, scopes: [] }
   createVisible.value = true
 }
 
 const submitCreate = async () => {
   creating.value = true
   try {
-    const payload: { name?: string; expires_in_days?: number } = {}
+    const payload: { name?: string; expires_in_days?: number; scopes?: string[] } = {}
     if (createForm.value.name.trim()) payload.name = createForm.value.name.trim()
     if (createForm.value.expiresInDays > 0) payload.expires_in_days = createForm.value.expiresInDays
+    // 权限范围：空数组 = 全量（服务端口径）；显式传空数组与不传等价，
+    // 这里始终传 ⇒ 前端与后端对「没选」的理解是同一个。
+    payload.scopes = createForm.value.scopes
     const res = await userApi.createApiKey(payload)
     createdKey.value = res.data.key
     createdKeyId.value = res.data.api_key.id
@@ -244,7 +366,9 @@ const revoke = async (row: ApiKeyItem) => {
     ElMessage.success(t('user.tokens.revokeSuccess'))
     loadList()
   } catch {
-    ElMessage.error(t('user.tokens.loadFailed'))
+    // 吊销失败 ≠ 加载失败（2026-10-26 审计）：复用 loadFailed 会弹出
+    // 「加载 API Key 列表失败」⇒ 与用户刚做的操作完全无关，看不出哪一步失败。
+    ElMessage.error(t('user.tokens.revokeFailed'))
   }
 }
 
@@ -268,7 +392,8 @@ const revokeAll = async () => {
     ElMessage.success(t('user.tokens.revokeAllSuccess', { count: res.data.revoked }))
     loadList()
   } catch {
-    ElMessage.error(t('user.tokens.loadFailed'))
+    // 同上：批量吊销失败用 revokeFailed，不用 loadFailed
+    ElMessage.error(t('user.tokens.revokeFailed'))
   }
 }
 
@@ -317,5 +442,12 @@ onMounted(loadList)
   margin: 10px 0 0;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+/* 吊销时间（审计信息）：弱化但**始终可见**（不做成 tooltip） */
+.revoked-at {
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
 }
 </style>

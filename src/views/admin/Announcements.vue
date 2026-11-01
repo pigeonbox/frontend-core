@@ -8,7 +8,7 @@
         </div>
       </template>
 
-      <el-table :data="items" style="width: 100%">
+      <el-table class="admin-table-wide" :data="items" style="width: 100%">
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="title" :label="t('admin.announcementsPage.colTitle')" min-width="200" show-overflow-tooltip />
         <el-table-column :label="t('admin.announcementsPage.colType')" width="110">
@@ -31,7 +31,7 @@
         <el-table-column prop="start_at" :label="t('admin.announcementsPage.colStartAt')" width="170">
           <template #default="{ row }">{{ row.start_at || '—' }}</template>
         </el-table-column>
-        <el-table-column :label="t('admin.announcementsPage.colActions')" width="220" fixed="right" class-name="nowrap-actions">
+        <el-table-column :label="t('admin.announcementsPage.colActions')" width="260" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <el-button size="small" @click="openEdit(row)">{{ t('admin.announcementsPage.edit') }}</el-button>
             <el-button v-if="row.status === 1" size="small" type="warning" plain @click="setStatus(row, 2)">{{ t('admin.announcementsPage.offline') }}</el-button>
@@ -41,6 +41,29 @@
         </el-table-column>
         <template #empty>{{ t('admin.announcementsPage.empty') }}</template>
       </el-table>
+
+      <!-- 窄屏（≤768px）卡片形态：表格列宽合计 990px ⇒ 390px 视口下内容列全被裁。
+           字段策展=手机上也该看见的（类型/级别/状态/生效时间），标签复用表格列同一批
+           i18n key ⇒ 宽窄两屏口径一致。开关样式在 styles/main.scss（全局）。 -->
+      <NarrowCardList :rows="items" :fields="cardFields" :head="cardHead">
+        <template #type="{ row }">
+          <el-tag size="small" :type="row.type === 'maintenance' ? 'warning' : 'info'">{{ typeLabel(row.type) }}</el-tag>
+        </template>
+        <template #level="{ row }">
+          <el-tag size="small" :type="levelTagType(row.level)">{{ row.level }}</el-tag>
+        </template>
+        <template #status="{ row }">
+          <el-tag size="small" :type="row.status === 1 ? 'success' : row.status === 2 ? 'danger' : 'info'">
+            {{ row.status === 1 ? t('admin.announcementsPage.statusPublished') : row.status === 2 ? t('admin.announcementsPage.statusOffline') : t('admin.announcementsPage.statusDraft') }}
+          </el-tag>
+        </template>
+        <template #actions="{ row }">
+          <el-button size="small" @click="openEdit(row)">{{ t('admin.announcementsPage.edit') }}</el-button>
+          <el-button v-if="row.status === 1" size="small" type="warning" plain @click="setStatus(row, 2)">{{ t('admin.announcementsPage.offline') }}</el-button>
+          <el-button v-else size="small" type="success" plain @click="setStatus(row, 1)">{{ t('admin.announcementsPage.publish') }}</el-button>
+          <el-button size="small" type="danger" plain @click="onDelete(row)">{{ t('admin.announcementsPage.delete') }}</el-button>
+        </template>
+      </NarrowCardList>
 
       <div class="pager">
         <el-pagination
@@ -92,12 +115,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -121,11 +145,22 @@ const form = ref({ title: '', content: '', type: 'system', level: 'info', start_
 const typeLabel = (v: string) => (v === 'maintenance' ? t('admin.announcementsPage.typeMaintenance') : v === 'feature' ? t('admin.announcementsPage.typeFeatureShort') : t('admin.announcementsPage.typeSystem'))
 const levelTagType = (l: string) => (l === 'error' ? 'danger' : l === 'warning' ? 'warning' : l === 'success' ? 'success' : 'info')
 
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径必然一致、不新增翻译。
+// 用 computed 而非常量数组：t() 随语言切换重算，常量数组会把标签冻结在首次渲染。
+const cardFields = computed(() => [
+  { key: 'type', label: t('admin.announcementsPage.colType') },
+  { key: 'level', label: t('admin.announcementsPage.colLevel') },
+  { key: 'status', label: t('admin.announcementsPage.colStatus') },
+  { key: 'start_at', label: t('admin.announcementsPage.colStartAt'), get: (r: NotifyRow) => r.start_at || '—' },
+])
+const cardHead = (row: NotifyRow) => row.title
+
 const { list: items, total, page, loading, reload, handlePageChange } = useTableQuery<NotifyRow>(
   async ({ page, page_size }) => {
     try {
       const res = await adminApi.listNotifies({ page, page_size })
-      if (res.code === 0 || res.code === 200) {
+      if (res.code === 200) {
         const d = res.data as Record<string, unknown>
         const list = (d.list || d.items || d.notifies) as NotifyRow[] | undefined
         const items = Array.isArray(list) ? list : Array.isArray(d) ? (d as unknown as NotifyRow[]) : []
@@ -175,7 +210,7 @@ const doSave = async () => {
     const res = editId.value
       ? await adminApi.updateNotify(editId.value, payload)
       : await adminApi.createNotify(payload)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.announcementsPage.saved'))
       dlg.value = false
       load()
@@ -194,7 +229,7 @@ const setStatus = async (row: NotifyRow, status: number) => {
     const res = await adminApi.updateNotify(row.id, {
       title: row.title, content: row.content, type: row.type, level: row.level, status,
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(status === 1 ? t('admin.announcementsPage.publishedToast') : t('admin.announcementsPage.offlineToast'))
       load()
     } else {
@@ -212,7 +247,7 @@ const onDelete = async (row: NotifyRow) => {
     return
   }
   const res = await adminApi.deleteNotify(row.id)
-  if (res.code === 0 || res.code === 200) {
+  if (res.code === 200) {
     ElMessage.success(t('admin.announcementsPage.deleted'))
     load()
   } else {
@@ -235,8 +270,4 @@ onMounted(load)
   justify-content: flex-end;
 }
 
-/* 操作列三按钮（编辑/下线/删除）不折行 */
-:deep(.nowrap-actions .cell) {
-  white-space: nowrap;
-}
 </style>

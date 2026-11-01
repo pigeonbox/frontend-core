@@ -9,7 +9,10 @@
     <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png" />
     <link rel="icon" sizes="48x48" href="./favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover：让 env(safe-area-inset-*) 生效（刘海/灵动岛/底部指示条/
+         圆角屏的安全区内缩）。缺它时 iOS 把安全区恒为 0 ⇒ 内容会压到刘海/指示条下
+         （折叠屏的圆角与内屏挖孔同理）。-->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>PigeonBox</title>
     <!-- 首帧引导外链（同步阻塞脚本，执行时机与原内联一致）：
          独立文件配合 CSP script-src 'self'，内联脚本会迫使开 'unsafe-inline' -->

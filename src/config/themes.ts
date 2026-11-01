@@ -18,17 +18,29 @@ export interface ThemePreset {
   swatch: string
 }
 
+/**
+ * 默认主题（产品出厂主色）= 青竹。
+ * 与三处保持一致：main.scss 的 --primary-* 预填值、静态图标底色
+ * （scripts/gen-brand-icons.py 生成）、以及本注册表首项。
+ * 后端 ui.accent_color 缺省为空 ⇒ 前端回落到 main.scss 默认值；
+ * 管理台用 matchThemePreset 反查高亮，故空值也返回默认项。
+ */
+export const DEFAULT_THEME_KEY = 'emerald'
+
 export const THEMES: ThemePreset[] = [
+  { key: 'emerald', labelKey: 'admin.configPage.themes.emerald', accent: '#0e9f6e', swatch: '#0e9f6e' },
   { key: 'indigo', labelKey: 'admin.configPage.themes.indigo', accent: '#5e6ad2', swatch: '#5e6ad2' },
   { key: 'fresh', labelKey: 'admin.configPage.themes.fresh', accent: '#409eff', swatch: '#409eff' },
-  { key: 'emerald', labelKey: 'admin.configPage.themes.emerald', accent: '#0e9f6e', swatch: '#0e9f6e' },
+  { key: 'ink', labelKey: 'admin.configPage.themes.ink', accent: '#18181b', swatch: '#18181b' },
   { key: 'amber', labelKey: 'admin.configPage.themes.amber', accent: '#d97706', swatch: '#d97706' },
   { key: 'rose', labelKey: 'admin.configPage.themes.rose', accent: '#e11d48', swatch: '#e11d48' },
-  { key: 'ink', labelKey: 'admin.configPage.themes.ink', accent: '#18181b', swatch: '#18181b' },
 ]
 
-/** 根据 accent 反查预设名（无命中=自定义） */
+/** 默认主色（缺省 accent 时的实际生效值，与 main.scss 一致） */
+export const DEFAULT_ACCENT = THEMES.find((t) => t.key === DEFAULT_THEME_KEY)?.accent ?? '#0e9f6e'
+
+/** 根据 accent 反查预设名（未配置=默认项；无命中=自定义） */
 export const matchThemePreset = (accent?: string): string => {
-  if (!accent) return ''
+  if (!accent) return DEFAULT_THEME_KEY
   return THEMES.find((t) => t.accent.toLowerCase() === accent.toLowerCase())?.key ?? 'custom'
 }

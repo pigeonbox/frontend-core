@@ -32,6 +32,15 @@
 
           <!-- ============ 站点与外观（base + ui） ============ -->
           <el-form v-if="activeSection === 'site'" label-width="180px" class="config-form">
+            <!-- 未配置公网地址时告警：分享链接会带内网地址，外部用户打不开 -->
+            <el-alert
+              v-if="publicUrlMissing"
+              type="warning"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.basic.publicUrlWarn')"
+            />
             <el-divider content-position="left">{{ t('admin.configPage.sections.site') }}</el-divider>
             <el-form-item :label="t('admin.configPage.basic.siteName')">
               <el-input v-model="configForm.base.name" />
@@ -39,6 +48,16 @@
 
             <el-form-item :label="t('admin.configPage.basic.siteDescription')">
               <el-input v-model="configForm.base.description" type="textarea" :rows="3" />
+            </el-form-item>
+
+            <el-form-item :label="t('admin.configPage.basic.publicUrl')">
+              <el-input
+                v-model="configForm.base.public_url"
+                :placeholder="t('admin.configPage.basic.publicUrlPlaceholder')"
+                clearable
+                style="max-width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.basic.publicUrlHint') }}</span>
             </el-form-item>
 
             <el-divider content-position="left">{{ t('admin.configPage.sections.appearance') }}</el-divider>
@@ -62,7 +81,7 @@
               <span class="field-hint">{{ t('admin.configPage.themes.hint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.appearance.accentColor')">
-              <el-input v-model="exForm.ui.accent_color" placeholder="#409eff" style="width: 220px" />
+              <el-input v-model="exForm.ui.accent_color" placeholder="#0e9f6e" style="width: 220px" />
               <span class="field-hint">{{ t('admin.configPage.appearance.accentHint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.appearance.showAdminEntry')">
@@ -97,6 +116,60 @@
             <el-form-item :label="t('admin.configPage.upload.anonymousDailyBytes')">
               <el-input-number v-model="exForm.upload_ex.anonymous_daily_bytes" :min="0" :max="107374182400" />
               <span class="field-hint">{{ t('admin.configPage.upload.anonymousDailyBytesHint') }}</span>
+            </el-form-item>
+            <!-- 单文件上限（upload_ex.max_file_size，字节）：此前后端能存能热应用，
+                 但管理台没有入口 ⇒ 管理员改不动，实际由反代层的 nginx 硬顶，
+                 表现是「大文件上传到一半被 nginx 拒成 413」。这里给出业务侧权威入口。 -->
+            <el-form-item :label="t('admin.configPage.upload.maxFileSize')">
+              <el-input-number v-model="maxFileSizeMb" :min="0" :max="1048576" :step="1024" />
+              <span class="field-hint">{{ t('admin.configPage.upload.maxFileSizeHint') }}</span>
+            </el-form-item>
+            <!-- 单次发送**总量**上限（user.user_upload_size）：与上面的「单文件上限」是
+                 **两个不同的闸**——单文件上限管单个文件，本项管一次发送（多文件合计）的
+                 体积，只约束登录用户（匿名走访客日配额）。
+                 配成「总量 < 单文件」⇒ 超过单文件上限的文件永远发不出去（先被总量闸拒），
+                 而界面仍在宣称单文件上限有效 ⇒ 这里告警 + 一键对齐。
+                 编辑入口在「账户与登录」分区（user 段，PUT /admin/config/user）。 -->
+            <el-form-item :label="t('admin.configPage.upload.batchCap')">
+              <span class="field-hint">{{ t('admin.configPage.upload.batchCapCurrent', { size: batchCapText }) }}</span>
+              <el-button
+                v-if="uploadCapConflict"
+                size="small"
+                type="warning"
+                plain
+                :loading="aligningCap"
+                @click="alignUploadCap"
+              >
+                {{ t('admin.configPage.upload.batchCapAlign') }}
+              </el-button>
+              <el-alert
+                v-if="uploadCapConflict"
+                type="warning"
+                :closable="false"
+                show-icon
+                class="cap-conflict-alert"
+              >
+                {{ t('admin.configPage.upload.batchCapConflict', { total: batchCapText, perFile: maxFileSizeText }) }}
+              </el-alert>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.upload.allowedExpireStyles')">
+              <el-select
+                v-model="exForm.upload_ex.allowed_expire_styles"
+                multiple
+                clearable
+                collapse-tags
+                collapse-tags-tooltip
+                :placeholder="t('admin.configPage.upload.allowedExpireStylesPlaceholder')"
+                class="expire-style-select"
+              >
+                <el-option
+                  v-for="s in EXPIRE_STYLE_KEYS"
+                  :key="s"
+                  :label="t(EXPIRE_STYLE_I18N_KEYS[s])"
+                  :value="s"
+                />
+              </el-select>
+              <span class="field-hint">{{ t('admin.configPage.upload.allowedExpireStylesHint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.transfer.uploadGates')">
               <span class="field-hint">
@@ -175,12 +248,13 @@
 
             <el-form-item :label="t('admin.configPage.user.uploadLimit')">
               <el-input-number
-                v-model="configForm.user.useruploadsize"
-                :min="1048576"
-                :step="1048576"
+                v-model="userUploadSizeMb"
+                :min="0"
+                :max="1048576"
+                :step="1024"
                 controls-position="right"
               />
-              <span class="field-hint">{{ t('admin.configPage.user.bytesDefault') }}</span>
+              <span class="field-hint">{{ t('admin.configPage.user.uploadLimitHint') }}</span>
             </el-form-item>
 
             <el-form-item :label="t('admin.configPage.user.storageQuota')">
@@ -319,113 +393,54 @@
               style="margin-bottom: 16px"
               :title="t('admin.configPage.envPriorityHint')"
             />
-            <!-- 两功能白话导航卡：设备直传（人人可用）/ 跨站联邦（进阶） -->
+            <!-- 白话导航卡：跨站联邦（Wave B'：设备直传面已拆为 PigeonBeam，本区只留联邦） -->
             <div class="p2p-intro">
               <div class="p2p-feature-card">
-                <div class="p2p-feature-head">
-                  <span class="p2p-feature-title">{{ t('admin.configPage.p2p.introDtTitle') }}</span>
-                  <el-tag size="small" type="success">{{ t('admin.configPage.p2p.introDtBadge') }}</el-tag>
-                </div>
-                <p class="p2p-feature-desc">{{ t('admin.configPage.p2p.introDtDesc') }}</p>
-                <p class="p2p-feature-steps">{{ t('admin.configPage.p2p.introDtSteps') }}</p>
-                <el-link type="primary" @click="goP2pOps">{{ t('admin.configPage.p2p.openOpsPage') }} →</el-link>
-              </div>
-              <div class="p2p-feature-card is-muted">
                 <div class="p2p-feature-head">
                   <span class="p2p-feature-title">{{ t('admin.configPage.p2p.introFedTitle') }}</span>
                   <el-tag size="small" type="info">{{ t('admin.configPage.p2p.introFedBadge') }}</el-tag>
                 </div>
                 <p class="p2p-feature-desc">{{ t('admin.configPage.p2p.introFedDesc') }}</p>
+                <el-link type="primary" @click="goFederationOps">{{ t('admin.configPage.p2p.openOpsPage') }} →</el-link>
               </div>
             </div>
 
-            <!-- 区块一：设备直传（推荐先配）——字段绑定不变 -->
-            <el-divider content-position="left">{{ t('admin.configPage.sections.directTransfer') }}</el-divider>
-            <el-form-item :label="t('admin.configPage.p2p.dtEnabled')">
-              <el-switch v-model="exForm.p2p.direct.enabled" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.dtEnabledHint') }}</span>
+            <!-- 跨站联邦（Wave B'：设备直传面已拆为独立应用 PigeonBeam，p2p 分区只留联邦） -->
+            <el-divider content-position="left">{{ t('admin.configPage.sections.federation') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
+              <el-switch v-model="exForm.p2p.federation.enabled" />
+              <span class="field-hint">{{ t('admin.configPage.p2p.fedEnabledHint') }}</span>
             </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.sendRoots')">
+            <el-form-item :label="t('admin.configPage.p2p.registryUrl')">
               <el-input
-                v-model="p2pSendRootsText"
-                type="textarea"
-                :rows="3"
-                :placeholder="t('admin.configPage.p2p.sendRootsPlaceholder')"
+                v-model="exForm.p2p.federation.registry_url"
+                :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                style="width: 360px"
               />
-              <span class="field-hint">{{ t('admin.configPage.p2p.sendRootsHint') }}</span>
+              <span class="field-hint">{{ t('admin.configPage.p2p.registryUrlHint') }}</span>
             </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.recvDir')">
-              <el-input v-model="exForm.p2p.direct.recv_dir" :placeholder="t('admin.configPage.p2p.recvDirPlaceholder')" style="width: 360px" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.recvDirHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.maxTaskMB')">
-              <el-input-number v-model="p2pMaxTaskMB" :min="0" :max="1048576" controls-position="right" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.maxTaskMBHint') }}</span>
-            </el-form-item>
-            <el-form-item :label="t('admin.configPage.p2p.inboxQuotaGB')">
-              <el-input-number v-model="p2pInboxQuotaGB" :min="0" :max="10240" controls-position="right" />
-              <span class="field-hint">{{ t('admin.configPage.p2p.inboxQuotaGBHint') }}</span>
+            <el-form-item :label="t('admin.configPage.p2p.publicUrl')">
+              <el-input
+                v-model="exForm.p2p.federation.public_url"
+                :placeholder="t('admin.configPage.p2p.publicUrlPlaceholder')"
+                style="width: 360px"
+              />
+              <span class="field-hint">{{ t('admin.configPage.p2p.publicUrlHint') }}</span>
             </el-form-item>
             <el-collapse class="p2p-advanced">
-              <el-collapse-item name="dt-advanced" :title="t('admin.configPage.p2p.dtAdvancedTitle')">
-                <el-form-item :label="t('admin.configPage.p2p.dtRegistry')">
+              <el-collapse-item name="fed-advanced" :title="t('admin.configPage.p2p.fedAdvancedTitle')">
+                <el-form-item :label="t('admin.configPage.p2p.minEntropy')">
+                  <el-input-number v-model="exForm.p2p.federation.announce_min_entropy_bits" :min="0" :max="256" />
+                  <span class="field-hint">{{ t('admin.configPage.p2p.minEntropyHint') }}</span>
+                </el-form-item>
+                <el-form-item :label="t('admin.configPage.p2p.nodeKeyPath')">
                   <el-input
-                    v-model="exForm.p2p.direct.registry_url"
-                    :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
+                    v-model="exForm.p2p.federation.node_key_path"
+                    :placeholder="t('admin.configPage.p2p.nodeKeyPathPlaceholder')"
                     style="width: 360px"
                   />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.dtRegistryHint') }}</span>
+                  <span class="field-hint p2p-danger-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
                 </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.dtDiscoverable')">
-                  <el-switch v-model="exForm.p2p.direct.discoverable" />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.dtDiscoverableHint') }}</span>
-                </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.binaryPath')">
-                  <el-input v-model="exForm.p2p.direct.binary_path" :placeholder="t('admin.configPage.p2p.binaryPathPlaceholder')" style="width: 360px" />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.binaryPathHint') }}</span>
-                </el-form-item>
-              </el-collapse-item>
-            </el-collapse>
-
-            <!-- 区块二：跨站联邦（进阶，默认折叠）——字段绑定不变 -->
-            <el-collapse class="p2p-advanced">
-              <el-collapse-item name="fed" :title="t('admin.configPage.p2p.fedCollapseTitle')">
-                <el-form-item :label="t('admin.configPage.p2p.fedEnabled')">
-                  <el-switch v-model="exForm.p2p.federation.enabled" />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.fedEnabledHint') }}</span>
-                </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.registryUrl')">
-                  <el-input
-                    v-model="exForm.p2p.federation.registry_url"
-                    :placeholder="t('admin.configPage.p2p.registryUrlPlaceholder')"
-                    style="width: 360px"
-                  />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.registryUrlHint') }}</span>
-                </el-form-item>
-                <el-form-item :label="t('admin.configPage.p2p.publicUrl')">
-                  <el-input
-                    v-model="exForm.p2p.federation.public_url"
-                    :placeholder="t('admin.configPage.p2p.publicUrlPlaceholder')"
-                    style="width: 360px"
-                  />
-                  <span class="field-hint">{{ t('admin.configPage.p2p.publicUrlHint') }}</span>
-                </el-form-item>
-                <el-collapse class="p2p-advanced">
-                  <el-collapse-item name="fed-advanced" :title="t('admin.configPage.p2p.fedAdvancedTitle')">
-                    <el-form-item :label="t('admin.configPage.p2p.minEntropy')">
-                      <el-input-number v-model="exForm.p2p.federation.announce_min_entropy_bits" :min="0" :max="256" />
-                      <span class="field-hint">{{ t('admin.configPage.p2p.minEntropyHint') }}</span>
-                    </el-form-item>
-                    <el-form-item :label="t('admin.configPage.p2p.nodeKeyPath')">
-                      <el-input
-                        v-model="exForm.p2p.federation.node_key_path"
-                        :placeholder="t('admin.configPage.p2p.nodeKeyPathPlaceholder')"
-                        style="width: 360px"
-                      />
-                      <span class="field-hint p2p-danger-hint">{{ t('admin.configPage.p2p.nodeKeyPathHint') }}</span>
-                    </el-form-item>
-                  </el-collapse-item>
-                </el-collapse>
               </el-collapse-item>
             </el-collapse>
           </el-form>
@@ -442,15 +457,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, type Component } from 'vue'
+import { ref, computed, watch, onMounted, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Picture, Upload, Download, User, Lock, Message, Connection } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { THEMES, matchThemePreset, type ThemePreset } from '@/config/themes'
+import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS } from '@/config/expireStyles'
 import { adminApi } from '@/api/admin'
 import { useConfigStore } from '@/stores/config'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { uploadCapMismatch, alignedUploadCap } from '@/utils/uploadCap'
+import { formatFileSize } from '@/utils/format'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -499,11 +517,13 @@ const loading = ref(false)
 const saving = ref(false)
 const configStore = useConfigStore()
 
-const configForm = reactive({
+const configForm = ref({
   base: {
     name: '',
     description: '',
-    port: 12346
+    port: 12346,
+    // 站点公网地址（base 值段字段，整段随 base 提交；空串=未配置→前端回退 location.origin）
+    public_url: ''
   },
   transfer: {
     max_count: 100,
@@ -511,11 +531,16 @@ const configForm = reactive({
   },
   user: {
     allowuserregistration: 0,
-    useruploadsize: 52428800,
+    // 单次发送总量上限（字节，0 = 不限）：2026-10-30 起出厂默认即为不限
+    // （此前默认 50MB，与单文件上限默认「不限」自相矛盾）。
+    useruploadsize: 0,
     userstoragequota: 1073741824,
     sessionexpiryhours: 168
   }
 })
+
+// 公网地址未配置告警（内网部署时分享链接会带内网地址，外部用户打不开）
+const publicUrlMissing = computed(() => !configForm.value.base.public_url.trim())
 
 const fetchConfig = async () => {
   loading.value = true
@@ -524,10 +549,12 @@ const fetchConfig = async () => {
     if (res.code === 200 && res.data) {
       // 映射配置数据
       if (res.data.base) {
-        Object.assign(configForm.base, res.data.base)
+        Object.assign(configForm.value.base, res.data.base)
+        // 后端可能下发 null（未配置）→ 归一为空串，避免把 null 提交回配置段
+        if (!configForm.value.base.public_url) configForm.value.base.public_url = ''
       }
       if (res.data.transfer) {
-        Object.assign(configForm.transfer, res.data.transfer)
+        Object.assign(configForm.value.transfer, res.data.transfer)
       }
       // v0.7.3 扩容设置段预填
       fetchExSections(res.data as Record<string, unknown>)
@@ -546,12 +573,14 @@ const fetchConfig = async () => {
 const fetchUserSettings = async () => {
   try {
     const res = await adminApi.getUserSettings()
-    if ((res.code === 0 || res.code === 200) && res.data) {
+    if ((res.code === 200) && res.data) {
       const d = res.data as Record<string, unknown>
-      configForm.user.allowuserregistration = Number(d.allowuserregistration === true || d.allowuserregistration === 1)
-      if (typeof d.useruploadsize === 'number' && d.useruploadsize > 0) configForm.user.useruploadsize = d.useruploadsize
-      if (typeof d.userstoragequota === 'number' && d.userstoragequota > 0) configForm.user.userstoragequota = d.userstoragequota
-      if (typeof d.sessionexpiryhours === 'number' && d.sessionexpiryhours > 0) configForm.user.sessionexpiryhours = d.sessionexpiryhours
+      configForm.value.user.allowuserregistration = Number(d.allowuserregistration === true || d.allowuserregistration === 1)
+      // ⚠️ 0 是合法值（不限）——此前用 `> 0` 过滤 ⇒ 0 被当成「没值」而跳过，
+      // 表单永远停在默认的 52428800 ⇒ **管理员根本表达不了「不限」**。
+      if (typeof d.useruploadsize === 'number' && d.useruploadsize >= 0) configForm.value.user.useruploadsize = d.useruploadsize
+      if (typeof d.userstoragequota === 'number' && d.userstoragequota > 0) configForm.value.user.userstoragequota = d.userstoragequota
+      if (typeof d.sessionexpiryhours === 'number' && d.sessionexpiryhours > 0) configForm.value.user.sessionexpiryhours = d.sessionexpiryhours
     }
   } catch (error) {
     console.error('fetch user settings failed:', error)
@@ -560,13 +589,20 @@ const fetchUserSettings = async () => {
 
 // ==================== v0.7.3 扩容设置段（ui/download/notify/oidc/local_import/api_token）====================
 // 扁平契约：每段独立保存（adminApi.updateConfig({ 段名: 值 })），后端 nil-保留未提交段
-const exForm = reactive({
+const exForm = ref({
   ui: { background: '', accent_color: '', show_admin_addr: true, robots_text: '' },
   upload_ex: {
     open_upload: true,
     require_login: false,
     anonymous_daily_count: 0,
     anonymous_daily_bytes: 0,
+    // 单文件上限（字节，0=不限）。服务端 presign init 阶段即按此值拒超限文件
+    // （错误码 30008），零流量拒绝；反代 nginx 上限须 ≥ 本值。
+    max_file_size: 0,
+    // 允许用户选择的过期样式；**空 = 全部允许**（服务端 effectiveExpireStyles 语义）。
+    // 此前管理台没有这个字段的编辑器（后端接受、界面不暴露）⇒ 管理员改不动，
+    // 老实例若白名单不含 count（「按取件次数」）就永远加不回来（2026-10-22）。
+    allowed_expire_styles: [] as string[],
   },
   download: {
     s3_direct_download: false,
@@ -582,43 +618,74 @@ const exForm = reactive({
   local_import: { enabled: false, roots: [] as string[] },
   api_token: { enabled: true, per_key_qps: 20, per_key_burst: 40 },
   p2p: {
+    // Wave B'：设备直传面（p2p.direct）已拆为独立应用 PigeonBox，Box 侧只留联邦
     federation: { enabled: false, registry_url: '', public_url: '', node_key_path: '', announce_min_entropy_bits: 40 },
-    direct: { enabled: false, registry_url: '', relay_addr: '', send_roots: [] as string[], recv_dir: '', max_task_bytes: 0, inbox_quota_bytes: 0, binary_path: '', discoverable: false },
   },
 })
 
 // 主题预设（2026-10-07 轻量主题包）：选择=写 ui.accent_color 走既有持久化与热应用
-const themePresetKey = computed(() => matchThemePreset(exForm.ui.accent_color))
+const themePresetKey = computed(() => matchThemePreset(exForm.value.ui.accent_color))
 const applyThemePreset = (th: ThemePreset) => {
-  exForm.ui.accent_color = th.accent
+  exForm.value.ui.accent_color = th.accent
 }
 
 const origin = window.location.origin
 // 白名单目录 textarea ↔ roots 数组(逗号分隔,自动去空)
 const localImportRootsText = computed({
-  get: () => exForm.local_import.roots.join(', '),
+  get: () => exForm.value.local_import.roots.join(', '),
   set: (v: string) => {
-    exForm.local_import.roots = v.split(',').map((x) => x.trim()).filter(Boolean)
+    exForm.value.local_import.roots = v.split(',').map((x) => x.trim()).filter(Boolean)
   },
 })
 
-// P2P 直传:send_roots 每行一个绝对路径(textarea ↔ 数组)
-const p2pSendRootsText = computed({
-  get: () => exForm.p2p.direct.send_roots.join('\n'),
-  set: (v: string) => {
-    exForm.p2p.direct.send_roots = v.split('\n').map((x) => x.trim()).filter(Boolean)
+// 单文件上限：配置以字节存储，界面以 MB 编辑（0 = 不限）。
+// 存回时按 1MB=1048576 字节换算并取整（4GiB 上限 = 4096MB = 4294967296 精确无误差）。
+const maxFileSizeMb = computed({
+  get: () => {
+    const bytes = exForm.value.upload_ex.max_file_size ?? 0
+    return bytes > 0 ? Math.round((bytes / 1024 / 1024) * 100) / 100 : 0
+  },
+  set: (v: number | undefined) => {
+    const mb = Number(v) || 0
+    exForm.value.upload_ex.max_file_size = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
   },
 })
-// 配额以友好单位展示(后端存字节;0 = 后端缺省)
-const p2pMaxTaskMB = computed({
-  get: () => Math.round(exForm.p2p.direct.max_task_bytes / 1024 / 1024),
-  set: (v: number) => { exForm.p2p.direct.max_task_bytes = v * 1024 * 1024 },
+
+// 单次发送**总量**上限（user.user_upload_size）：配置以字节存储，界面以 MB 编辑（0 = 不限）。
+//
+// ⚠️ 2026-10-30 前该字段是「字节直填 + min=1MB + 表单把 0 当没值」⇒
+// 既显示 52428800 这种看不懂的数字，又**根本表达不了「不限」**（0）。
+const userUploadSizeMb = computed({
+  get: () => {
+    const bytes = configForm.value.user.useruploadsize ?? 0
+    return bytes > 0 ? Math.round((bytes / 1024 / 1024) * 100) / 100 : 0
+  },
+  set: (v: number | undefined) => {
+    const mb = Number(v) || 0
+    configForm.value.user.useruploadsize = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
+  },
 })
-const p2pInboxQuotaGB = computed({
-  get: () => Math.round(exForm.p2p.direct.inbox_quota_bytes / 1024 / 1024 / 1024),
-  set: (v: number) => { exForm.p2p.direct.inbox_quota_bytes = v * 1024 * 1024 * 1024 },
+
+/**
+ * 两个上传闸口是否矛盾：「单次发送总量上限」低于「单文件上限」
+ * ⇒ 超过单文件上限的文件**永远发不出去**（先被总量闸拒）。
+ */
+const uploadCapConflict = computed(() =>
+  uploadCapMismatch(configForm.value.user.useruploadsize ?? 0, exForm.value.upload_ex.max_file_size ?? 0)
+)
+
+/** 展示用的上限文本（不限时给「不限」二字，而不是 0 字节） */
+const batchCapText = computed(() => {
+  const bytes = configForm.value.user.useruploadsize ?? 0
+  return bytes > 0 ? formatFileSize(bytes) : t('admin.configPage.upload.batchCapUnlimited')
 })
-const goP2pOps = () => {
+const maxFileSizeText = computed(() => {
+  const bytes = exForm.value.upload_ex.max_file_size ?? 0
+  return bytes > 0 ? formatFileSize(bytes) : t('admin.configPage.upload.batchCapUnlimited')
+})
+
+// 联邦管理台入口（Wave B'：直传操作页已退役，/admin/p2p 现指联邦页）
+const goFederationOps = () => {
   const m = router.currentRoute.value.path.match(/^(.*?\/admin)/)
   router.push(`${m ? m[1] : '/admin'}/p2p`)
 }
@@ -626,49 +693,47 @@ const goP2pOps = () => {
 const fetchExSections = (data: Record<string, unknown>) => {
   const sec = data as Record<string, any>
   if (sec.ui) {
-    Object.assign(exForm.ui, sec.ui)
+    Object.assign(exForm.value.ui, sec.ui)
     // 旧库 ui 段无 show_admin_addr 键（后端缺省=展示），归一为开避免开关显示与实际相反
-    if (exForm.ui.show_admin_addr == null) exForm.ui.show_admin_addr = true
+    if (exForm.value.ui.show_admin_addr == null) exForm.value.ui.show_admin_addr = true
   }
   if (sec.upload_ex) {
-    Object.assign(exForm.upload_ex, sec.upload_ex)
-    if (exForm.upload_ex.open_upload == null) exForm.upload_ex.open_upload = true
-    if (exForm.upload_ex.require_login == null) exForm.upload_ex.require_login = false
-    if (!exForm.upload_ex.anonymous_daily_count) exForm.upload_ex.anonymous_daily_count = 0
-    if (!exForm.upload_ex.anonymous_daily_bytes) exForm.upload_ex.anonymous_daily_bytes = 0
+    Object.assign(exForm.value.upload_ex, sec.upload_ex)
+    if (exForm.value.upload_ex.open_upload == null) exForm.value.upload_ex.open_upload = true
+    if (exForm.value.upload_ex.require_login == null) exForm.value.upload_ex.require_login = false
+    if (!exForm.value.upload_ex.anonymous_daily_count) exForm.value.upload_ex.anonymous_daily_count = 0
+    if (!exForm.value.upload_ex.anonymous_daily_bytes) exForm.value.upload_ex.anonymous_daily_bytes = 0
+    // 旧库/空值归一为空数组（=全部允许）；否则多选框拿到 null 会渲染异常
+    if (!Array.isArray(exForm.value.upload_ex.allowed_expire_styles)) {
+      exForm.value.upload_ex.allowed_expire_styles = []
+    }
   }
   if (sec.download) {
-    Object.assign(exForm.download, sec.download)
+    Object.assign(exForm.value.download, sec.download)
     // 旧库 download 段无直传新键 → 后端下发 null：归一为默认值（nil 语义=开启/100MB/600s）
-    if (!exForm.download.presign_policy) {
-      // 旧库无 presign_policy 键：按旧匿名开关推导（false=authenticated，否则 everyone）
-      const legacy = (exForm.download as Record<string, unknown>).presign_anonymous_enabled
-      exForm.download.presign_policy = legacy === false ? 'authenticated' : 'everyone'
+    // 旧开关 presign_anonymous_enabled 已退役（2026-10-26）：后端读配置时已把它的
+    // 语义并入 presign_policy，前端不再二次推导。
+    if (!exForm.value.download.presign_policy) {
+      exForm.value.download.presign_policy = 'everyone'
     }
-    if (!exForm.download.presign_threshold_mb) exForm.download.presign_threshold_mb = 100
-    if (!exForm.download.presign_expire_seconds) exForm.download.presign_expire_seconds = 600
+    if (!exForm.value.download.presign_threshold_mb) exForm.value.download.presign_threshold_mb = 100
+    if (!exForm.value.download.presign_expire_seconds) exForm.value.download.presign_expire_seconds = 600
     // 旧库无 code_case_insensitive 键 → 后端下发 null：归一为默认值（nil 语义=开启）
-    if (exForm.download.code_case_insensitive == null) exForm.download.code_case_insensitive = true
+    if (exForm.value.download.code_case_insensitive == null) exForm.value.download.code_case_insensitive = true
   }
   if (sec.notify) {
-    Object.assign(exForm.notify, sec.notify)
-    if (sec.notify.smtp) Object.assign(exForm.notify.smtp, sec.notify.smtp)
+    Object.assign(exForm.value.notify, sec.notify)
+    if (sec.notify.smtp) Object.assign(exForm.value.notify.smtp, sec.notify.smtp)
   }
-  if (sec.oidc) Object.assign(exForm.oidc, sec.oidc)
-  if (sec.local_import) Object.assign(exForm.local_import, sec.local_import)
-  if (sec.api_token) Object.assign(exForm.api_token, sec.api_token)
+  if (sec.oidc) Object.assign(exForm.value.oidc, sec.oidc)
+  if (sec.local_import) Object.assign(exForm.value.local_import, sec.local_import)
+  if (sec.api_token) Object.assign(exForm.value.api_token, sec.api_token)
   if (sec.p2p?.federation) {
-    Object.assign(exForm.p2p.federation, sec.p2p.federation)
+    Object.assign(exForm.value.p2p.federation, sec.p2p.federation)
     // 旧库无 p2p 段/缺键 null 归一（后端 env 种子回填见 ensureConfigLoaded）
-    if (exForm.p2p.federation.enabled == null) exForm.p2p.federation.enabled = false
+    if (exForm.value.p2p.federation.enabled == null) exForm.value.p2p.federation.enabled = false
     // 注意用 == null 而非 !x：合法 0（禁用熵门槛）不能被显示成默认 40
-    if (exForm.p2p.federation.announce_min_entropy_bits == null) exForm.p2p.federation.announce_min_entropy_bits = 40
-  }
-  if (sec.p2p?.direct) {
-    Object.assign(exForm.p2p.direct, sec.p2p.direct)
-    if (exForm.p2p.direct.enabled == null) exForm.p2p.direct.enabled = false
-    if (exForm.p2p.direct.send_roots == null) exForm.p2p.direct.send_roots = []
-    if (exForm.p2p.direct.discoverable == null) exForm.p2p.direct.discoverable = false
+    if (exForm.value.p2p.federation.announce_min_entropy_bits == null) exForm.value.p2p.federation.announce_min_entropy_bits = 40
   }
 }
 
@@ -676,27 +741,49 @@ const fetchExSections = (data: Record<string, unknown>) => {
 // 写入辅助：非成功码抛错，供多段/多端点分区串联，失败即中断并统一走 handleError
 const putConfig = async (payload: Record<string, unknown>) => {
   const res = await adminApi.updateConfig(payload)
-  if (!(res.code === 0 || res.code === 200)) {
+  if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
   }
 }
 
 const putUserSettings = async () => {
   const res = await adminApi.updateUserSettings({
-    allowuserregistration: Number(configForm.user.allowuserregistration) === 1,
-    useruploadsize: configForm.user.useruploadsize,
-    userstoragequota: configForm.user.userstoragequota,
-    sessionexpiryhours: configForm.user.sessionexpiryhours
+    allowuserregistration: Number(configForm.value.user.allowuserregistration) === 1,
+    useruploadsize: configForm.value.user.useruploadsize,
+    userstoragequota: configForm.value.user.userstoragequota,
+    sessionexpiryhours: configForm.value.user.sessionexpiryhours
   })
-  if (!(res.code === 0 || res.code === 200)) {
+  if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
+  }
+}
+
+// ==================== 一键对齐「单次发送总量上限」（2026-10-30） ====================
+// 矛盾态：单次发送总量上限 < 单文件上限 ⇒ 超过单文件上限的文件永远发不出去。
+// 对齐动作 = 把总量上限抬到与单文件上限一致（即「允许发一个最大文件」）。
+// ⚠️ 写在 **user 段**（PUT /admin/config/user），与本分区保存的 upload_ex 段
+// 是两个端点 ⇒ 独立动作，不随本分区「保存」一起提交。
+const aligningCap = ref(false)
+const alignUploadCap = async () => {
+  const target = alignedUploadCap(exForm.value.upload_ex.max_file_size ?? 0)
+  if (target <= 0) return
+  aligningCap.value = true
+  try {
+    configForm.value.user.useruploadsize = target
+    await putUserSettings()
+    ElMessage.success(t('admin.configPage.upload.capAligned'))
+    await fetchUserSettings()
+  } catch (e) {
+    handleError(e)
+  } finally {
+    aligningCap.value = false
   }
 }
 
 // GET 快照：契约存在 required 字段（如 block_on_limit）且不在 rlForm 中，
 // 保存时合并快照，避免缺 required 被 400
 let rlSnapshot: Record<string, unknown> = {}
-const rlForm = reactive({
+const rlForm = ref({
   enabled: true,
   global_qps: 100,
   upload_qps: 10,
@@ -711,7 +798,7 @@ const putRateLimit = async () => {
   const res = await adminApi.updateRateLimitConfig({
     config: { ...rlSnapshot, ...rlForm }
   })
-  if (!(res.code === 0 || res.code === 200)) {
+  if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
   }
 }
@@ -721,35 +808,35 @@ const saveCurrent = async () => {
   try {
     switch (activeSection.value) {
       case 'site':
-        await putConfig({ base: configForm.base, ui: { ...exForm.ui } })
+        await putConfig({ base: configForm.value.base, ui: { ...exForm.value.ui } })
         break
       case 'share':
         await putConfig({
-          upload_ex: { ...exForm.upload_ex },
-          transfer: configForm.transfer,
-          local_import: { enabled: exForm.local_import.enabled, roots: exForm.local_import.roots },
+          upload_ex: { ...exForm.value.upload_ex },
+          transfer: configForm.value.transfer,
+          local_import: { enabled: exForm.value.local_import.enabled, roots: exForm.value.local_import.roots },
         })
         break
       case 'download':
-        await putConfig({ download: { ...exForm.download } })
+        await putConfig({ download: { ...exForm.value.download } })
         break
       case 'account':
         // 用户配置走专属端点，OIDC 走通用配置段，两段串行提交
         await putUserSettings()
-        await putConfig({ oidc: { ...exForm.oidc } })
+        await putConfig({ oidc: { ...exForm.value.oidc } })
         break
       case 'security':
         // 限流走专属端点（{config: …} 包裹），API Token 走通用配置段
         await putRateLimit()
-        await putConfig({ api_token: { ...exForm.api_token } })
+        await putConfig({ api_token: { ...exForm.value.api_token } })
         break
       case 'notify':
         await putConfig({
-          notify: { webhook_url: exForm.notify.webhook_url, smtp: { ...exForm.notify.smtp } },
+          notify: { webhook_url: exForm.value.notify.webhook_url, smtp: { ...exForm.value.notify.smtp } },
         })
         break
       case 'p2p':
-        await putConfig({ p2p: { federation: { ...exForm.p2p.federation }, direct: { ...exForm.p2p.direct } } })
+        await putConfig({ p2p: { federation: { ...exForm.value.p2p.federation } } })
         break
     }
     ElMessage.success(t('admin.configPage.saved'))
@@ -771,12 +858,12 @@ const rlStatus = ref<Record<string, unknown> | null>(null)
 const fetchRateLimit = async () => {
   try {
     const res = await adminApi.getRateLimitConfig()
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       const data = (res.data || {}) as Record<string, unknown>
       rlSnapshot = { ...data }
-      for (const k of Object.keys(rlForm) as (keyof typeof rlForm)[]) {
+      for (const k of Object.keys(rlForm.value) as (keyof typeof rlForm.value)[]) {
         if (typeof data[k] === 'boolean' || typeof data[k] === 'number') {
-          ;(rlForm as Record<string, unknown>)[k] = data[k]
+          ;(rlForm.value as Record<string, unknown>)[k] = data[k]
         }
       }
     }
@@ -791,7 +878,7 @@ const fetchRateLimitStatus = async () => {
   rlStatusLoading.value = true
   try {
     const res = await adminApi.getRateLimitStatus()
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       rlStatus.value = res.data || null
     } else {
       handleError(new Error(res.message || t('admin.configPage.ratelimit.fetchStatusFailed')))
@@ -814,7 +901,7 @@ const doSMTPTest = async () => {
   smtpTesting.value = true
   try {
     const res = await adminApi.testSMTP(smtpTestTo.value)
-    if (res.code === 0 || res.code === 200) ElMessage.success(t('admin.configPage.notify.testSent'))
+    if (res.code === 200) ElMessage.success(t('admin.configPage.notify.testSent'))
     else handleError(new Error(res.message || t('admin.configPage.notify.sendFailed')))
   } catch (e) {
     handleError(e)
@@ -828,7 +915,7 @@ const doOIDCTest = async () => {
   oidcTesting.value = true
   try {
     const res = await adminApi.testOIDC()
-    if (res.code === 0 || res.code === 200) ElMessage.success(t('admin.configPage.oidc.testOk'))
+    if (res.code === 200) ElMessage.success(t('admin.configPage.oidc.testOk'))
     else handleError(new Error(res.message || t('admin.configPage.oidc.testFailed')))
   } catch (e) {
     handleError(e)
@@ -913,6 +1000,11 @@ onMounted(() => {
   margin-left: 10px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+/* 过期样式多选：8 个标签一行放不下，给个宽度让标签换行 */
+.expire-style-select {
+  width: 420px;
+  max-width: 100%;
 }
 .ml8 {
   margin-left: 8px;
@@ -1068,6 +1160,26 @@ onMounted(() => {
 
   .config-form {
     max-width: none;
+  }
+}
+
+/* 窄屏：表单标签**移到输入框上方**——label-width="180px" 是写死在 el-form 上的
+   属性，媒体查询改不了 ⇒ 窄屏下标签占掉大半宽度、输入框被挤到视口外
+   （390px 真机实测：配置表单输入框宽度为 0，手机上一个设置项都改不了）。
+   这里用 display:block 让 label 与 content 上下排列，并解除固定标签宽。 */
+@media (max-width: 768px) {
+  .config-form :deep(.el-form-item) {
+    display: block;
+  }
+
+  .config-form :deep(.el-form-item__label) {
+    display: flex;
+    width: auto !important;
+    height: auto;
+    line-height: 1.5;
+    text-align: left;
+    justify-content: flex-start;
+    padding-bottom: 4px;
   }
 }
 

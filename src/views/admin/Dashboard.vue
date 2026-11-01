@@ -26,8 +26,15 @@
     </div>
 
     <!-- 统计卡片 -->
+    <!-- ⚠️ 2026-10-26 审计修复：取数失败时**必须显式标记**。此前 catch 只
+         console.error，随后 stats.* 保持 0、recent* 置空 ⇒ 页面渲染「用户数 0 /
+         文件数 0 / 今日上传 0」+ 空表格，与「站点真的没人用」**视觉上完全一致**
+         ⇒ 管理员可能据此误触发清理运维。 -->
+    <div v-if="statsError" class="stats-error">
+      <el-tag type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
+    </div>
     <el-row :gutter="24" class="stats-row">
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-primary">
           <div class="stat-icon">
             <el-icon size="32"><User /></el-icon>
@@ -39,7 +46,7 @@
         </div>
       </el-col>
 
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-violet">
           <div class="stat-icon">
             <el-icon size="32"><Folder /></el-icon>
@@ -51,7 +58,7 @@
         </div>
       </el-col>
 
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-teal">
           <div class="stat-icon">
             <el-icon size="32"><Coin /></el-icon>
@@ -63,7 +70,7 @@
         </div>
       </el-col>
 
-      <el-col :span="6">
+      <el-col :span="6" :xs="12">
         <div class="stat-card tone-amber">
           <div class="stat-icon">
             <el-icon size="32"><TrendCharts /></el-icon>
@@ -101,12 +108,13 @@
 
     <!-- 图表区域 -->
     <el-row :gutter="24" class="charts-row">
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="chart-card" shadow="hover">
           <template #header>
             <div class="card-header">
               <h3>{{ t('admin.trend7d') }}</h3>
-              <el-tag type="info">{{ t('admin.realtime') }}</el-tag>
+              <el-tag v-if="trendError" type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
+              <el-tag v-else type="info">{{ t('admin.realtime') }}</el-tag>
             </div>
           </template>
           <TrendChart
@@ -118,7 +126,7 @@
         </el-card>
       </el-col>
 
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="chart-card" shadow="hover">
           <template #header>
             <div class="card-header">
@@ -154,7 +162,7 @@
 
     <!-- 最近活动 -->
     <el-row :gutter="24" class="recent-row">
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="recent-card" shadow="hover">
           <template #header>
             <div class="card-header">
@@ -162,6 +170,7 @@
                 <el-icon><User /></el-icon>
                 {{ t('admin.recentUsers') }}
               </h3>
+              <el-tag v-if="recentUsersError" type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
               <el-button text type="primary" @click="$router.push(adminBase + '/users')">
                 {{ t('common.viewAll') }}
                 <el-icon><ArrowRight /></el-icon>
@@ -172,6 +181,7 @@
             :data="recentUsers"
             size="small"
             v-loading="loading"
+            class="admin-table-wide"
             :header-cell-style="{ background: 'var(--color-muted)', fontWeight: '600' }"
           >
             <el-table-column :label="t('common.username')">
@@ -192,17 +202,27 @@
             </el-table-column>
             <el-table-column :label="t('common.status')" width="100">
               <template #default="{ row }">
-                <!-- status wire 形态两代并存：数字 1/0（/admin/users 列表）与 'active' 旧串 -->
+                <!-- status 形态：数字 1/0（/admin/users 列表） -->
                 <el-tag :type="isActiveStatus(row.status) ? 'success' : 'danger'" size="small">
                   {{ isActiveStatus(row.status) ? t('common.normal') : t('common.disabled') }}
                 </el-tag>
               </template>
             </el-table-column>
           </el-table>
+
+          <!-- 窄屏（≤768px）卡片形态（仪表盘两张「最近 N 条」表同样会被裁） -->
+          <NarrowCardList :rows="recentUsers" :fields="userCardFields">
+            <template #status="{ row }">
+              <el-tag :type="isActiveStatus(row.status) ? 'success' : 'danger'" size="small">
+                {{ isActiveStatus(row.status) ? t('common.normal') : t('common.disabled') }}
+              </el-tag>
+            </template>
+            <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+          </NarrowCardList>
         </el-card>
       </el-col>
 
-      <el-col :span="12">
+      <el-col :span="12" :xs="24">
         <el-card class="recent-card" shadow="hover">
           <template #header>
             <div class="card-header">
@@ -210,6 +230,7 @@
                 <el-icon><Folder /></el-icon>
                 {{ t('admin.recentFiles') }}
               </h3>
+              <el-tag v-if="recentFilesError" type="danger" size="small">{{ t('admin.loadFailed') }}</el-tag>
               <el-button text type="primary" @click="$router.push(adminBase + '/files')">
                 {{ t('common.viewAll') }}
                 <el-icon><ArrowRight /></el-icon>
@@ -220,6 +241,7 @@
             :data="recentFiles"
             size="small"
             v-loading="loading"
+            class="admin-table-wide"
             :header-cell-style="{ background: 'var(--color-muted)', fontWeight: '600' }"
           >
             <el-table-column :label="t('admin.fileName')" prop="filename" show-overflow-tooltip />
@@ -237,6 +259,13 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <NarrowCardList :rows="recentFiles" :fields="fileCardFields">
+            <template #file_size="{ row }">
+              <el-tag type="info" size="small">{{ formatFileSize(row.file_size) }}</el-tag>
+            </template>
+            <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+          </NarrowCardList>
         </el-card>
       </el-col>
     </el-row>
@@ -267,10 +296,24 @@ import {
 import { adminApi } from '@/api/admin'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 import TrendChart, { type TrendPoint } from '@/components/TrendChart.vue'
 
 // vite define 注入的构建版本（package.json,对齐发布列车）
 const appVersion = __APP_VERSION__
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+const userCardFields = computed(() => [
+  { key: 'nickname', label: t('admin.nickname') },
+  { key: 'status', label: t('common.status') },
+  { key: 'created_at', label: t('admin.registeredAt') },
+])
+const fileCardFields = computed(() => [
+  { key: 'file_size', label: t('admin.size') },
+  { key: 'username', label: t('admin.uploader') },
+  { key: 'created_at', label: t('admin.uploadedAt') },
+])
 
 const { t, locale } = useI18n()
 const userStore = useUserStore()
@@ -278,12 +321,21 @@ const router = useRouter()
 
 const loading = ref(false)
 
+// 取数失败标记（2026-10-26 审计）：三个取数函数各自置位，模板渲染
+// `admin.loadFailed` 标签 ⇒ 「没有数据」与「数据坏了」可区分。
+// （与趋势图的 trendError 同构；此前三处 catch 只 console.error，页面零标记。）
+const statsError = ref(false)
+const recentUsersError = ref(false)
+const recentFilesError = ref(false)
+
 // 服务端构建版本（/version,管理员门禁;拉取失败静默,页脚显示 —）
 const serverVersion = ref('')
 
 // 用户状态激活判定：/admin/users wire 返回数字 1/0（Users.vue 同款双形态兼容）；
-// 此前只比对 'active' 旧串,数字形态恒判假→最新用户表全员显示「禁用」
-const isActiveStatus = (s: unknown): boolean => s === 1 || s === 'active'
+// status 形态：**只有数字 1/0**（/admin/users 列表的 wire 形态）；'active' 旧串
+// 形态已删（2026-10-25 删除旧版本兼容——唯一产生旧串的 /admin/users/filter 端点
+// 前端零调用，已随死导出一并删除）
+const isActiveStatus = (s: unknown): boolean => s === 1
 
 // 页脚版本号展示:空值显示 —;dev/commit 哈希等非语义化版本不带 v 前缀
 const formatVersion = (v: string) => {
@@ -353,9 +405,18 @@ const recentUsers = ref<RecentUser[]>([])
 const recentFiles = ref<RecentFile[]>([])
 const trendData = ref<TrendPoint[]>([])
 
-// 图表分类色板——与品牌靛蓝同族的中饱和色,按序取色保证相邻项对比清晰;
-// 弃用旧粉紫渐变系(#f093fb/#fa709a):0.2 透明度下发灰且花哨,不符合"简约不简单"
-const typeColors = ['#5e6ad2', '#0ea5e9', '#14b8a6', '#f59e0b', '#f43f5e', '#8b5cf6']
+// 文件类型分布的分类色板——与统计卡徽标**同一套语义色**（主色 + 紫 + 青绿 +
+// 琥珀 + 玫瑰 + 天蓝），且按「相邻项色相拉开」排序（青竹主色紧邻紫、天蓝压轴）：
+// 原色板把天蓝/青绿相邻,青竹主色下第 2、3 根条几乎同色。
+// 首色用 var(--primary-color) 跟随主题,其余为固定分类色(明暗底都可读)。
+const typeColors = [
+  'var(--primary-color)',
+  '#7c3aed',
+  '#0d9488',
+  '#d97706',
+  '#f43f5e',
+  '#0ea5e9',
+]
 
 interface FileTypeStat {
   type: string
@@ -412,9 +473,11 @@ const fetchDashboardStats = async () => {
       animateNumber('userCount', stats.userCount)
       animateNumber('fileCount', stats.fileCount)
       animateNumber('todayUploads', stats.todayUploads)
+      statsError.value = false
     }
   } catch (error) {
     console.error('Failed to fetch dashboard stats:', error)
+    statsError.value = true
   }
 }
 
@@ -423,18 +486,14 @@ const fetchRecentUsers = async () => {
     const res = await adminApi.getRecentUsers()
     if (res.code === 200) {
       // 后端 GET /admin/users 返回 {items,total,page,page_size}（此前读 data.users 恒空）
-      const data = res.data as { items?: RecentUser[] } | RecentUser[] | undefined
-      if (data && Array.isArray((data as { items: RecentUser[] }).items)) {
-        recentUsers.value = (data as { items: RecentUser[] }).items.slice(0, 5)
-      } else if (Array.isArray(data)) {
-        recentUsers.value = data.slice(0, 5)
-      } else {
-        recentUsers.value = []
-      }
+      const data = res.data as { items?: RecentUser[] } | undefined
+      recentUsers.value = Array.isArray(data?.items) ? data.items.slice(0, 5) : []
+      recentUsersError.value = false
     }
   } catch (error) {
     console.error('Failed to fetch recent users:', error)
     recentUsers.value = []
+    recentUsersError.value = true
   }
 }
 
@@ -448,34 +507,21 @@ const fetchRecentFiles = async () => {
         file_name?: string
         code?: string
         file_size?: number
-        size?: number
         created_at?: string
-        CreatedAt?: string
-      }> } | RecentFile[] | undefined
-      if (data && Array.isArray((data as { items: unknown[] }).items)) {
-        const list = (data as { items: Array<{
-          file_name?: string
-          code?: string
-          file_size?: number
-          size?: number
-          created_at?: string
-          CreatedAt?: string
-        }> }).items
-        recentFiles.value = list.slice(0, 5).map((f) => ({
-          filename: f.file_name || f.code || '-',
-          file_size: f.file_size || f.size || 0,
-          username: '-',
-          created_at: f.created_at || f.CreatedAt || '',
-        }))
-      } else if (Array.isArray(data)) {
-        recentFiles.value = (data as RecentFile[]).slice(0, 5)
-      } else {
-        recentFiles.value = []
-      }
+      }> } | undefined
+      const list = Array.isArray(data?.items) ? data.items : []
+      recentFiles.value = list.slice(0, 5).map((f) => ({
+        filename: f.file_name || f.code || '-',
+        file_size: f.file_size || 0,
+        username: '-',
+        created_at: f.created_at || '',
+      }))
+      recentFilesError.value = false
     }
   } catch (error) {
     console.error('Failed to fetch recent files:', error)
     recentFiles.value = []
+    recentFilesError.value = true
   }
 }
 
@@ -507,20 +553,26 @@ onMounted(async () => {
   }
 })
 
-// 趋势序列：后端 /admin/stats/trend 真实数据（uploads 按创建、downloads 按传输日志）；
-// 拉取失败时回退 mock，面板不空白
+// 趋势序列：后端 /admin/stats/trend 真实数据（uploads 按创建、downloads 按传输日志）。
+//
+// ⚠️ 2026-10-26 审计修复：原实现拉取失败时**回退 mock**（随机数生成的示例数据）
+// ⇒ 面板不空、但管理员会把**假数字当成真实趋势** ⇒ 静默失败（最危险的一类：
+// 看起来一切正常，数据是编的）。⇒ 改为：失败就**不画数据** + 显式错误标记
+// （`admin.loadFailed`），让「没有数据」和「数据坏了」可区分。
+const trendError = ref(false)
 const fetchTrend = async () => {
   try {
     const res = await adminApi.getStatsTrend(7)
     const days = (res.data as { days?: TrendPoint[] })?.days
     if (Array.isArray(days) && days.length > 0) {
       trendData.value = days
+      trendError.value = false
       return
     }
+    trendError.value = true
   } catch {
-    // 回退 mock
+    trendError.value = true
   }
-  generateMockTrend()
 }
 
 // 富指标（/admin/stats/enhanced）：真实昨日对比/下载总量/top 后缀分布
@@ -535,28 +587,12 @@ const enhanced = ref<{
 const fetchEnhancedStats = async () => {
   try {
     const res = await adminApi.getEnhancedStats()
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       enhanced.value = res.data as typeof enhanced.value
     }
   } catch {
     // 富指标失败不影响基础面板
   }
-}
-
-const generateMockTrend = () => {
-  // 后端尚未提供 /admin/stats/trend — 临时基于总数生成示例数据
-  const base = Math.max(stats.todayUploads, 10)
-  const now = new Date()
-  const days: TrendPoint[] = []
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now)
-    d.setDate(d.getDate() - i)
-    const dateStr = d.toISOString().slice(0, 10)
-    const uploads = Math.floor(base * (0.4 + Math.random() * 0.8))
-    const downloads = Math.floor(uploads * (0.6 + Math.random() * 0.6))
-    days.push({ date: dateStr, uploads, downloads })
-  }
-  trendData.value = days
 }
 
 const generateMockFileTypeDist = () => {
@@ -595,6 +631,11 @@ const generateMockFileTypeDist = () => {
 </script>
 
 <style scoped>
+/* 取数失败标记（2026-10-26）：贴在统计行上方，避免与正常卡片重叠 */
+.stats-error {
+  margin-bottom: 12px;
+}
+
 /* 文件健康洞察卡 */
 .health-card {
   margin-bottom: 24px;
@@ -741,9 +782,10 @@ const generateMockFileTypeDist = () => {
   border-color: var(--primary-color);
 }
 
-/* 图标色调编码:用户=accent / 文件=色调2 / 存储=色调3 / 今日上传=色调4。
-   2-4 默认紫/青绿/琥珀(main.scss),accent 生效时由 utils/accent.ts 按主色
-   色相偏移派生覆盖——随颜色主题选择器联动,深浅模式变量已各自就绪 */
+/* 图标色调编码:用户=主色 / 文件=色调2(紫) / 存储=色调3(青绿) / 今日上传=色调4(琥珀)。
+   色调 2-4 是**固定语义色板**(utils/accent.ts 的 TONE_PALETTE),不随主色派生 ——
+   2026-10-26 起:原为「主色色相偏移」派生,主色一变(墨黑⇒全灰 / 青竹⇒全绿)
+   三个徽标就失去区分度。语义四色恒定 ⇒ 换任何主题都认得出。 */
 .stat-icon {
   position: relative;
   z-index: 1;

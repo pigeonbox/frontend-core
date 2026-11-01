@@ -26,6 +26,16 @@ jobs:
         # 仓库里的 package.json version 须与发布 tag 手工保持同步
         # （库线先手打 tag，发布列车再消费该 tag），本步骤不回写仓库
         run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --no-workspaces-update --allow-same-version
+      # ⚠️ 发布前**必跑构建**（2026-10-25 实录）：`npm pack` 只打包源码、**不编译
+      # SFC**，所以「纯 CSS 的 <style> 块里写了双斜杠行注释」这类**只在编译期暴露**
+      # 的错误会被原样打进 tgz ⇒ 壳仓构建炸（v0.11.24 实录：壳仓 CI 与本仓 CI
+      # 双双红，坏 tgz 已发布）。⇒ 把构建放在发布**之前**当闸门：构建不过 ⇒
+      # **不发 tgz**（不产出坏产物），失败也归因到正确的仓。
+      - name: 发布前构建闸门（构建不过 ⇒ 不发 tgz）
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run build
       - name: Pack 源码包
         run: npm pack --pack-destination .
       - name: Upload to release

@@ -8,6 +8,7 @@
         </div>
         <div class="header-actions">
           <el-button
+            class="batch-only"
             type="danger"
             plain
             :disabled="!selectedIds.length"
@@ -16,6 +17,7 @@
             {{ selectedIds.length ? t('admin.filesPage.batchBlockCount', { n: selectedIds.length }) : t('admin.filesPage.batchBlock') }}
           </el-button>
           <el-button
+            class="batch-only"
             type="success"
             plain
             :disabled="!selectedIds.length"
@@ -24,6 +26,7 @@
             {{ t('admin.filesPage.batchRestore') }}
           </el-button>
           <el-button
+            class="batch-only"
             type="warning"
             plain
             :disabled="!selectedIds.length"
@@ -32,6 +35,7 @@
             {{ t('admin.filesPage.batchExtend') }}
           </el-button>
           <el-button
+            class="batch-only"
             type="danger"
             plain
             :disabled="!selectedIds.length"
@@ -119,7 +123,7 @@
       <el-table
         :data="filesList"
         v-loading="loading"
-        class="files-table"
+        class="admin-table-wide files-table"
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="44" />
@@ -166,22 +170,22 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('admin.uploader')" width="100" align="center">
+        <el-table-column :label="t('admin.uploader')" width="120" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.user_id" type="info">
-              ID: {{ row.user_id }}
+              {{ row.username || `ID: ${row.user_id}` }}
             </el-tag>
             <span v-else class="anonymous">{{ t('admin.filesPage.anonymous') }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="owner_ip" :label="t('admin.filesPage.colIp')" width="130" align="center">
+        <el-table-column prop="owner_ip" :label="t('admin.filesPage.colIp')" width="140" align="center">
           <template #default="{ row }">
             <span class="owner-ip">{{ row.owner_ip || '-' }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column prop="used_count" :label="t('admin.filesPage.colDownloads')" width="96" align="center">
+        <el-table-column prop="used_count" :label="t('admin.filesPage.colDownloads')" width="120" align="center">
           <template #default="{ row }">
             <div class="download-count">
               <el-icon><Download /></el-icon>
@@ -204,7 +208,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column :label="t('admin.filesPage.colActions')" width="260" align="center" fixed="right">
+        <el-table-column :label="t('admin.filesPage.colActions')" width="320" align="center" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <template v-if="row.deleted">
               <el-button type="success" size="small" round @click="restoreDeleted(row)">{{ t('admin.filesPage.restore') }}</el-button>
@@ -251,6 +255,63 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 窄屏（≤768px）卡片形态：本表 9 列合计 ~1300px ⇒ 390px 视口下内容列全被裁。
+           策展=手机上真正要看的（大小/状态/上传者/IP/取件次数/创建/过期），批量操作
+           （表头多选）仍是桌面专属，窄屏不提供。 -->
+      <NarrowCardList :rows="filesList" :fields="cardFields">
+        <template #head="{ row }">
+          <div class="narrow-file-name">
+            {{ row.file_name || row.code }}
+            <el-tag v-if="row.is_text" size="small" type="success">{{ t('admin.filesPage.tagText') }}</el-tag>
+            <el-tag v-if="(row.file_count || 0) > 1" size="small" type="info">{{ t('admin.filesPage.fileCount', { n: row.file_count }) }}</el-tag>
+          </div>
+          <div v-if="row.is_text && row.text_preview" class="narrow-text-preview">{{ row.text_preview }}</div>
+        </template>
+        <template #size="{ row }">
+          <el-tag type="info" effect="plain">{{ formatFileSize(row.size) }}</el-tag>
+        </template>
+        <template #status="{ row }">
+          <el-tag :type="statusTagType(row.status)" effect="dark">{{ statusLabel(row.status) }}</el-tag>
+        </template>
+        <template #uploader="{ row }">
+          <el-tag v-if="row.user_id" type="info">{{ row.username || `ID: ${row.user_id}` }}</el-tag>
+          <span v-else class="anonymous">{{ t('admin.filesPage.anonymous') }}</span>
+        </template>
+        <template #ip="{ row }">
+          <span class="owner-ip">{{ row.owner_ip || '-' }}</span>
+        </template>
+        <template #downloads="{ row }">
+          <div class="download-count">
+            <el-icon><Download /></el-icon>
+            {{ row.used_count || 0 }}
+          </div>
+        </template>
+        <template #created_at="{ row }">{{ formatDate(row.created_at) }}</template>
+        <template #expired_at="{ row }">
+          <div :class="['expire-time', { expired: isExpired(row.expired_at) }]">{{ formatDate(row.expired_at) }}</div>
+        </template>
+        <template #actions="{ row }">
+          <template v-if="row.deleted">
+            <el-button type="success" size="small" round @click="restoreDeleted(row)">{{ t('admin.filesPage.restore') }}</el-button>
+            <el-button type="danger" size="small" round @click="purgeDeleted(row)">{{ t('admin.filesPage.purge') }}</el-button>
+          </template>
+          <template v-else>
+            <el-button v-if="row.status !== 'blocked'" type="warning" size="small" round @click="setStatus(row, 'blocked')">
+              {{ t('admin.filesPage.block') }}
+            </el-button>
+            <el-button v-else type="success" size="small" round @click="setStatus(row, 'normal')">
+              {{ t('admin.filesPage.restore') }}
+            </el-button>
+            <el-button v-if="!row.is_text" size="small" round @click="downloadFile(row)">{{ t('admin.filesPage.download') }}</el-button>
+            <el-button size="small" round @click="openEdit(row)">{{ t('admin.filesPage.edit') }}</el-button>
+            <el-button type="danger" size="small" round @click="deleteFile(row)">
+              <el-icon><Delete /></el-icon>
+              {{ t('admin.filesPage.delete') }}
+            </el-button>
+          </template>
+        </template>
+      </NarrowCardList>
 
       <div class="pagination-wrapper">
         <el-pagination
@@ -312,20 +373,25 @@
 
 <script setup lang="ts">
 import { formatFileSize, toLocaleDateTime as formatDate } from '@/utils/format'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import {
   Refresh, Document, Picture, Download, Delete,
   VideoPlay, Headset, Reading
 } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
+import { request } from '@/utils/request'
 import { loadViews, saveView, deleteView } from '@/utils/savedViews'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { useRouteParam } from '@/composables/useRouteParam'
+import NarrowCardList from '@/components/admin/NarrowCardList.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
+const route = useRoute()
 
 type FileStatus = 'normal' | 'blocked' | 'pending_review'
 
@@ -415,6 +481,19 @@ const statusTagType = (status: string): 'success' | 'danger' | 'warning' => {
     default: return 'success'
   }
 }
+
+// ── 窄屏（≤768px）卡片字段 ──────────────────────────────────────────────────
+// 标签**复用表格列的同一批 i18n key** ⇒ 宽窄两屏口径一致、不新增翻译。
+// 用 computed 而非常量数组：t() 随语言切换重算，常量数组会把标签冻结在首次渲染。
+const cardFields = computed(() => [
+  { key: 'size', label: t('admin.size') },
+  { key: 'status', label: t('admin.filesPage.colStatus') },
+  { key: 'uploader', label: t('admin.uploader') },
+  { key: 'ip', label: t('admin.filesPage.colIp') },
+  { key: 'downloads', label: t('admin.filesPage.colDownloads') },
+  { key: 'created_at', label: t('admin.createdAt') },
+  { key: 'expired_at', label: t('admin.filesPage.colExpiresAt') },
+])
 
 const getFileIcon = (row: any) => {
   const filename = row.file_name || ''
@@ -552,7 +631,7 @@ const setStatus = async (row: any, status: FileStatus) => {
   }
   try {
     const res = await adminApi.setFileStatus(row.id, status)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(isBlock ? t('admin.filesPage.blockDone') : t('admin.filesPage.restoreDone'))
       await fetchFiles()
     } else {
@@ -578,7 +657,7 @@ const batchSetStatus = async (status: FileStatus) => {
   }
   try {
     const res = await adminApi.batchSetFileStatus(selectedIds.value, status)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       const n = res.data?.affected ?? selectedIds.value.length
       ElMessage.success(isBlock ? t('admin.filesPage.batchBlockDone', { n }) : t('admin.filesPage.batchRestoreDone', { n }))
       await fetchFiles()
@@ -604,7 +683,7 @@ const deleteFile = async (file: any) => {
 
     // 使用 code 而不是 ID
     const res = await adminApi.deleteFileByCode(file.code)
-    if (res.code === 200 || res.code === 0) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.deleteDone'))
       await fetchFiles()
     } else {
@@ -639,7 +718,7 @@ const batchDelete = async () => {
   saving.value = true
   try {
     const res = await adminApi.batchDeleteFilesByIds(selectedIds.value)
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.batchDeleteDone', { n: res.data?.deleted ?? selectedIds.value.length }))
       await fetchFiles()
     } else {
@@ -658,7 +737,7 @@ const submitBatchExtend = async () => {
   saving.value = true
   try {
     const res = await adminApi.batchExtendFiles(selectedIds.value, batchExtendValue.value, 'day')
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.batchExtendDone', { n: res.data?.extended ?? selectedIds.value.length }))
       batchExtendVisible.value = false
       await fetchFiles()
@@ -692,7 +771,7 @@ const submitEdit = async () => {
       expire_style: 'day',
       expired_count: editForm.expiredCount
     })
-    if (res.code === 0 || res.code === 200) {
+    if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.saved'))
       editVisible.value = false
       await fetchFiles()
@@ -708,14 +787,20 @@ const submitEdit = async () => {
 
 const downloadFile = async (row: any) => {
   // 管理端下载：/admin/files/:id 受 AdminMiddleware 保护，window.open 带不上
-  // 凭证——改为同源 fetch（自动携带会话 Cookie）→ blob → 触发保存
+  // 凭证——改为同源请求（自动携带会话 Cookie）→ blob → 触发保存。
+  //
+  // ⚠️ 2026-10-26 审计修复：此前用**裸 axios**（`await import('axios')`）绕过统一
+  // 实例 ⇒ 裸 axios 走浏览器**根路径**，不带部署前缀 ⇒ 在「统一网关下页面挂在
+  // /app/pigeonbox/ 前缀」的部署形态（src/utils/base.ts 的 appBase() 明确支持）
+  // 下**必然 404 ⇒ 管理台一个文件都下载不了**。
+  // ⇒ 改走统一实例（src/utils/request.ts：baseURL = VITE_API_BASE_URL || appBase()）。
   try {
-    const { default: axios } = await import('axios')
-    const res = await axios.get(adminApi.fileDownloadUrl(row.id), {
+    const blob = await request<Blob>({
+      url: adminApi.fileDownloadUrl(row.id),
       responseType: 'blob',
-      withCredentials: true
+      withCredentials: true,
     })
-    const url = URL.createObjectURL(res.data)
+    const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     a.download = row.file_name || `${row.code}.bin`
@@ -728,14 +813,23 @@ const downloadFile = async (row: any) => {
   }
 }
 
-onMounted(() => {
-  // 仪表盘健康洞察卡跳转入口：?health=expiring_soon 等直达过滤视图
-  const h = new URLSearchParams(window.location.hash.split('?')[1] || '').get('health')
-  if (h && ['active', 'expired', 'expiring_soon', 'never_picked', 'forever'].includes(h)) {
-    filters.health = h
+// 仪表盘健康洞察卡跳转入口：?health=expiring_soon 等直达过滤视图。
+//
+// 两点修正（2026-10-23）：
+//   ① 取 route.query 而非手搓 window.location.hash 解析（vue-router hash 模式
+//      已经把 '#' 后的 query 解析进 route.query）。
+//   ② **参数变化即跟随**：仪表盘 5 张健康卡是 router.push 同一 path、只有 query
+//      不同 ⇒ 同一路由记录组件被复用，只在挂载时读一次的话，**连点第二张卡
+//      过滤不生效**（与分享页/寄件页同一坑，本仓第三处复发）。
+const HEALTH_QUERY_KEYS = ['active', 'expired', 'expiring_soon', 'never_picked', 'forever']
+useRouteParam(
+  () => route.query.health as string | undefined,
+  (h) => {
+    if (h && HEALTH_QUERY_KEYS.includes(h)) filters.health = h
+    else if (!h) filters.health = ''
+    reload()
   }
-  reload()
-})
+)
 </script>
 
 <style scoped>
@@ -863,6 +957,9 @@ onMounted(() => {
   font-family: monospace;
   font-size: 13px;
   color: var(--color-text-regular);
+  /* IP 是不可断的定长串，列宽临界时会被折成两行（实测 223.70.159.239 断成
+     "223.70.159.23" + "9"）⇒ 强制单行 */
+  white-space: nowrap;
 }
 
 .download-count {

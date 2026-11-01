@@ -47,6 +47,25 @@ const BLACK: Rgb = { r: 0, g: 0, b: 0 }
 // 深色混合目标贴近 --color-bg(#0a0a0a) 而非纯黑，色阶过渡更顺
 const DARK_BASE: Rgb = { r: 10, g: 10, b: 10 }
 
+/** 暗色主色在深色底上的最低对比度（正文级可读性下限） */
+const DARK_MIN_CONTRAST = 4.5
+
+/** WCAG 相对亮度 */
+function relativeLuminance(c: Rgb): number {
+  const f = (v: number) => {
+    const s = v / 255
+    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
+  }
+  return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b)
+}
+
+/** WCAG 对比度 */
+function contrastRatio(a: Rgb, b: Rgb): number {
+  const la = relativeLuminance(a)
+  const lb = relativeLuminance(b)
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05)
+}
+
 function parseHex(raw: string): Rgb | null {
   const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(raw.trim())
   if (!m || !m[1]) return null
@@ -67,51 +86,42 @@ const mix = (c: Rgb, t: Rgb, ratio: number): Rgb => ({
 
 const lighten = (c: Rgb, ratio: number): Rgb => mix(c, WHITE, ratio)
 
+/**
+ * 暗色主色：先按 30% 提亮；若仍不足与深色底(#0a0a0a)的 4.5:1 对比度，继续提亮到达标。
+ *
+ * 为什么需要地板：主色在暗色模式下会被当**文字色**用（链接、强调文本），
+ * 固定 30% 提亮对彩色 accent 够用，但灰阶 accent（墨黑 #18181b → #5a5a5c）
+ * 只有 2.2:1 ⇒ 暗色下链接几乎看不见。提亮到 42%（#79797b ≈4.6:1）才达标。
+ * 彩色 accent 原就达标 ⇒ 取值不变，既有主题不受影响。
+ */
+function darkBase(accent: Rgb): Rgb {
+  let ratio = 0.3
+  let c = lighten(accent, ratio)
+  while (ratio < 1 && contrastRatio(c, DARK_BASE) < DARK_MIN_CONTRAST) {
+    ratio = Math.min(1, Math.round((ratio + 0.01) * 100) / 100)
+    c = lighten(accent, ratio)
+  }
+  return c
+}
+
 const rgb = (c: Rgb): string => `rgb(${c.r}, ${c.g}, ${c.b})`
 
-function hslToRgb(h: number, s: number, l: number): Rgb {
-  const c = (1 - Math.abs(2 * l - 1)) * s
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
-  const m = l - c / 2
-  let t: [number, number, number]
-  if (h < 60) t = [c, x, 0]
-  else if (h < 120) t = [x, c, 0]
-  else if (h < 180) t = [0, c, x]
-  else if (h < 240) t = [0, x, c]
-  else if (h < 300) t = [x, 0, c]
-  else t = [c, 0, x]
-  return {
-    r: Math.round((t[0] + m) * 255),
-    g: Math.round((t[1] + m) * 255),
-    b: Math.round((t[2] + m) * 255),
-  }
-}
+// 统计卡图标色调 2-4 = **固定语义色板**（紫 / 青绿 / 琥珀），不随主色派生。
+// 2026-10-26 实录：原实现是「主色色相偏移(+30/-60/+160)」派生，只有靛蓝这类
+// 彩色主色才恰好落在紫/青绿/琥珀上；主色换成墨黑（灰阶）或青竹后分别退化成
+// 「3 个几乎一样的灰」和「3 个绿」，语义四色构图直接崩掉（界面看着发闷）。
+// ⇒ 改为固定色板：4 张卡的图标（主色 + 紫 + 青绿 + 琥珀）恒定可辨，
+//    换任何主题色都不影响这组语义配色的识别度。
+const TONE_PALETTE: { light: Rgb; dark: Rgb }[] = [
+  { light: { r: 124, g: 58, b: 237 }, dark: { r: 167, g: 139, b: 250 } }, // 2 紫
+  { light: { r: 13, g: 148, b: 136 }, dark: { r: 45, g: 212, b: 191 } },  // 3 青绿
+  { light: { r: 217, g: 119, b: 6 }, dark: { r: 245, g: 158, b: 11 } },  // 4 琥珀
+]
 
-/** 色相旋转 deg 度（饱和度/亮度不变）；灰阶（d≈0）原样返回 */
-function rotateHue(c: Rgb, deg: number): Rgb {
-  const r = c.r / 255, g = c.g / 255, b = c.b / 255
-  const max = Math.max(r, g, b), min = Math.min(r, g, b)
-  const d = max - min
-  if (d < 1e-6) return c
-  const l = (max + min) / 2
-  const s = d / (1 - Math.abs(2 * l - 1))
-  let h: number
-  if (max === r) h = ((g - b) / d) % 6
-  else if (max === g) h = (b - r) / d + 2
-  else h = (r - g) / d + 4
-  h = ((h * 60 + deg) % 360 + 360) % 360
-  return hslToRgb(h, s, l)
-}
-
-// 统计卡图标色调 2-4 = 主色色相偏移派生（+30/-60/+160）：默认靛蓝(#5e6ad2)
-// 下恰好落在 main.scss 预填的紫/青绿/琥珀色相上，语义四色构图不变；
-// 灰阶主题（ink）旋转后仍近灰阶，图标随之去彩色。
-const TONE_HUE_OFFSETS = [30, -60, 160] as const
-
-function toneVars(base: Rgb, dark: boolean): Record<string, string> {
+function toneVars(dark: boolean): Record<string, string> {
   const out: Record<string, string> = {}
-  TONE_HUE_OFFSETS.forEach((off, i) => {
-    const tone = dark ? lighten(rotateHue(base, off), 0.3) : rotateHue(base, off)
+  TONE_PALETTE.forEach((p, i) => {
+    const tone = dark ? p.dark : p.light
     const alpha = dark ? 0.16 : 0.1
     out[`--stat-tone-${i + 2}-color`] = rgb(tone)
     out[`--stat-tone-${i + 2}-bg`] = `rgba(${tone.r}, ${tone.g}, ${tone.b}, ${alpha})`
@@ -120,10 +130,22 @@ function toneVars(base: Rgb, dark: boolean): Record<string, string> {
 }
 
 export interface ResolvedAccent {
-  /** CSS 变量 → 值（含 --el-color-primary 系、--primary-* 家族与 --stat-tone-* 派生色调） */
+  /** CSS 变量 → 值（含 --el-color-primary 系、--primary-* 家族与 --stat-tone-* 语义色调） */
   vars: Record<string, string>
   /** 规范化为 6 位 hex 的 accent（供首帧引导缓存） */
   hex: string
+}
+
+/**
+ * 图标底座渐变端点：与静态图标底色（hub scripts/gen-brand-icons.py）和
+ * main.scss 的 `.logo-icon/.logo` 底座同公式 —— mix(主色,白 6%) → mix(主色,黑 30%)。
+ * 运行时动态图标（浏览器标签 / iOS 主屏）用同一套端点，
+ * 保证「静态图标 / 界面 logo / 浏览器标签图标」三者永远同色。
+ */
+export function accentGradient(accent: string | null | undefined): { top: string; bottom: string } | null {
+  const c = parseHex(accent || '')
+  if (!c) return null
+  return { top: rgb(mix(c, WHITE, 0.06)), bottom: rgb(mix(c, BLACK, 0.30)) }
 }
 
 /**
@@ -135,7 +157,7 @@ export function resolveAccent(raw: string | null | undefined, dark: boolean): Re
   if (!accent) return null
 
   // 深色下主色提亮（与 main.scss html.dark 同公式），保证 #0a0a0a 底对比度
-  const base = dark ? lighten(accent, 0.3) : accent
+  const base = dark ? darkBase(accent) : accent
   const toward = dark ? DARK_BASE : WHITE
   const darkenTarget = dark ? WHITE : BLACK
 
@@ -155,9 +177,9 @@ export function resolveAccent(raw: string | null | undefined, dark: boolean): Re
     '--primary-bg': dark ? `rgba(${base.r}, ${base.g}, ${base.b}, 0.14)` : rgb(mix(base, WHITE, 0.9)),
     '--primary-color-rgb': `${base.r}, ${base.g}, ${base.b}`,
     '--primary-gradient': `linear-gradient(135deg, ${rgb(base)} 0%, ${rgb(base)} 100%)`,
-    // 仪表盘统计卡图标色调 2-4（随主色派生；深浅模式各自的底色透明度与
-    // main.scss 预填值同款）
-    ...toneVars(accent, dark),
+    // 仪表盘统计卡图标色调 2-4（固定语义色板 紫/青绿/琥珀；深浅模式各自的
+    // 底色透明度与 main.scss 预填值同款）
+    ...toneVars(dark),
   }
   const hex = '#' + [accent.r, accent.g, accent.b]
     .map((v) => v.toString(16).padStart(2, '0'))
