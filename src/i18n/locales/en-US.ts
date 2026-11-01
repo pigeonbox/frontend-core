@@ -1,4 +1,4 @@
-// 中文语言包
+// English (US) locale pack.
 export default {
   common: {
     app_name: 'PigeonBox',
@@ -93,7 +93,7 @@ export default {
     feature_presign_desc: 'Files over 100MB go through presigned direct upload to object storage, saving server bandwidth.',
     feature_anonymous_title: 'Anonymous Pickup',
     feature_anonymous_desc: 'No sign-up needed; enter the pickup code and password to download.',
-    // 顶栏用户区（兼容老 key 命名）
+    // Top-bar user area (kept under the legacy key names).
     slogan: 'Share securely anytime, anywhere',
     description: 'Share files and text in seconds, set expiry times, and keep your privacy safe',
     retrieve: 'Retrieve',
@@ -205,7 +205,7 @@ export default {
       expireMinutes: 'Expires in {n} minutes',
       expireForever: 'Never expires',
       expirePassed: 'Already expired',
-      // 「按取件次数」expiry: expires once the pickup count runs out (2026-10-22)
+      // "By count" expiry: expires once the pickup count runs out (2026-10-22)
       expireCount: 'Recipient can pick up at most {n} time(s)',
       cardSubtitle: 'Scan or type the pickup code to collect',
       cardCodeLabel: 'Pickup code',
@@ -307,7 +307,7 @@ export default {
       day1: '1 day',
       day7: '7 days',
       day30: '30 days',
-      // 「按取件次数」: recipient can pick up at most N times (added 2026-10-22)
+      // "By count": recipient can pick up at most N times (added 2026-10-22)
       count: 'By count',
       countUnit: 'times',
       forever: 'Forever',
@@ -1125,7 +1125,15 @@ export default {
       importedCode: 'Pickup code: {code}',
       imported: 'Imported',
       shareUrlCopied: 'Share link copied: {url}',
-      // For matching server-side messages (not UI copy): backend messages do not follow the locale, so both locales keep the original Chinese value
+      // Server-message matching patterns (NOT user-facing copy).
+      //
+      // These two values are matched with `msg.includes(...)` against the **raw
+      // backend error text** in views/admin/LocalFiles.vue. The backend always
+      // emits Chinese (the strings live in core/app/share/localfiles.go and do
+      // not follow the caller's locale), so these values MUST stay byte-identical
+      // to the zh-CN ones — translating them would silently break the
+      // "feature disabled" / "add whitelist roots" guidance for en-US users.
+      // Guarded by src/i18n/__tests__/parity.spec.ts.
       serverDisabledPattern: '本地文件功能未启用',
       serverNoRootsPattern: '白名单目录',
     },

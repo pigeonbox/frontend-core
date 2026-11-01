@@ -41,12 +41,18 @@ interface RouteSpec {
 }
 
 /**
- * 10 条路由 + 1 条前端实际在用的本地导入面（/admin/local-files/import）。
+ * 10 条路由 + 1 条前端实际在用的本地导入面（/admin/local-files/import）
+ * + 1 条联邦面认领端点（/admin/p2p/invites/accept）。
  *
  * ⚠️ `/api/v1/user/shares/import-local`（契约里的用户侧导入面）**前端从未
  * 调用**——前端的管理台本地文件页走的是 `/admin/local-files/import`
  * （admin 域，带 root 索引）。两条都登记：前者钉「暂无调用点」，后者钉
  * 「调用点必须用契约类型」，谁新增调用点都会被守卫捞出来。
+ *
+ * 联邦面认领端点（2026-11-01 登记）：contracts v0.20.7 起 p2p 域已发布
+ * `AdminP2pInviteAcceptResp` ⇒ api/p2p.ts 此前那份**手写副本**必须改掉；
+ * 登记进表后，手写副本再出现即红（规则 ④ 的字段集判别力：code/message/data
+ * 三个字段，≥2 ⇒ 有判别力）。
  */
 const ROUTES: RouteSpec[] = [
   {
@@ -124,6 +130,15 @@ const ROUTES: RouteSpec[] = [
     dts: 'admin',
     dupStructs: ['AdminImportLocalFileData'],
     note: 'POST /admin/local-files/import（前端实际在用的本地导入面）',
+  },
+  {
+    path: '/admin/p2p/invites/accept',
+    types: ['AdminP2pInviteAcceptResp'],
+    dts: 'p2p',
+    dupStructs: ['AdminP2pInviteAcceptResp'],
+    note:
+      'POST /admin/p2p/invites/accept（联邦面认领邀请；v0.20.7 起 contracts 已发布 ' +
+      'AdminP2pInviteAcceptResp ⇒ 此处不再允许手写副本）',
   },
 ]
 
@@ -244,7 +259,7 @@ function gte(a: string, b: string): boolean {
   return true
 }
 
-describe('契约类型漂移守卫（10 条业务路由）', () => {
+describe('契约类型漂移守卫（10 条业务路由 + 本地导入面 + 联邦认领端点）', () => {
   it('① 钉版：contracts ≥ 0.20.0 且 package.json / lock / 实装包三处一致', () => {
     const installed = JSON.parse(
       readFileSync(resolve(contractsRoot, 'package.json'), 'utf8'),
@@ -351,7 +366,7 @@ describe('契约类型漂移守卫（10 条业务路由）', () => {
     }
   })
 
-  it('④b 契约包确实提供了这 10 条路由的类型（钉版回退会红）', () => {
+  it('④b 契约包确实提供了这批路由的类型（钉版回退会红）', () => {
     const dtsCache = new Map<Dts, string>()
     for (const spec of ROUTES) {
       if (!dtsCache.has(spec.dts)) dtsCache.set(spec.dts, readDts(spec.dts))
