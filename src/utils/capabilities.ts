@@ -57,6 +57,25 @@ export function isMultiReplica(cfg: CapabilitiesCarrier | null | undefined): boo
 }
 
 /**
+ * 服务端**明确**告知「本实例是多副本部署」。
+ *
+ * 与 isMultiReplica 的区别：isMultiReplica 在「未知」时返回 false（按单站处理），
+ * 而本函数只认服务端**明确**说出来的多副本（deployment_mode ∈ {public, admin}）。
+ *
+ * 为什么需要这个更严的版本：直传（/beam）入口的显隐是**安全面**上的判断——
+ * 多副本拓扑下直传在架构上不可用（core 的 deployment.go 会把联邦强制降级关闭，
+ * 节点身份是进程级的 Ed25519，多副本语义未定义），此时若仍给出直传入口，
+ * 用户点了只会落到一个坏路径。而老后端（不下发 capabilities 段）属于**未知**，
+ * 不能据此把功能藏没 ⇒ 未知时一律当「不是多副本」，保持入口可见。
+ *
+ * ⇒ 只有服务端明确说多副本时才收起用不上的入口。
+ */
+export function multiReplicaDeclared(cfg: CapabilitiesCarrier | null | undefined): boolean {
+  const mode = deploymentMode(cfg)
+  return mode === 'public' || mode === 'admin'
+}
+
+/**
  * 站点公网地址是否已配置。
  *
  * 未配置 ⇒ 分享链接按**请求来源**拼 ⇒ NAS 内网部署会把内网 IP 发给外部用户
@@ -76,4 +95,36 @@ export function publicUrlConfigured(cfg: CapabilitiesCarrier | null | undefined)
 export function publicUrlMissing(cfg: CapabilitiesCarrier | null | undefined): boolean {
   const caps = readCapabilities(cfg)
   return caps.public_url_set === false
+}
+
+/**
+ * 跨站取件（联邦）是否**可用**——能不能向用户承诺这个能力。
+ *
+ * 两个输入：
+ *  1. 服务端声明的 `federationEnabled`（顶层字段，生效值）；
+ *  2. 服务端**明确**告知的部署模式（capabilities 段）。
+ *
+ * ## 为什么不能只看服务端声明
+ *
+ * 多副本拓扑下联邦**架构上不可用**：节点身份是**进程级** Ed25519 密钥，
+ * 多副本各持各的身份 ⇒ 跨站注册/解析语义未定义（拍板：暂不支持）。
+ * 服务端本该把它降级为 false——前端此前**完全信任**这一条
+ * （stores/config.ts 的注释就写着「多副本模式下被强制降级为 false」）。
+ *
+ * 但服务端的降级是**启动时**做的：运行期一次管理台保存、或一次**多副本配置广播**，
+ * 都会把 DB 里的「提交意图」整段盖回全局配置 ⇒ 降级被**复活** ⇒
+ * federationEnabled 又变 true ⇒ 前端在多副本下**承诺了一个用不了的跨站取件**。
+ *
+ * ⇒ 前端**双保险**：多副本（服务端**明确**说的）一律按不可用处理，
+ * 不管服务端声明成什么。
+ *
+ * 老后端（能力位未知 ⇒ multiReplicaDeclared=false）不受影响：
+ * 保持服务端声明，不因「不知道」就把功能藏没。
+ */
+export function federationUsable(
+  cfg: CapabilitiesCarrier | null | undefined,
+  federationEnabled: boolean,
+): boolean {
+  if (multiReplicaDeclared(cfg)) return false
+  return federationEnabled
 }
