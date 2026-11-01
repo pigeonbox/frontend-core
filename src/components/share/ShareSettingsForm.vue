@@ -114,6 +114,33 @@
             {{ t('upload.e2e.needSecureContext') }}
           </div>
           <div v-else class="e2e-hint">{{ t(e2eHintKey) }}</div>
+          <!-- 口令型 E2E（2026-11-01 core#30）：内容密钥用口令包装落服务端，口令是
+               取件人能否解密的唯一凭据（错口令=内容永久不可解）⇒ 必填 + 两次一致。
+               与上方 require_auth 的取件密码是两回事（那道门在服务端）。 -->
+          <div v-if="settings.e2e && e2eAvailable" class="e2e-password-rows">
+            <el-input
+              v-model="settings.e2e_password"
+              type="password"
+              show-password
+              maxlength="128"
+              :placeholder="t('upload.e2e.passwordPlaceholder')"
+              class="password-input"
+            />
+            <el-input
+              v-model="settings.e2e_password_confirm"
+              type="password"
+              show-password
+              maxlength="128"
+              :placeholder="t('upload.e2e.passwordConfirmPlaceholder')"
+              class="password-input"
+            />
+            <div
+              v-if="settings.e2e_password_confirm && settings.e2e_password !== settings.e2e_password_confirm"
+              class="e2e-hint e2e-hint--warn"
+            >
+              {{ t('upload.e2e.passwordMismatch') }}
+            </div>
+          </div>
         </div>
       </el-collapse-item>
     </el-collapse>
@@ -358,6 +385,14 @@ const unitLabel = (u: ShareExpireStyle) => t(UNIT_KEYS[u])
 
 .password-input {
   margin-top: 12px;
+}
+
+.e2e-password-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  max-width: 280px;
 }
 
 .e2e-hint {

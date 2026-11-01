@@ -8,6 +8,7 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
+import type { WrappedKeyFields } from '@/types/share'
 import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 
 /**
@@ -18,10 +19,11 @@ import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
  * 这两项是**表单必填**且直接进 FormData（`String(undefined)` 会发出字面量
  * "undefined"）⇒ 这里收紧为 required，其余字段跟契约走。
  */
-export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
-  expire_value: number
-  expire_style: string
-}
+export type MultiShareOptions = publicapiContract.MultiShareDirectReq &
+  Pick<WrappedKeyFields, 'wrapped_key'> & {
+    expire_value: number
+    expire_style: string
+  }
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
 export type MultiShareResult = publicapiContract.MultiShareData
@@ -42,9 +44,10 @@ export type MultiShareBindEntryInput = Omit<publicapiContract.MultiShareBindEntr
 }
 
 /** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
-export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> & {
-  entries: MultiShareBindEntryInput[]
-}
+export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> &
+  Pick<WrappedKeyFields, 'wrapped_key'> & {
+    entries: MultiShareBindEntryInput[]
+  }
 
 export const isOkCode = (code?: number) => code === 0 || code === 200
 
@@ -63,6 +66,8 @@ export async function multiDirect(
   formData.append('require_auth', String(opts.require_auth))
   if (opts.require_auth && opts.password) formData.append('password', opts.password)
   if (opts.encrypted) formData.append('encrypted', 'true')
+  // 口令型 E2E（2026-11-01 core#30）：口令包装的内容密钥随创建请求落服务端
+  if (opts.wrapped_key) formData.append('wrapped_key', opts.wrapped_key)
   if (opts.custom_code) formData.append('custom_code', opts.custom_code)
   if (opts.note) formData.append('note', opts.note)
 
@@ -172,6 +177,7 @@ export async function multiBind(
     require_auth: opts.require_auth || false,
     password: opts.password || '',
     encrypted: opts.encrypted || false,
+    wrapped_key: opts.wrapped_key || '',
     custom_code: opts.custom_code || '',
     note: opts.note || '',
   }

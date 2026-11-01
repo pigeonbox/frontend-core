@@ -43,9 +43,29 @@
 
         <!-- 分享内容 -->
         <div v-else-if="shareData" class="content-section">
-          <!-- E2E 缺密钥提示 -->
+          <!-- 口令型 E2E（2026-11-01 core#30）：内容密钥由口令包装存服务端，
+               取件人输入口令本地解包后再解密 -->
+          <div v-if="needE2ePassword" class="e2e-password-box">
+            <div class="e2e-password-title">{{ t('share.e2ePasswordTitle') }}</div>
+            <div class="e2e-password-desc">{{ t('share.e2ePasswordDesc') }}</div>
+            <div class="e2e-password-row">
+              <el-input
+                v-model="e2ePassword"
+                type="password"
+                show-password
+                :placeholder="t('share.e2ePasswordPlaceholder')"
+                @keyup.enter="submitE2ePassword"
+              />
+              <el-button type="primary" :loading="e2eBusy" @click="submitE2ePassword">
+                {{ t('share.e2ePasswordSubmit') }}
+              </el-button>
+            </div>
+            <!-- 「口令错误」与「取件密码错误」是两回事（后者是服务端那道门），提示分开 -->
+            <div v-if="e2ePasswordError" class="e2e-password-error">{{ e2ePasswordError }}</div>
+          </div>
+          <!-- 旧「URL-hash key」存量分享缺 key 参数 -->
           <el-alert
-            v-if="shareData.encrypted && !e2eKey"
+            v-else-if="shareData.encrypted && !e2eKey"
             type="warning"
             :title="t('share.e2eKeyMissing')"
             :closable="false"
@@ -53,7 +73,7 @@
             style="margin-bottom: 16px"
           />
           <el-alert
-            v-else-if="e2eError"
+            v-if="e2eError"
             type="error"
             :title="e2eError"
             :closable="false"
@@ -198,7 +218,7 @@ import {
   HomeFilled, Document, Folder, Download, CopyDocument, Loading, Memo
 } from '@element-plus/icons-vue'
 import { shareApi } from '@/api/share'
-import { decryptBytes, decryptText } from '@/utils/e2e'
+import { decryptBytes, decryptText, unwrapKey } from '@/utils/e2e'
 import { copyToClipboard } from '@/utils/clipboard'
 import { translateError } from '@/utils/api-interceptor'
 import { isPasswordFamilyError, isPasswordMissingOnly } from '@/utils/password-error'
@@ -273,6 +293,10 @@ const fetchShare = async (pwd?: string) => {
   // 页面会一边提示「缺少密钥」一边仍显示旧明文（2026-10-24 实测）。
   decryptedText.value = ''
   e2eError.value = ''
+  // 口令解包状态随分享清掉：换分享后必须重新输口令（旧口令/旧明文不得滞留）
+  unwrappedKey.value = ''
+  e2ePassword.value = ''
+  e2ePasswordError.value = ''
   // 切分享时先清掉上一份内容：否则 A 的内容会挂在 B 的地址/加载态里残留
   // （2026-10-23 浏览器实测：A→B 切换时页面一直显示 A）。
   shareData.value = null
@@ -284,14 +308,10 @@ const fetchShare = async (pwd?: string) => {
 
     if (res.code === 200) {
       shareData.value = res.data
-      // E2E 文本解密（密文 base64 存于 text 字段）
+      // E2E 文本解密（密文 base64 存于 text 字段）：URL-hash key 当场解；
+      // 口令型待输口令后由 submitE2ePassword 解
       if (res.data?.encrypted && res.data?.text && e2eKey.value) {
-        decryptedText.value = ''
-        try {
-          decryptedText.value = await decryptText(e2eKey.value, res.data.text)
-        } catch {
-          e2eError.value = t('share.decryptFailed')
-        }
+        await decryptShareText(e2eKey.value)
       }
     } else if (res.code === 403 || res.code === 10003 || res.data?.has_password) {
       needPassword.value = true
@@ -370,8 +390,19 @@ const buildDownloadUrl = (fileId?: number): string => {
 }
 
 // ===== E2E 解密（端到端加密分享） =====
-// 密钥来自分享链接 hash 路由的 query（#/share/CODE?key=xxx），服务端不可见
-const e2eKey = computed(() => (typeof route.query.key === 'string' ? route.query.key : ''))
+// 两条密钥来源（2026-11-01 core#30）：
+//  ① 存量：分享链接 hash 路由 query 的 ?key=（旧「URL-hash key」形态，照常可取，
+//     且换纯 JS 密码学后 http 下也能解）；
+//  ② 口令型：ShareDetail.wrapped_key（服务端只存口令包装的密钥）由取件人输入
+//     口令本地解包（unwrapKey）——密钥不再进 URL。
+const legacyE2eKey = computed(() => (typeof route.query.key === 'string' ? route.query.key : ''))
+const unwrappedKey = ref('')
+const e2eKey = computed(() => legacyE2eKey.value || unwrappedKey.value)
+// 口令型 E2E 的口令输入与错误提示
+const e2ePassword = ref('')
+const e2ePasswordError = ref('')
+/** 需要口令解包（有 wrapped_key 且本地尚未解出密钥） */
+const needE2ePassword = computed(() => !!shareData.value?.wrapped_key && !e2eKey.value)
 const e2eError = ref('')
 const e2eBusy = ref(false)
 // 解密后的文本（未加密分享直接用原文）
@@ -385,9 +416,50 @@ const displayText = computed(() => {
   if (shareData.value?.encrypted) return decryptedText.value || t2ePendingText()
   return shareData.value?.text || ''
 })
-const t2ePendingText = () => (e2eKey.value ? t('share.decrypting') : t('share.noKeyNoDecrypt'))
+const t2ePendingText = () =>
+  e2eKey.value
+    ? t('share.decrypting')
+    : needE2ePassword.value
+      ? t('share.e2ePasswordFirst')
+      : t('share.noKeyNoDecrypt')
 
 const isEncrypted = computed(() => !!shareData.value?.encrypted)
+
+/** E2E 文本解密（密文 base64 存于 text 字段；key = URL-hash 或口令解包所得） */
+const decryptShareText = async (key: string) => {
+  decryptedText.value = ''
+  try {
+    decryptedText.value = await decryptText(key, shareData.value?.text || '')
+    e2eError.value = ''
+  } catch {
+    e2eError.value = t('share.decryptFailed')
+  }
+}
+
+/**
+ * 口令解包（2026-11-01 core#30）：unwrapKey 失败（口令错/信封坏）一律提示
+ * 「口令错误，请重试」并保留输入可重试——与「分享不存在」「取件密码错误」
+ * （服务端那道门）是**不同**提示，文案不得混用。
+ */
+const submitE2ePassword = async () => {
+  const wrapped = (shareData.value?.wrapped_key as string | undefined) || ''
+  if (!wrapped) return
+  if (!e2ePassword.value) {
+    ElMessage.warning(t('share.e2ePasswordPlaceholder'))
+    return
+  }
+  e2eBusy.value = true
+  e2ePasswordError.value = ''
+  try {
+    unwrappedKey.value = unwrapKey(e2ePassword.value, wrapped)
+    // 文本当场解密；文件在点击下载时经 fetchDecryptSave 同一路径解密
+    await decryptShareText(unwrappedKey.value)
+  } catch {
+    e2ePasswordError.value = t('share.e2ePasswordWrong')
+  } finally {
+    e2eBusy.value = false
+  }
+}
 
 /** 解密并保存文件（E2E 分享：服务端流返回密文） */
 const fetchDecryptSave = async (url: string, name: string) => {
@@ -427,7 +499,9 @@ const downloadFile = (fileId?: number, name?: string) => {
     || `${shareCode.value}.bin`
   if (isEncrypted.value) {
     if (!e2eKey.value) {
-      e2eError.value = t('share.keyMissingParam')
+      // 口令型缺的是口令（引导去输）；存量 URL-hash 分享缺的是 key 参数
+      if (needE2ePassword.value) ElMessage.warning(t('share.e2ePasswordFirst'))
+      else e2eError.value = t('share.keyMissingParam')
       return
     }
     void fetchDecryptSave(url, fallbackName)
@@ -756,6 +830,39 @@ useRouteParam(
     padding: 24px;
   }
 }
+/* 口令型 E2E 口令输入区（2026-11-01 core#30） */
+.e2e-password-box {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  background: var(--color-muted);
+}
+
+.e2e-password-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.e2e-password-desc {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.e2e-password-row {
+  display: flex;
+  gap: 10px;
+  max-width: 420px;
+}
+
+.e2e-password-error {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-danger);
+}
+
 /* 文件备注（发送者附言） */
 .note-box {
   margin-bottom: 16px;

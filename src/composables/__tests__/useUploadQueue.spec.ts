@@ -17,12 +17,13 @@ vi.mock('@/api/multifile', () => ({
 vi.mock('@/utils/e2e', () => ({
   generateKeyB64: vi.fn(),
   encryptFile: vi.fn(),
+  wrapKey: vi.fn(),
 }))
 
 import { ElMessage } from 'element-plus'
 import { uploadFile } from '@/api/share'
 import { multiDirect, chunkUploadFile, multiBind } from '@/api/multifile'
-import { generateKeyB64, encryptFile } from '@/utils/e2e'
+import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 
 const MB = 1024 * 1024
 const t = (k: string) => k
@@ -39,6 +40,8 @@ const baseSettings = (): ShareSettings => ({
   require_auth: false,
   password: '',
   e2e: false,
+  e2e_password: '',
+  e2e_password_confirm: '',
   custom_code: '',
   note: '',
 })
@@ -50,6 +53,7 @@ const mocked = {
   multiBind: vi.mocked(multiBind),
   generateKeyB64: vi.mocked(generateKeyB64),
   encryptFile: vi.mocked(encryptFile),
+  wrapKey: vi.mocked(wrapKey),
   ElMessageError: vi.mocked(ElMessage.error),
   ElMessageSuccess: vi.mocked(ElMessage.success),
 }
@@ -66,7 +70,7 @@ describe('useUploadQueue', () => {
     const q = useUploadQueue({ settings: baseSettings(), t })
     q.addFiles([mkFile('a.txt', 5 * MB)])
     const out = await q.start()
-    expect(out).toMatchObject({ code: 'A1', full_share_url: 'http://x/#/share/A1', e2e_key: undefined })
+    expect(out).toMatchObject({ code: 'A1', full_share_url: 'http://x/#/share/A1', e2e_wrapped: undefined })
     expect(mocked.uploadFile).toHaveBeenCalledOnce()
     const [file, callOpts] = mocked.uploadFile.mock.calls[0]!
     expect(file.name).toBe('a.txt')
@@ -118,19 +122,44 @@ describe('useUploadQueue', () => {
     expect(mocked.uploadFile).not.toHaveBeenCalled()
   })
 
-  it('E2E 加密顺序：payload 为密文且 e2e_key 进结果', async () => {
+  it('E2E 加密顺序：payload 为密文、wrapped_key 随创建请求、e2e_wrapped 进结果', async () => {
     mocked.generateKeyB64.mockResolvedValue('k-e2e')
+    mocked.wrapKey.mockReturnValue('wrapped-k')
     const cipher = mkFile('a.txt.enc', 5 * MB)
     mocked.encryptFile.mockResolvedValue(cipher)
     mocked.uploadFile.mockResolvedValue({ code: 'E1', url: 'http://x/#/share/E1' })
-    const q = useUploadQueue({ settings: { ...baseSettings(), e2e: true }, t })
+    const q = useUploadQueue({ settings: { ...baseSettings(), e2e: true, e2e_password: 'pwd' }, t })
     q.addFiles([mkFile('a.txt', 5 * MB)])
     const out = await q.start()
-    expect(out).toMatchObject({ code: 'E1', e2e_key: 'k-e2e' })
+    // 口令型 E2E（2026-11-01 core#30）：密钥不进结果/链接，wrapped_key 随请求落服务端
+    expect(out).toMatchObject({ code: 'E1', e2e_wrapped: true })
+    expect(mocked.wrapKey).toHaveBeenCalledOnce()
     const [file] = mocked.uploadFile.mock.calls[0]!
     expect(file).toBe(cipher)
     expect(file).not.toBe(q.tasks.value[0]!.file)
     expect(mocked.uploadFile.mock.calls[0]![1]!.encrypted).toBe(true)
+    expect(mocked.uploadFile.mock.calls[0]![1]!.wrapped_key).toBe('wrapped-k')
+  })
+
+  it('E2E 下 presign 通道不参与决策（presign 无密钥交付字段且历史实现传原文件）', async () => {
+    const presign = vi.fn()
+    mocked.generateKeyB64.mockResolvedValue('k-e2e')
+    mocked.wrapKey.mockReturnValue('wrapped-k')
+    mocked.encryptFile.mockImplementation(async (_k: string, f: File) => f)
+    mocked.chunkUploadFile.mockResolvedValue('uid')
+    mocked.multiBind.mockResolvedValue({ code: 'C9', url: 'http://x/#/share/C9', share_url: '', file_count: 1 })
+    const q = useUploadQueue({
+      settings: { ...baseSettings(), e2e: true, e2e_password: 'pwd' },
+      t,
+      presignThreshold: 1 * MB,
+      presign,
+    })
+    q.addFiles([mkFile('big.bin', 50 * MB)])
+    const out = await q.start()
+    expect(presign).not.toHaveBeenCalled()
+    expect(mocked.multiBind).toHaveBeenCalledOnce()
+    expect(mocked.multiBind.mock.calls[0]![1]!.wrapped_key).toBe('wrapped-k')
+    expect(out).toMatchObject({ code: 'C9', e2e_wrapped: true })
   })
 
   it('上传失败：任务标 error + 不再弹全局 toast（行内已有逐条错误文本）+ start 返回 null', async () => {

@@ -1,11 +1,12 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
+import type { WrappedKeyFields } from '@/types/share'
 import type { share as shareContract } from '@pigeonbox/contracts'
 
 export const shareApi = {
   // 分享文本(请求契约 = contracts IDL 生成;此前手写类型漏 custom_code/encrypted)
-  shareText: (data: shareContract.ShareTextReq) => {
+  shareText: (data: shareContract.ShareTextReq & Pick<WrappedKeyFields, 'wrapped_key'>) => {
     const formData = new FormData()
     formData.append('text', data.text)
     formData.append('expire_value', String(data.expire_value))
@@ -13,6 +14,8 @@ export const shareApi = {
     formData.append('expire_style', data.expire_style)
     formData.append('require_auth', String(data.require_auth || false))
     if (data.encrypted) formData.append('encrypted', 'true')
+    // 口令型 E2E（2026-11-01 core#30）：内容密钥经口令包装后随创建请求落服务端
+    if (data.wrapped_key) formData.append('wrapped_key', data.wrapped_key)
     if (data.custom_code) formData.append('custom_code', data.custom_code)
 
     // 响应契约 = ShareData{code,url}(share_url/full_share_url/qr_code_data 为
@@ -50,7 +53,8 @@ export const shareApi = {
   // 取件密码经 X-Share-Password 请求头(2026-10-16 拍板;query 形态有访问日志/
   // Referer 泄漏面,与下载端点停收 ?password= 同批收敛;IDL GetShareReq api.header)
   getShare: (code: string, password?: string) => {
-    return request<ApiResponse<shareContract.ShareDetail>>({
+    // WrappedKeyFields = 口令型 E2E 垫片（contracts v0.20.10 抬钉版后移除组合）
+    return request<ApiResponse<shareContract.ShareDetail & WrappedKeyFields>>({
       url: '/share/select/',
       method: 'GET',
       params: { code },
@@ -81,6 +85,8 @@ export async function uploadFile(
     require_auth: boolean
     password?: string
     encrypted: boolean
+    /** 口令型 E2E（2026-11-01 core#30）：口令包装的内容密钥，随创建请求落服务端 */
+    wrapped_key?: string
     custom_code?: string
     note?: string
   },
@@ -95,6 +101,7 @@ export async function uploadFile(
   formData.append('require_auth', String(opts.require_auth))
   if (opts.require_auth && opts.password) formData.append('password', opts.password)
   if (opts.encrypted) formData.append('encrypted', 'true')
+  if (opts.wrapped_key) formData.append('wrapped_key', opts.wrapped_key)
   if (opts.custom_code) formData.append('custom_code', opts.custom_code)
   if (opts.note) formData.append('note', opts.note)
 
