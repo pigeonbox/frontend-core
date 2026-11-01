@@ -49,10 +49,17 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // 用 **构建产物** 起服务（`vite preview`）而不是 dev server：
+    // 用 **构建产物**起服务（`vite preview`）而不是 dev server：
     // E2E 要验的是发布出去的形态（base './' + hash 路由），dev server 的
     // HMR 与 transform 行为跟产物不同，dev 绿、产物坏的情况照样漏。
-    command: `npm run preview -- --port ${PORT} --strictPort`,
+    //
+    // ⚠️ **必须显式 --host 127.0.0.1**：vite preview 默认绑 `localhost`，
+    // 而 Node 17+ 的 `localhost` 先解析到 **IPv6 ::1** ⇒ 监听在 ::1 上；
+    // Playwright 按 baseURL 去探 **IPv4 127.0.0.1** ⇒ 连不上 ⇒
+    // `Timed out waiting 120000ms from config.webServer`。
+    //  macOS 本机恰好也监听 127.0.0.1 ⇒ **本地全绿、CI 全红**（首跑即踩）。
+    //  ⇒ 绑定与探测地址都钉死 IPv4，两端对齐。
+    command: `npm run preview -- --port ${PORT} --strictPort --host 127.0.0.1`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
