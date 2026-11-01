@@ -1,16 +1,21 @@
 /**
- * 契约 v0.20.10 口令型 E2E 字段垫片（contracts 钉版抬升后移除，改用 share.ShareDetail 原生字段）。
+ * 多文件通道的 `wrapped_key` 局部扩展（core#30 / frontend-core#38）。
  *
- * 2026-11-01 core#30 / frontend-core#38：内容密钥不再进分享链接，改由口令包装成
- * wrapped_key（base64 信封，见 utils/e2e.ts）随分享创建提交、落服务端。contracts
- * 钉版（v0.20.9 的 tgz）还没有这两个字段 ⇒ 先在此垫片，组合类型接住：
- *   - wrapped_key：取件侧解包用（ShareDetail 下发）；
- *   - has_wrapped_key：metadata 端点的提前渲染标志——**缺字段 ≠ false**，
- *     老后端不下发时不得据此隐藏口令输入（以 detail.wrapped_key 为准）。
+ * 2026-11-01 core#30：内容密钥不再进分享链接，改由口令包装成 wrapped_key
+ * （base64 信封，见 utils/e2e.ts）随分享创建提交、落服务端。
+ *
+ * ⚠️ **只有 multi 通道需要这个扩展**：contracts v0.20.10 已原生覆盖
+ * `ShareTextReq.wrapped_key` / `ShareFileReq.wrapped_key` /
+ * `ShareDetail.wrapped_key` / `RetrieveData.wrapped_key` / `has_wrapped_key`
+ * ⇒ 那几处直接用契约类型即可，**不得再叠加垫片**（叠加会出现同名可选字段
+ * 与契约字段语义打架，且让「契约已原生覆盖」这件事被掩盖）。
+ *
+ * ⚠️ 但 `MultiShareDirectReq` / `MultiShareBindReq`（contracts v0.20.10）
+ * **确实还没有** `wrapped_key` ⇒ multi 通道用本地扩展补上，待 contracts
+ * 下一版增量入契约后移除。
  */
-export interface WrappedKeyFields {
+export interface MultiWrappedKeyField {
   wrapped_key?: string
-  has_wrapped_key?: boolean
 }
 
 /** 分享详情（/share/select 响应载荷） */

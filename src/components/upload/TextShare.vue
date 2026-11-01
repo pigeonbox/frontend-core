@@ -136,9 +136,15 @@ const handleShare = async () => {
       wrappedKey = wrapKey(settings.e2e_password, e2eKey)
     }
 
+    // ⚠️ **明文口令绝不入请求**：settings 展开会把 e2e_password 带进入参 ⇒
+    // 当前 api 层只挑字段转发（不泄漏），但那依赖 api 层的实现细节 ——
+    // 一旦有人改成展开转发，口令就会进请求体（进而进日志/抓包）。
+    // ⇒ 此处显式剔除，口令只在本机用于 wrapKey。
+    const { e2e_password: _e2ePassword, e2e_password_confirm: _e2ePasswordConfirm, ...shareFields } = settings
+
     const res = await shareApi.shareText({
       text: payloadText,
-      ...settings,
+      ...shareFields,
       encrypted: settings.e2e,
       wrapped_key: wrappedKey || undefined,
       custom_code: userStore.isLoggedIn ? settings.custom_code : '',

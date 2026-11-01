@@ -8,7 +8,7 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
-import type { WrappedKeyFields } from '@/types/share'
+import type { MultiWrappedKeyField } from '@/types/share'
 import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 
 /**
@@ -18,9 +18,16 @@ import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
  * （收敛前 core 用 DefaultPostForm 读 ⇒ 缺字段时 handler 显式兜底），但前端
  * 这两项是**表单必填**且直接进 FormData（`String(undefined)` 会发出字面量
  * "undefined"）⇒ 这里收紧为 required，其余字段跟契约走。
+ *
+ * ⚠️ `wrapped_key` 是**本地扩展**：contracts v0.20.10 的 `MultiShare*Req`
+ * **尚未**声明该字段（core 的 multi handler 已按 `wrapped_key` 读表单/JSON，
+ * 见 transport/http/handler/share_multi.go）⇒ 本地补上，待 contracts 下一版
+ * 增量入契约后移除。
+ * （对照：`ShareTextReq` / `ShareFileReq` / `ShareDetail` / `RetrieveData`
+ *  在 v0.20.10 已原生含 `wrapped_key` ⇒ 那几处直接用契约类型，不叠加垫片。）
  */
 export type MultiShareOptions = publicapiContract.MultiShareDirectReq &
-  Pick<WrappedKeyFields, 'wrapped_key'> & {
+  Pick<MultiWrappedKeyField, 'wrapped_key'> & {
     expire_value: number
     expire_style: string
   }
@@ -45,7 +52,7 @@ export type MultiShareBindEntryInput = Omit<publicapiContract.MultiShareBindEntr
 
 /** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
 export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> &
-  Pick<WrappedKeyFields, 'wrapped_key'> & {
+  Pick<MultiWrappedKeyField, 'wrapped_key'> & {
     entries: MultiShareBindEntryInput[]
   }
 
