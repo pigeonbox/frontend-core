@@ -8,7 +8,6 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
-import type { MultiWrappedKeyField } from '@/types/share'
 import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 
 /**
@@ -26,11 +25,10 @@ import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
  * （对照：`ShareTextReq` / `ShareFileReq` / `ShareDetail` / `RetrieveData`
  *  在 v0.20.10 已原生含 `wrapped_key` ⇒ 那几处直接用契约类型，不叠加垫片。）
  */
-export type MultiShareOptions = publicapiContract.MultiShareDirectReq &
-  Pick<MultiWrappedKeyField, 'wrapped_key'> & {
-    expire_value: number
-    expire_style: string
-  }
+export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
+  expire_value: number
+  expire_style: string
+}
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
 export type MultiShareResult = publicapiContract.MultiShareData
@@ -51,10 +49,9 @@ export type MultiShareBindEntryInput = Omit<publicapiContract.MultiShareBindEntr
 }
 
 /** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
-export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> &
-  Pick<MultiWrappedKeyField, 'wrapped_key'> & {
-    entries: MultiShareBindEntryInput[]
-  }
+export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> & {
+  entries: MultiShareBindEntryInput[]
+}
 
 export const isOkCode = (code?: number) => code === 0 || code === 200
 
