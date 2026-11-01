@@ -57,7 +57,7 @@ import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { Promotion } from '@element-plus/icons-vue'
-import { encryptText, generateKeyB64 } from '@/utils/e2e'
+import { encryptText, generateKeyB64, wrapKey } from '@/utils/e2e'
 import { useUserStore } from '@/stores/user'
 import { useShareSettings } from '@/composables/useShareSettings'
 import { translateError } from '@/utils/api-interceptor'
@@ -78,7 +78,8 @@ const emit = defineEmits<{
     code: string
     share_url: string
     full_share_url: string
-    e2e_key?: string
+    /** 口令型 E2E 标志（2026-11-01 core#30）：密钥已口令包装落服务端，链接不含密钥 */
+    e2e_wrapped?: boolean
     file_name?: string
     has_password?: boolean
     pickup_code?: string
@@ -97,7 +98,7 @@ const textMaxBytes = computed(() => configStore.config?.textMaxBytes || 222 * 10
 const byteLength = computed(() => new TextEncoder().encode(textContent.value).length)
 
 // 分享设置（过期/密码/自定义码/E2E）——与 FileUpload 共用同一状态机
-const { settings, validate } = useShareSettings()
+const { settings, validate, validateE2e } = useShareSettings()
 
 const handleShare = async () => {
   if (!textContent.value.trim()) {
@@ -106,6 +107,12 @@ const handleShare = async () => {
   }
   if (!validate()) {
     ElMessage.warning(t('upload.passwordRequired'))
+    return
+  }
+  // E2E 口令校验：专属提示，不与取件密码混用（2026-11-01 core#30）
+  const e2eErr = validateE2e()
+  if (e2eErr) {
+    ElMessage.warning(t(e2eErr))
     return
   }
 
@@ -118,18 +125,28 @@ const handleShare = async () => {
   sharing.value = true
 
   try {
-    // E2E：生成密钥并加密文本（密文 base64 作为分享内容；密钥随链接传递）
-    let e2eKey = ''
+    // E2E（口令型，2026-11-01 core#30）：生成内容密钥并加密文本（密文 base64 作为
+    // 分享内容）；密钥**不进链接**，用口令包装成 wrapped_key 随创建请求落服务端，
+    // 取件人凭口令本地解包。
+    let wrappedKey = ''
     let payloadText = textContent.value
     if (settings.e2e) {
-      e2eKey = await generateKeyB64()
+      const e2eKey = await generateKeyB64()
       payloadText = await encryptText(e2eKey, textContent.value)
+      wrappedKey = wrapKey(settings.e2e_password, e2eKey)
     }
+
+    // ⚠️ **明文口令绝不入请求**：settings 展开会把 e2e_password 带进入参 ⇒
+    // 当前 api 层只挑字段转发（不泄漏），但那依赖 api 层的实现细节 ——
+    // 一旦有人改成展开转发，口令就会进请求体（进而进日志/抓包）。
+    // ⇒ 此处显式剔除，口令只在本机用于 wrapKey。
+    const { e2e_password: _e2ePassword, e2e_password_confirm: _e2ePasswordConfirm, ...shareFields } = settings
 
     const res = await shareApi.shareText({
       text: payloadText,
-      ...settings,
+      ...shareFields,
       encrypted: settings.e2e,
+      wrapped_key: wrappedKey || undefined,
       custom_code: userStore.isLoggedIn ? settings.custom_code : '',
     })
 
@@ -140,7 +157,7 @@ const handleShare = async () => {
         code: res.data.code,
         share_url: res.data.url,
         full_share_url: res.data.url,
-        e2e_key: e2eKey || undefined,
+        e2e_wrapped: settings.e2e ? true : undefined,
         // file_name 故意不传：文本分享无直链下载端点，成功弹窗据此隐藏命令行 Tab
         has_password: !!settings.password,
         // 文本/文件分享同权铸造 6 位取件码（E2E 密文分享为空），成功弹窗展示快捷卡

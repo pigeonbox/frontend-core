@@ -8,6 +8,7 @@
 import { request } from '@/utils/request'
 import { xhrSend } from '@/api/_xhr'
 import type { ApiResponse } from '@/types/common'
+import type { MultiWrappedKeyField } from '@/types/share'
 import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 
 /**
@@ -17,11 +18,19 @@ import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
  * （收敛前 core 用 DefaultPostForm 读 ⇒ 缺字段时 handler 显式兜底），但前端
  * 这两项是**表单必填**且直接进 FormData（`String(undefined)` 会发出字面量
  * "undefined"）⇒ 这里收紧为 required，其余字段跟契约走。
+ *
+ * ⚠️ `wrapped_key` 是**本地扩展**：contracts v0.20.10 的 `MultiShare*Req`
+ * **尚未**声明该字段（core 的 multi handler 已按 `wrapped_key` 读表单/JSON，
+ * 见 transport/http/handler/share_multi.go）⇒ 本地补上，待 contracts 下一版
+ * 增量入契约后移除。
+ * （对照：`ShareTextReq` / `ShareFileReq` / `ShareDetail` / `RetrieveData`
+ *  在 v0.20.10 已原生含 `wrapped_key` ⇒ 那几处直接用契约类型，不叠加垫片。）
  */
-export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
-  expire_value: number
-  expire_style: string
-}
+export type MultiShareOptions = publicapiContract.MultiShareDirectReq &
+  Pick<MultiWrappedKeyField, 'wrapped_key'> & {
+    expire_value: number
+    expire_style: string
+  }
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
 export type MultiShareResult = publicapiContract.MultiShareData
@@ -42,9 +51,10 @@ export type MultiShareBindEntryInput = Omit<publicapiContract.MultiShareBindEntr
 }
 
 /** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
-export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> & {
-  entries: MultiShareBindEntryInput[]
-}
+export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entries'> &
+  Pick<MultiWrappedKeyField, 'wrapped_key'> & {
+    entries: MultiShareBindEntryInput[]
+  }
 
 export const isOkCode = (code?: number) => code === 0 || code === 200
 
@@ -63,6 +73,8 @@ export async function multiDirect(
   formData.append('require_auth', String(opts.require_auth))
   if (opts.require_auth && opts.password) formData.append('password', opts.password)
   if (opts.encrypted) formData.append('encrypted', 'true')
+  // 口令型 E2E（2026-11-01 core#30）：口令包装的内容密钥随创建请求落服务端
+  if (opts.wrapped_key) formData.append('wrapped_key', opts.wrapped_key)
   if (opts.custom_code) formData.append('custom_code', opts.custom_code)
   if (opts.note) formData.append('note', opts.note)
 
@@ -172,6 +184,7 @@ export async function multiBind(
     require_auth: opts.require_auth || false,
     password: opts.password || '',
     encrypted: opts.encrypted || false,
+    wrapped_key: opts.wrapped_key || '',
     custom_code: opts.custom_code || '',
     note: opts.note || '',
   }

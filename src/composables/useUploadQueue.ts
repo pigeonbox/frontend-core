@@ -4,7 +4,7 @@ import { pickUploadPlan } from '@/composables/useUploadPlan'
 import { uploadFile } from '@/api/share'
 import { multiDirect, chunkUploadFile, multiBind, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
 import type { PresignCompleteData } from '@/api/presign'
-import { generateKeyB64, encryptFile } from '@/utils/e2e'
+import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
 import { formatFileSize } from '@/utils/format'
 import type { ShareSettings } from '@/composables/useShareSettings'
@@ -235,12 +235,14 @@ export function useUploadQueue(opts: {
     settleBatch(t('upload_view.presign.abort'))
   }
 
-  const multiOptions = (): MultiShareOptions => ({
+  const multiOptions = (wrappedKey?: string): MultiShareOptions => ({
     expire_value: settings.expire_value,
     expire_style: settings.expire_style,
     require_auth: settings.require_auth,
     password: settings.password,
     encrypted: settings.e2e,
+    // 口令型 E2E（2026-11-01 core#30）：口令包装的内容密钥随创建请求落服务端
+    wrapped_key: wrappedKey || undefined,
     // 统一为登录才发（原 multi 路径无条件发送，对齐 single 路径与后端 v0.11.1 语义）
     custom_code: opts.isLoggedIn?.() ?? true ? settings.custom_code || undefined : undefined,
     note: settings.note || undefined,
@@ -288,8 +290,10 @@ export function useUploadQueue(opts: {
     batchRunning = true
     batchCancelled = false
 
-    // E2E：单密钥 + 逐文件预加密（密文作为实际上传内容）
+    // E2E（口令型，2026-11-01 core#30）：单密钥 + 逐文件预加密（密文作为实际上传
+    // 内容）；密钥不进链接，用口令包装成 wrapped_key 随各通道的创建请求落服务端。
     let e2eKey = ''
+    let wrappedKey = ''
     if (settings.e2e) {
       const tooBig = pending.filter((f) => f.file.size > E2E_MAX_BYTES)
       if (tooBig.length > 0) {
@@ -299,6 +303,7 @@ export function useUploadQueue(opts: {
       }
       try {
         e2eKey = await generateKeyB64()
+        wrappedKey = wrapKey(settings.e2e_password, e2eKey)
         for (const task of pending) {
           if (batchCancelled) break
           task.status = 'encrypting'
@@ -331,8 +336,11 @@ export function useUploadQueue(opts: {
     // 通道决策（用原始文件大小——钉现状）
     const totalBytes = pending.reduce((s, f) => s + f.file.size, 0)
     const maxFileBytes = Math.max(...pending.map((f) => f.file.size))
-    // 匿名直传开关：后端下发 false 时， presign 通道不参与决策（>阈值 落 multi-chunk）
-    const presignAllowed = opts.presignAllowed?.() ?? true
+    // 匿名直传开关：后端下发 false 时， presign 通道不参与决策（>阈值 落 multi-chunk）。
+    // E2E 也强制退出 presign（2026-11-01 core#30）：presign 通道既不收 wrapped_key
+    // （init 无此字段，密钥无从交付 ⇒ 取件人永远解不开），历史实现还直传 task.file
+    // 原文件（明文泄漏面）⇒ E2E 一律走 direct/multi 通道（密文 + wrapped_key）。
+    const presignAllowed = (opts.presignAllowed?.() ?? true) && !settings.e2e
     let plan = pickUploadPlan({
       count: pending.length,
       totalBytes,
@@ -360,6 +368,7 @@ export function useUploadQueue(opts: {
             require_auth: settings.require_auth,
             password: settings.password || undefined,
             encrypted: settings.e2e && task.payload !== task.file,
+            wrapped_key: settings.e2e ? wrappedKey : undefined,
             custom_code: opts.isLoggedIn?.() ?? true ? settings.custom_code || undefined : undefined,
             note: settings.note || undefined,
           },
@@ -381,7 +390,7 @@ export function useUploadQueue(opts: {
           code: res.code,
           share_url: res.url,
           full_share_url: res.url,
-          e2e_key: settings.e2e ? e2eKey : undefined,
+          e2e_wrapped: settings.e2e ? true : undefined,
           file_name: task.file.name,
           has_password: !!settings.password,
           pickup_code: res.pickup_code || undefined,
@@ -419,7 +428,7 @@ export function useUploadQueue(opts: {
             code: r.code || '',
             share_url: r.url || '',
             full_share_url: r.url || '',
-            e2e_key: settings.e2e ? e2eKey : undefined,
+            e2e_wrapped: settings.e2e ? true : undefined,
             file_name: task.file.name,
             has_password: !!settings.password,
             pickup_code: r.pickup_code || undefined,
@@ -445,7 +454,7 @@ export function useUploadQueue(opts: {
         const capBytes = payloads.map((f) => f.size)
         const result = await multiDirect(
           payloads,
-          multiOptions(),
+          multiOptions(wrappedKey),
           (loaded) => {
             let acc = 0
             for (let idx = 0; idx < pending.length; idx++) {
@@ -469,7 +478,7 @@ export function useUploadQueue(opts: {
           code: result.code,
           share_url: result.share_url || result.url,
           full_share_url: result.url,
-          e2e_key: settings.e2e ? e2eKey : undefined,
+          e2e_wrapped: settings.e2e ? true : undefined,
           file_name: pending.length === 1 ? pending[0]!.file.name : undefined,
           has_password: !!settings.password,
           pickup_code: result.pickup_code || undefined,
@@ -504,7 +513,7 @@ export function useUploadQueue(opts: {
         task.statusText = t('upload.prepare')
         entries.push({ upload_id: sessionId })
       }
-      const result = await multiBind(entries, multiOptions())
+      const result = await multiBind(entries, multiOptions(wrappedKey))
       for (const task of pending) {
         task.status = 'success'
         task.progress = 100
@@ -515,7 +524,7 @@ export function useUploadQueue(opts: {
         code: result.code,
         share_url: result.share_url || result.url,
         full_share_url: result.url,
-        e2e_key: settings.e2e ? e2eKey : undefined,
+        e2e_wrapped: settings.e2e ? true : undefined,
         file_name: pending.length === 1 ? pending[0]!.file.name : undefined,
         has_password: !!settings.password,
         pickup_code: result.pickup_code || undefined,

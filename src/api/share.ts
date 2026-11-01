@@ -13,6 +13,8 @@ export const shareApi = {
     formData.append('expire_style', data.expire_style)
     formData.append('require_auth', String(data.require_auth || false))
     if (data.encrypted) formData.append('encrypted', 'true')
+    // 口令型 E2E（2026-11-01 core#30）：内容密钥经口令包装后随创建请求落服务端
+    if (data.wrapped_key) formData.append('wrapped_key', data.wrapped_key)
     if (data.custom_code) formData.append('custom_code', data.custom_code)
 
     // 响应契约 = ShareData{code,url}(share_url/full_share_url/qr_code_data 为
@@ -34,6 +36,11 @@ export const shareApi = {
     formData.append('require_auth', String(data.require_auth))
     if (data.require_auth && data.password) formData.append('password', data.password)
     if (data.note) formData.append('note', data.note)
+    // 口令型 E2E（2026-11-01 core#30）：内容密钥经口令包装后随创建请求落服务端。
+    // ⚠️ 服务端 share/file 端点按表单字段 `wrapped_key` 读（core 的
+    // gen/handler/share/share_service.go）⇒ 漏发这一项 ⇒ 单文件通道的口令型
+    // E2E 静默失效（服务端拿到空 wrapped key ⇒ 不铸取件码 ⇒ 取件方拿不到解封材料）。
+    if (data.wrapped_key) formData.append('wrapped_key', data.wrapped_key)
 
     // 响应契约 = ShareData{code,url}(幻影字段清理同上)
     return request<ApiResponse<shareContract.ShareData>>({
@@ -81,6 +88,8 @@ export async function uploadFile(
     require_auth: boolean
     password?: string
     encrypted: boolean
+    /** 口令型 E2E（2026-11-01 core#30）：口令包装的内容密钥，随创建请求落服务端 */
+    wrapped_key?: string
     custom_code?: string
     note?: string
   },
@@ -95,6 +104,7 @@ export async function uploadFile(
   formData.append('require_auth', String(opts.require_auth))
   if (opts.require_auth && opts.password) formData.append('password', opts.password)
   if (opts.encrypted) formData.append('encrypted', 'true')
+  if (opts.wrapped_key) formData.append('wrapped_key', opts.wrapped_key)
   if (opts.custom_code) formData.append('custom_code', opts.custom_code)
   if (opts.note) formData.append('note', opts.note)
 

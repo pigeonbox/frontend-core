@@ -103,7 +103,9 @@ export default {
     loggedIn: 'Logged In',
     shareSuccess: 'Shared successfully',
     shareSuccessSubtitle: 'Your share link has been created',
-    e2eLinkWarning: 'This share is end-to-end encrypted: the link contains the decryption key. Send the full link and do not remove any parameters.',
+    // Password-wrapped E2E (2026-11-01 core#30): the link carries no key; send the
+    // passphrase through a separate channel.
+    e2eWrappedWarning: 'The recipient needs a passphrase to decrypt. Send the passphrase via a separate channel.',
     qrCodeTip: 'Scan to open',
     copyLink: 'Copy Link',
     linkCopied: 'Link copied to clipboard',
@@ -384,12 +386,18 @@ export default {
       title: 'End-to-End Encryption',
       on: 'Encrypted (Zero-Knowledge)',
       off: 'Not Encrypted',
-      hint: 'The key is generated in this browser and embedded in the share link; the server only stores ciphertext and cannot decrypt it. Files up to 100MB only; do not lose the key parameter in the link.',
-      hintText: 'The key is generated in this browser and embedded in the share link; the server only stores ciphertext and cannot decrypt it. Do not lose the key parameter in the link.',
-      needSecureContext: 'End-to-end encryption is unavailable on the current access method (HTTPS or localhost required) — the switch is disabled because browsers only expose WebCrypto in a secure context.',
+      hint: 'Content is encrypted in this browser before upload; the server only stores ciphertext. The decryption key is wrapped with your passphrase, so the link itself carries no key. Files up to 100MB only; a forgotten passphrase cannot be recovered.',
+      hintText: 'Content is encrypted in this browser before upload; the server only stores ciphertext. The decryption key is wrapped with your passphrase, so the link itself carries no key. A forgotten passphrase cannot be recovered.',
+      needSecureContext: 'This browser lacks the randomness capability required for end-to-end encryption, so the switch is disabled.',
       encrypting: 'Encrypting...',
       tooLarge: 'End-to-end encryption only supports files up to 100MB',
-      failed: 'Encryption failed (requires HTTPS)',
+      failed: 'Encryption failed',
+      // Password-wrapped E2E (2026-11-01 core#30): the passphrase is the only way
+      // for the recipient to recover the content key.
+      passwordPlaceholder: 'Set a decryption passphrase (the recipient needs it)',
+      passwordConfirmPlaceholder: 'Repeat the decryption passphrase',
+      passwordMismatch: 'The passphrases do not match',
+      passwordRequired: 'Please set a decryption passphrase',
     },
   },
   share: {
@@ -412,7 +420,15 @@ export default {
     passwordDesc: 'This share requires a password',
     passwordPlaceholder: 'Enter the access password',
     confirmAccess: 'Continue',
-    e2eKeyMissing: 'This share is end-to-end encrypted, but the link is missing the decryption key (key parameter), so the content cannot be decrypted',
+    e2eKeyMissing: 'This share is end-to-end encrypted, but the link is missing the decryption key (key parameter) — legacy encrypted shares need the full link (with the key parameter) to decrypt',
+    // Password-wrapped E2E (2026-11-01 core#30): what is missing here is the
+    // passphrase, not a key parameter.
+    e2ePasswordTitle: 'This share is end-to-end encrypted',
+    e2ePasswordDesc: 'The content is encrypted; picking it up requires the decryption passphrase set by the sender',
+    e2ePasswordPlaceholder: 'Enter the decryption passphrase',
+    e2ePasswordSubmit: 'Decrypt',
+    e2ePasswordWrong: 'Wrong passphrase, please try again',
+    e2ePasswordFirst: 'Please enter the decryption passphrase first',
     contentTitle: 'Shared Content',
     codeWithLabel: 'Share code: {code}',
     // Opened via the 6-digit pickup code (an alias): must not be labelled

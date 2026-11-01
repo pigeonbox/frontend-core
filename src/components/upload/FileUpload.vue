@@ -147,7 +147,7 @@ const batchCapLimit = computed(() =>
 
 const emit = defineEmits<{ success: [result: ShareResult] }>()
 
-const { settings, validate } = useShareSettings()
+const { settings, validate, validateE2e } = useShareSettings()
 const presignDialog = ref<InstanceType<typeof PresignUploadDialog> | null>(null)
 
 // 单请求体上限：后端 Hertz max body = upload_size（未知时保守取 8MB），留 1MB 表单开销余量
@@ -211,6 +211,12 @@ const handleFileChange = (uploadFile: UploadFile) => {
 const handleUploadAll = async () => {
   if (!validate()) {
     ElMessage.warning(t('upload.passwordRequired'))
+    return
+  }
+  // E2E 口令校验：专属提示，不与取件密码混用（2026-11-01 core#30）
+  const e2eErr = validateE2e()
+  if (e2eErr) {
+    ElMessage.warning(t(e2eErr))
     return
   }
   const outcome = await start()

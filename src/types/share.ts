@@ -1,3 +1,23 @@
+/**
+ * 多文件通道的 `wrapped_key` 局部扩展（core#30 / frontend-core#38）。
+ *
+ * 2026-11-01 core#30：内容密钥不再进分享链接，改由口令包装成 wrapped_key
+ * （base64 信封，见 utils/e2e.ts）随分享创建提交、落服务端。
+ *
+ * ⚠️ **只有 multi 通道需要这个扩展**：contracts v0.20.10 已原生覆盖
+ * `ShareTextReq.wrapped_key` / `ShareFileReq.wrapped_key` /
+ * `ShareDetail.wrapped_key` / `RetrieveData.wrapped_key` / `has_wrapped_key`
+ * ⇒ 那几处直接用契约类型即可，**不得再叠加垫片**（叠加会出现同名可选字段
+ * 与契约字段语义打架，且让「契约已原生覆盖」这件事被掩盖）。
+ *
+ * ⚠️ 但 `MultiShareDirectReq` / `MultiShareBindReq`（contracts v0.20.10）
+ * **确实还没有** `wrapped_key` ⇒ multi 通道用本地扩展补上，待 contracts
+ * 下一版增量入契约后移除。
+ */
+export interface MultiWrappedKeyField {
+  wrapped_key?: string
+}
+
 /** 分享详情（/share/select 响应载荷） */
 export interface ShareInfo {
   code: string
@@ -22,7 +42,12 @@ export interface ShareResult {
   code: string
   share_url: string
   full_share_url: string
-  e2e_key?: string
+  /**
+   * 口令型 E2E（2026-11-01 core#30）：本次分享的密钥已用口令包装成 wrapped_key
+   * 落服务端 ⇒ **链接不再拼 ?key=**（旧 e2e_key 字段已随 URL-hash 密钥形态退役），
+   * 弹窗据此提示「取件需要口令，请通过另一渠道告知取件人」。
+   */
+  e2e_wrapped?: boolean
   file_name?: string
   has_password?: boolean
   /** 6 位取件码（文件分享铸造；前端成功弹窗据此展示快捷取件卡） */
