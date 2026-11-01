@@ -6,31 +6,33 @@
 // invites / invites-accept / invite-push / directory。
 //
 // 类型依赖纪律（关键）：前端消费的是**已发布**的 contracts tgz（package.json 钉
-// v0.17.0，发布包里直传类型还在）。所以这里只 import 新契约仍在的联邦类型；
-// 直传时代的状态/任务/发送/接收/取消/发布/日志/上传/配对那一族类型与任务模型
-// 一律不引用——等 contracts 发新版删掉旧 tgz 里的同名类型时，前端不会当场编译失败。
+// v0.20.7）。该发布包的 p2p 域**只剩联邦一族类型**（直传时代的状态/任务/发送/
+// 接收/取消/发布/日志/上传/配对那一族已随直传面退役从 IDL 删除），所以本文件
+// 的每个类型都直接取自契约生成物，不留手写副本。
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
 import type { p2p as p2pContract } from '@pigeonbox/contracts'
 
-// 邀请信封（跨站推送的凭证与状态机）——v0.17.0 与新契约同形
+// 邀请信封（跨站推送的凭证与状态机）——与契约同形
 export type P2pInvite = p2pContract.InviteInfo
-// 在线名录对端（p2pd 名录透传，零敏感）——v0.17.0 与新契约同形
+// 在线名录对端（p2pd 名录透传，零敏感）——与契约同形
 export type P2pDirectoryPeer = p2pContract.P2pDirectoryPeer
 
 /**
- * accept 的响应类型：**就地手写**，不 import contracts 的 accept 响应类型。
+ * accept 的响应类型：**引用 contracts 生成类型**（v0.20.7 起可用）。
  *
- * 原因：v0.17.0 发布包里 accept 的 data 仍是直传任务信封（随直传面一并从 IDL
+ * 沿革：v0.17.0 发布包里 accept 的 data 还是直传任务信封（随直传面一并从 IDL
  * 删除），新契约（contracts 4c3d188）改为 { invite: InviteInfo }——接受邀请退化为
- * 纯信封动作。引旧类型会绑死已删的任务模型，故按新契约就地声明。
- * TODO(待 contracts 新版发布): 改成 import type { AdminP2pInviteAcceptResp } from '@pigeonbox/contracts'
+ * 纯信封动作。引旧类型会绑死已删的任务模型。当时 contracts 尚未把该类型随 IDL
+ * 发布，只能就地手写一份；**v0.20.7 已发布** `AdminP2pInviteAcceptResp` /
+ * `AdminP2pInviteAcceptData` ⇒ 改为引用契约类型，删掉手写副本（手写副本与契约
+ * 漂移的风险由 src/api/__tests__/contractTypeDrift.spec.ts 守卫）。
+ *
+ * ⚠️ contracts 的 index 只导出**域命名空间**（`export type * as p2p from './p2p'`），
+ * 没有顶层类型导出 ⇒ 只能按 `p2pContract.X` 取用；写成
+ * `import type { AdminP2pInviteAcceptResp } from '@pigeonbox/contracts'` 编译不过。
  */
-export interface P2pInviteAcceptResp {
-  code: number
-  message: string
-  data: { invite: p2pContract.InviteInfo }
-}
+export type P2pInviteAcceptResp = p2pContract.AdminP2pInviteAcceptResp
 
 export const p2pApi = {
   // 待收邀请箱（跨站推送进来的口令信封）
@@ -39,7 +41,7 @@ export const p2pApi = {
 
   // 认领邀请：出箱 + 留痕 + 返回信封（不再 spawn 直传运行时）
   acceptInvite: (inviteId: string) =>
-    request<ApiResponse<{ invite: p2pContract.InviteInfo }>>({
+    request<ApiResponse<p2pContract.AdminP2pInviteAcceptData>>({
       url: '/admin/p2p/invites/accept',
       method: 'POST',
       data: { invite_id: inviteId },
