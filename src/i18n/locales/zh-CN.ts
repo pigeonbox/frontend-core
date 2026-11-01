@@ -776,6 +776,8 @@ export default {
         ratelimit: '接口限流',
         apitoken: 'API Token',
         webhook: 'Webhook',
+        telegram: 'Telegram',
+        bark: 'Bark',
         smtp: 'SMTP 邮件',
         federation: '联邦注册'
 
@@ -892,6 +894,16 @@ export default {
       notify: {
         webhook: 'Webhook URL',
         webhookPlaceholder: 'notify.created 事件 POST 地址，留空禁用',
+        telegramBotToken: 'Bot Token',
+        telegramBotTokenPlaceholder: 'BotFather 下发的机器人令牌',
+        telegramChatId: 'Chat ID',
+        telegramChatIdPlaceholder: '接收推送的会话 / 频道 ID，如 -1001234567890',
+        telegramHint: 'Bot Token 与 Chat ID 均填写才启用；留空即禁用 Telegram 推送',
+        barkServerUrl: 'Bark 服务地址',
+        barkServerUrlPlaceholder: 'https://api.day.app',
+        barkDeviceKey: 'Device Key',
+        barkDeviceKeyPlaceholder: 'Bark 设备密钥',
+        barkHint: '服务地址与 Device Key 均填写才启用；留空即禁用 Bark 推送',
         smtpHost: 'SMTP 主机',
         username: '用户名',
         password: '密码',
