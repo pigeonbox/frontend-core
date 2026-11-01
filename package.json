@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.2",
+    "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@pigeonbox/contracts": "https://github.com/pigeonbox/contracts/releases/download/v0.20.9/pigeonbox-contracts-0.20.9.tgz",
     "axios": "1.13.6",
     "element-plus": "2.13.4",
