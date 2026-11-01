@@ -95,3 +95,53 @@ describe('字面量 i18n 键必须存在于语言包', () => {
   })
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// en-US 语言包**值**里的中文残留（2026-11-01 审计）
+//
+// 背景：en-US.ts 曾有两条「值」是中文（serverDisabledPattern /
+// serverNoRootsPattern），第一眼看着像漏翻的文案，实际**必须保持中文**——它们
+// 是**服务端报文匹配串**：views/admin/LocalFiles.vue 用 `msg.includes(...)` 去
+// 匹配后端原样返回的中文报错（core/app/share/localfiles.go 的
+// errors.New("本地文件功能未启用") 与 "…未配置白名单目录（roots）"）。后端报文
+// 不随调用方 locale 变化 ⇒ 翻成英文会让 en-US 界面的「功能未启用 / 补白名单
+// 目录」分级引导**静默失效**（错误照常弹，但引导态不再出现）。
+//
+// 本守卫锁两件事：
+//   ① 除这两条匹配串外，en-US 的值**不得再出现中文**（新加的漏翻会红）；
+//   ② 这两条匹配串的值必须与 zh-CN **逐字相同**（被"顺手翻成英文"会红）。
+//
+// ⚠️ 后端改报错文案时，这两条匹配串与本守卫的期望值必须**一起**改。
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** CJK 表意文字 + CJK/全角标点（不含 em-dash / 弯引号 / ≥ 等排版符号） */
+const CJK_RE = /[\u3000-\u303f\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/
+
+/** 服务端报文匹配串：值必须保持中文原样（与 zh-CN 逐字一致） */
+const SERVER_MATCH_KEYS = new Set<string>([
+  'admin.localFilesPage.serverDisabledPattern',
+  'admin.localFilesPage.serverNoRootsPattern',
+])
+
+describe('en-US 语言包值的中文残留', () => {
+  it('除服务端报文匹配串外，en-US 的值不含中文', () => {
+    const offenders: string[] = []
+    for (const [k, v] of Object.entries(en)) {
+      if (typeof v !== 'string') continue
+      if (SERVER_MATCH_KEYS.has(k)) continue
+      if (CJK_RE.test(v)) offenders.push(`${k} = ${JSON.stringify(v)}`)
+    }
+    expect(offenders, `en-US 的值里出现中文：\n${offenders.join('\n')}`).toEqual([])
+  })
+
+  it('服务端报文匹配串的值与 zh-CN 逐字一致（翻成英文会破坏后端报文匹配）', () => {
+    for (const k of SERVER_MATCH_KEYS) {
+      expect(en[k], `en-US 的 ${k} 必须与 zh-CN 逐字相同`).toBe(zh[k])
+    }
+  })
+
+  it('服务端报文匹配串钉住后端报错原文（core/app/share/localfiles.go）', () => {
+    expect(en['admin.localFilesPage.serverDisabledPattern']).toBe('本地文件功能未启用')
+    expect(en['admin.localFilesPage.serverNoRootsPattern']).toBe('白名单目录')
+  })
+})
+
