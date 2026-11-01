@@ -365,6 +365,25 @@
               <el-input v-model="exForm.notify.webhook_url" :placeholder="t('admin.configPage.notify.webhookPlaceholder')" clearable />
             </el-form-item>
 
+            <!-- Telegram / Bark：与 webhook 同属外部推送 fan-out（缺省空 = 禁用该渠道） -->
+            <el-divider content-position="left">{{ t('admin.configPage.sections.telegram') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.notify.telegramBotToken')">
+              <el-input v-model="exForm.notify.telegram.bot_token" type="password" show-password :placeholder="t('admin.configPage.notify.telegramBotTokenPlaceholder')" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.telegramChatId')">
+              <el-input v-model="exForm.notify.telegram.chat_id" :placeholder="t('admin.configPage.notify.telegramChatIdPlaceholder')" clearable />
+              <span class="field-hint">{{ t('admin.configPage.notify.telegramHint') }}</span>
+            </el-form-item>
+
+            <el-divider content-position="left">{{ t('admin.configPage.sections.bark') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.notify.barkServerUrl')">
+              <el-input v-model="exForm.notify.bark.server_url" :placeholder="t('admin.configPage.notify.barkServerUrlPlaceholder')" clearable />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.barkDeviceKey')">
+              <el-input v-model="exForm.notify.bark.device_key" :placeholder="t('admin.configPage.notify.barkDeviceKeyPlaceholder')" clearable />
+              <span class="field-hint">{{ t('admin.configPage.notify.barkHint') }}</span>
+            </el-form-item>
+
             <el-divider content-position="left">{{ t('admin.configPage.sections.smtp') }}</el-divider>
             <el-form-item :label="t('admin.configPage.notify.smtpHost')">
               <el-input v-model="exForm.notify.smtp.host" placeholder="smtp.example.com:465" />
@@ -613,7 +632,13 @@ const exForm = ref({
     presign_expire_seconds: 600,
     code_case_insensitive: true,
   },
-  notify: { webhook_url: '', smtp: { host: '', port: 465, username: '', password: '', from: '' } },
+  notify: {
+    webhook_url: '',
+    smtp: { host: '', port: 465, username: '', password: '', from: '' },
+    // Telegram / Bark 推送渠道（2026-11-01 外部推送渠道扩展）：缺省空 = 禁用该渠道
+    telegram: { bot_token: '', chat_id: '' },
+    bark: { server_url: '', device_key: '' },
+  },
   oidc: { enabled: false, issuer: '', client_id: '', client_secret: '', scopes: 'openid profile email', frontend_callback: '' },
   local_import: { enabled: false, roots: [] as string[] },
   api_token: { enabled: true, per_key_qps: 20, per_key_burst: 40 },
@@ -724,6 +749,11 @@ const fetchExSections = (data: Record<string, unknown>) => {
   if (sec.notify) {
     Object.assign(exForm.value.notify, sec.notify)
     if (sec.notify.smtp) Object.assign(exForm.value.notify.smtp, sec.notify.smtp)
+    if (sec.notify.telegram) Object.assign(exForm.value.notify.telegram, sec.notify.telegram)
+    if (sec.notify.bark) Object.assign(exForm.value.notify.bark, sec.notify.bark)
+    // 后端/旧库下发 null 归一为空对象（v-model 需要稳定的嵌套对象，null 会渲染异常）
+    if (!exForm.value.notify.telegram) exForm.value.notify.telegram = { bot_token: '', chat_id: '' }
+    if (!exForm.value.notify.bark) exForm.value.notify.bark = { server_url: '', device_key: '' }
   }
   if (sec.oidc) Object.assign(exForm.value.oidc, sec.oidc)
   if (sec.local_import) Object.assign(exForm.value.local_import, sec.local_import)
@@ -832,7 +862,12 @@ const saveCurrent = async () => {
         break
       case 'notify':
         await putConfig({
-          notify: { webhook_url: exForm.value.notify.webhook_url, smtp: { ...exForm.value.notify.smtp } },
+          notify: {
+            webhook_url: exForm.value.notify.webhook_url,
+            smtp: { ...exForm.value.notify.smtp },
+            telegram: { ...exForm.value.notify.telegram },
+            bark: { ...exForm.value.notify.bark },
+          },
         })
         break
       case 'p2p':

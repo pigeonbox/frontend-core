@@ -20,7 +20,30 @@ export interface EmailConfigUpdate {
   [key: string]: unknown
 }
 
+// notify 段（通用 GET/PUT /admin/config 透传，语义见 contracts idl/admin.thrift 注释）。
+// telegram/bark 为外部推送渠道（2026-11-01 core#31）：缺省空 = 禁用该渠道。
+export interface TelegramNotifyUpdate {
+  bot_token?: string
+  chat_id?: string
+  [key: string]: unknown
+}
+
+export interface BarkNotifyUpdate {
+  server_url?: string
+  device_key?: string
+  [key: string]: unknown
+}
+
+export interface NotifyConfigUpdate {
+  webhook_url?: string
+  smtp?: Record<string, unknown>
+  telegram?: TelegramNotifyUpdate
+  bark?: BarkNotifyUpdate
+  [key: string]: unknown
+}
+
 export type AdminConfigUpdate = Partial<BasicConfigUpdate & SecurityConfigUpdate & EmailConfigUpdate> & {
+  notify?: NotifyConfigUpdate
   [key: string]: unknown
 }
 

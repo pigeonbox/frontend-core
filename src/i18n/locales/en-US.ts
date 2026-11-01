@@ -780,6 +780,8 @@ export default {
         ratelimit: 'Rate Limiting',
         apitoken: 'API Token',
         webhook: 'Webhook',
+        telegram: 'Telegram',
+        bark: 'Bark',
         smtp: 'SMTP Email',
         federation: 'Federation Registry'
 
@@ -896,6 +898,16 @@ export default {
       notify: {
         webhook: 'Webhook URL',
         webhookPlaceholder: 'POST endpoint for notify.created events; leave empty to disable',
+        telegramBotToken: 'Bot Token',
+        telegramBotTokenPlaceholder: 'Bot token issued by BotFather',
+        telegramChatId: 'Chat ID',
+        telegramChatIdPlaceholder: 'Chat / channel ID to push to, e.g. -1001234567890',
+        telegramHint: 'Enabled only when both Bot Token and Chat ID are set; leave empty to disable Telegram push',
+        barkServerUrl: 'Bark Server URL',
+        barkServerUrlPlaceholder: 'https://api.day.app',
+        barkDeviceKey: 'Device Key',
+        barkDeviceKeyPlaceholder: 'Bark device key',
+        barkHint: 'Enabled only when both Server URL and Device Key are set; leave empty to disable Bark push',
         smtpHost: 'SMTP Host',
         username: 'Username',
         password: 'Password',
