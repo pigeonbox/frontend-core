@@ -19,7 +19,7 @@ import { xhrSend } from '@/api/_xhr'
 import { publicApi } from '@/api/public'
 import { multiBind, multiDirect } from '@/api/multifile'
 import { notifyApi } from '@/api/notify'
-import { federationApi } from '@/api/federation'
+import { federationApi, federationDeliver } from '@/api/federation'
 import { userApi } from '@/api/user'
 import { localFilesApi } from '@/api/localFiles'
 
@@ -210,6 +210,67 @@ describe('GET /api/v1/federation/resolve（契约 FederationResolveData）', () 
     expect(res.data.available).toBe(true)
     expect(res.data.url).toBe('http://peer/s/ABC')
     expect(res.data.node_id).toBe('n1')
+  })
+})
+
+describe('POST /api/v1/federation/deliver（契约 FederationDeliverReq/FederationDeliverData）', () => {
+  it('multipart 形态：target_url 必发，title/note 可选，文件字段名 files', async () => {
+    mockedXhrSend.mockResolvedValue({
+      code: 200,
+      message: 'ok',
+      data: { file_count: 1, pickup_code: '654321', target_url: 'http://peer:12345' },
+    } as never)
+
+    const file = new File(['x'], 'a.txt')
+    const res = await federationDeliver([file], { target_url: 'http://peer:12345' })
+
+    const opts = mockedXhrSend.mock.calls[0]![0]
+    expect(opts.url).toBe('/api/v1/federation/deliver')
+    const form = opts.form as FormData
+    expect(form.get('target_url')).toBe('http://peer:12345')
+    // 可选字段缺省时**不出现**（不能发空串/字面量 "undefined"）
+    expect(form.get('title')).toBeNull()
+    expect(form.get('note')).toBeNull()
+    // 文件本体在 files 字段（服务端兼容 file）
+    expect(form.getAll('files')).toHaveLength(1)
+    expect((form.get('files') as File).name).toBe('a.txt')
+
+    // 响应透传：取件码是**对方柜**铸的，本柜只透传
+    expect(res.file_count).toBe(1)
+    expect(res.pickup_code).toBe('654321')
+    expect(res.target_url).toBe('http://peer:12345')
+  })
+
+  it('title/note 有值时随表单发出', async () => {
+    mockedXhrSend.mockResolvedValue({
+      code: 200,
+      message: 'ok',
+      data: { file_count: 1 },
+    } as never)
+
+    await federationDeliver([new File(['x'], 'a.txt')], {
+      target_url: 'http://peer:12345',
+      title: '资料',
+      note: '给你',
+    })
+
+    const form = mockedXhrSend.mock.calls[0]![0].form as FormData
+    expect(form.get('title')).toBe('资料')
+    expect(form.get('note')).toBe('给你')
+  })
+
+  it('错误分支：服务端拒绝（对端不在名单）⇒ 原样抛出，不吞错', async () => {
+    mockedXhrSend.mockRejectedValue(Object.assign(new Error('对方柜不在可投递名单'), { code: 40001 }))
+    await expect(
+      federationDeliver([new File(['x'], 'a.txt')], { target_url: 'http://nope:12345' }),
+    ).rejects.toThrow('对方柜不在可投递名单')
+  })
+
+  it('错误分支：服务端无 data ⇒ 抛 Error', async () => {
+    mockedXhrSend.mockResolvedValue({ code: 200, message: '', data: undefined } as never)
+    await expect(
+      federationDeliver([new File(['x'], 'a.txt')], { target_url: 'http://peer:12345' }),
+    ).rejects.toThrow('federation deliver failed')
   })
 })
 

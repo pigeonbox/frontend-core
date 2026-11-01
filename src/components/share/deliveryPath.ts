@@ -1,12 +1,14 @@
 // 寄件台「投递路径」与 PigeonBeam 直传入口（GET /beam）探测。
 //
 // 投递有三条走法：到柜（CS，文件上本服务器）/ 直连设备（P2P，设备↔设备端到端）/
-// 邀到别人的柜（联邦，**接收侧动作**，不在寄件台）。本模块只管前两条的路径判据。
+// 投递到别人的柜（联邦跨站投递，2026-11-01：文件转发到**另一个柜子**，取件码由
+// 对方柜铸）。前两条的判据在本模块；第三条由服务端能力位（capabilities
+// 段的 federation_delivery）决定 ⇒ 见 utils/capabilities.federationDeliveryAvailable。
 //
 // 平台适配器（fnos/qnap/openwrt 三仓同构）在 Box 服务根挂 GET /beam，服务端语义固定：
 //   302 → 入口在且就绪（重定向到本机 p2pcweb :12348/?t=<token>）
 //   401 → 入口在，但要求 Box 会话（未登录 / 登录过期）
-//   503 → 入口在，但 p2pcweb 未安装或未启动
+//   503 → 入口在，但 p2pcweb 未安装/未启动
 //   404 → 本机没挂 /beam（docker / charts / 桌面端）→ 不显示「直连设备」路径
 //
 // 探测必须 redirect:'manual'：跟随重定向会跨端口打到 :12348，撞 CORS 且拿不到状态码；
@@ -14,8 +16,8 @@
 //
 // 前端不做直传编排（Box 侧不内嵌 p2pc），这里只回答「本机有没有这个入口、什么状态」。
 
-/** 投递路径：到柜（本服务器）/ 直连设备 */
-export type DeliveryPath = 'box' | 'p2p'
+/** 投递路径：到柜（本服务器）/ 直连设备 / 投递到别人的柜（联邦跨站投递） */
+export type DeliveryPath = 'box' | 'p2p' | 'federation'
 
 /** 入口状态：未挂载 / 已挂载且就绪 / 已挂载需登录 / 已挂载但组件未就绪 */
 export type BeamEntryStatus = 'absent' | 'ready' | 'auth' | 'unready'
@@ -64,6 +66,10 @@ export async function probeBeamEntry(
  * ② 的依据：多副本下直传在架构上不可用（core 的 deployment.go 把联邦强制降级关闭，
  * 节点身份是进程级的 Ed25519，多副本语义未定义）⇒ 此时给出入口只会落到坏路径。
  *
+ * 「投递到别人的柜」（联邦跨站投递，2026-11-01）由**服务端能力位**决定
+ * （capabilities 段的 federation_delivery ⇒ utils/capabilities
+ * .federationDeliveryAvailable）：联邦启用且已登记可投递对端才开。
+ *
  * ⚠️ 「缺字段 = 未知，不是多副本」：老后端不下发 capabilities 段 ⇒ multiReplica=false
  * ⇒ 入口照常可见（宁可多给入口，也别给坏入口）。
  *
@@ -72,10 +78,14 @@ export async function probeBeamEntry(
 export function visibleDeliveryPaths(
   status: BeamEntryStatus,
   multiReplica: boolean,
+  federationDelivery: boolean,
 ): DeliveryPath[] {
   const list: DeliveryPath[] = ['box']
   if (status !== 'absent' && !multiReplica) {
     list.push('p2p')
+  }
+  if (federationDelivery) {
+    list.push('federation')
   }
   return list
 }

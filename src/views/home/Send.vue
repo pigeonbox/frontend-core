@@ -22,6 +22,7 @@
             <div class="card-head-icon">
               <el-icon size="22">
                 <Connection v-if="deliveryPath === 'p2p'" />
+                <Van v-else-if="deliveryPath === 'federation'" />
                 <Upload v-else-if="activeTab === 'file'" />
                 <Document v-else />
               </el-icon>
@@ -63,6 +64,12 @@
                 <TextShare @success="handleShareSuccess" />
               </div>
             </div>
+          </div>
+
+          <!-- 投递到别人的柜（联邦跨站投递，2026-11-01）：文件转发到**另一个柜子**，
+               取件码由**对方柜**铸 ⇒ 本表单必须把「此码在对方柜使用」说清楚。 -->
+          <div v-show="deliveryPath === 'federation'" class="box-pane">
+            <FederationDeliveryForm />
           </div>
 
           <!-- 卡内页脚：回取件 -->
@@ -107,7 +114,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   Upload, Document,
-  Download, Postcard, Connection
+  Download, Postcard, Connection, Van
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
@@ -118,6 +125,7 @@ import TextShare from '@/components/upload/TextShare.vue'
 import TopNav from '@/components/layout/TopNav.vue'
 import ShareResultDialog from '@/components/share/ShareResultDialog.vue'
 import DeliveryPathSelector from '@/components/share/DeliveryPathSelector.vue'
+import FederationDeliveryForm from '@/components/share/FederationDeliveryForm.vue'
 import type { DeliveryPath } from '@/components/share/deliveryPath'
 import { publicUrlMissing as publicUrlMissingOf } from '@/utils/capabilities'
 
@@ -148,13 +156,16 @@ const setTab = (tab: 'file' | 'text') => {
   router.replace({ query: { tab: tab === 'text' ? 'text' : undefined } })
 }
 
-// 投递路径：到柜（本服务器，默认）/ 直连设备（前端只给入口，不做直传编排）
+// 投递路径：到柜（本服务器，默认）/ 直连设备 / 投递到别人的柜（联邦跨站投递）
+// —— 可见集合由 DeliveryPathSelector 统一裁决（能力位 + 客户端探测）。
 const deliveryPath = ref<DeliveryPath>('box')
 
-// 卡头标题随投递路径走：直连设备时不还挂着「文件发送」
-const cardTitleKey = computed(() =>
-  deliveryPath.value === 'p2p' ? 'home.cardTitle.p2p' : 'home.cardTitle.' + activeTab.value
-)
+// 卡头标题随投递路径走：直连设备时不还挂着「文件发送」；跨站投递同理
+const cardTitleKey = computed(() => {
+  if (deliveryPath.value === 'p2p') return 'home.cardTitle.p2p'
+  if (deliveryPath.value === 'federation') return 'home.cardTitle.federation'
+  return 'home.cardTitle.' + activeTab.value
+})
 
 const shareResultDialog = ref<InstanceType<typeof ShareResultDialog> | null>(null)
 

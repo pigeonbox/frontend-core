@@ -28,7 +28,7 @@ import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import { withBase } from '@/utils/base'
-import { multiReplicaDeclared } from '@/utils/capabilities'
+import { multiReplicaDeclared, federationDeliveryAvailable } from '@/utils/capabilities'
 import {
   probeBeamEntry,
   visibleDeliveryPaths,
@@ -76,13 +76,20 @@ watch(() => userStore.isLoggedIn, () => { void runProbe() }, { immediate: true }
 // ⇒ 不能据此把功能藏没（宁可多给入口，也别给坏入口）。
 const multiReplica = computed(() => multiReplicaDeclared(configStore.config))
 
-// 可选路径：直连设备仅在本机确实挂了 /beam、且不是多副本拓扑时才出现。
+// 跨站投递（联邦前台化，2026-11-01）：能不能往**别人的柜**投文件，由服务端能力位
+// （capabilities 段的 federation_delivery）说了算——判据集中在 utils/capabilities，
+// 组件里不再各写一份 if。
+const federationDelivery = computed(() => federationDeliveryAvailable(configStore.config))
+
+// 可选路径：直连设备仅在本机确实挂了 /beam、且不是多副本拓扑时才出现；
+// 投递到别人的柜由服务端能力位决定。
 // 判定口径集中在 utils/deliveryPath 的 visibleDeliveryPaths（可单测）。
 const paths = computed<Array<{ key: DeliveryPath; labelKey: string }>>(() => {
-  const visible = visibleDeliveryPaths(status.value, multiReplica.value)
+  const visible = visibleDeliveryPaths(status.value, multiReplica.value, federationDelivery.value)
   const labels: Record<DeliveryPath, string> = {
     box: 'home.path.box',
     p2p: 'home.path.p2p',
+    federation: 'home.path.federation',
   }
   return visible.map((key) => ({ key, labelKey: labels[key] }))
 })

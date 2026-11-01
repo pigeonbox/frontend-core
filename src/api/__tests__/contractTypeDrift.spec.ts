@@ -125,6 +125,15 @@ const ROUTES: RouteSpec[] = [
     note: 'GET /api/v1/federation/resolve',
   },
   {
+    // 跨站投递（联邦前台化，2026-11-01）：访客在 A 柜把文件投到 B 柜；
+    // 响应里的 pickup_code 是 **B 柜铸的** 6 位码（A 柜只透传）。
+    path: '/api/v1/federation/deliver',
+    types: ['FederationDeliverReq', 'FederationDeliverData'],
+    dts: 'publicapi',
+    dupStructs: ['FederationDeliverData'],
+    note: 'POST /api/v1/federation/deliver（multipart；访客跨站投递）',
+  },
+  {
     path: '/admin/local-files/import',
     types: ['AdminImportLocalFileReq', 'AdminImportLocalFileData'],
     dts: 'admin',
