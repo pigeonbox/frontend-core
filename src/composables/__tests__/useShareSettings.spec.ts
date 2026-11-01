@@ -9,6 +9,8 @@ describe('useShareSettings', () => {
       require_auth: false,
       password: '',
       e2e: false,
+      e2e_password: '',
+      e2e_password_confirm: '',
       custom_code: '',
       note: '',
     })
@@ -30,6 +32,20 @@ describe('useShareSettings', () => {
     expect(validate()).toBe(true)
     settings.require_auth = false
     expect(validate()).toBe(true)
+  })
+
+  it('validateE2e：口令必填且两次一致（与取件密码分立，专属提示键）', () => {
+    const { settings, validateE2e } = useShareSettings()
+    // 未开 E2E ⇒ 不校验
+    expect(validateE2e()).toBe('')
+    settings.e2e = true
+    // 空口令 ⇒ passwordRequired（错口令=内容永久不可解，必须拦在发送前）
+    expect(validateE2e()).toBe('upload.e2e.passwordRequired')
+    settings.e2e_password = 'pwd'
+    settings.e2e_password_confirm = 'other'
+    expect(validateE2e()).toBe('upload.e2e.passwordMismatch')
+    settings.e2e_password_confirm = 'pwd'
+    expect(validateE2e()).toBe('')
   })
 
   it('reset 回默认值', () => {

@@ -8,11 +8,11 @@
     <div class="share-result">
       <el-result :icon="'success'" :title="t('home.shareSuccess')" :sub-title="t('home.shareSuccessSubtitle')" />
 
-      <!-- E2E 提示：链接含解密密钥 -->
+      <!-- 口令型 E2E 提示（2026-11-01 core#30）：链接不含密钥，取件需口令 -->
       <el-alert
-        v-if="shareE2EKey"
+        v-if="shareE2EWrapped"
         type="warning"
-        :title="t('home.e2eLinkWarning')"
+        :title="t('home.e2eWrappedWarning')"
         :closable="false"
         show-icon
         style="margin-bottom: 12px"
@@ -178,8 +178,9 @@ const visible = ref(false)
 const shareUrl = ref('')
 const shareCode = ref('')
 const qrCodeDataUrl = ref('')
-// E2E 密钥（有值时弹窗提示"链接含解密密钥"）
-const shareE2EKey = ref('')
+// 口令型 E2E（2026-11-01 core#30）：密钥已用口令包装落服务端，链接不含密钥，
+// 弹窗提示「取件需要口令，请通过另一渠道告知取件人」
+const shareE2EWrapped = ref(false)
 // 6 位取件码（文本/文件分享同权铸造；空=E2E 密文等未铸造场景）
 const sharePickupCode = ref('')
 // 命令行 Tab 可用性判定载荷
@@ -199,10 +200,10 @@ const siteBase = computed(() => configStore.siteBaseUrl)
 const publicUrlConfigured = computed(() => !!configStore.publicUrl)
 
 // 匿名直链下载端点仅文件分享可用（文本分享走 /share/:code 详情页）
-const wgetAvailable = computed(() => !!shareFileName.value && !shareHasPassword.value && !shareE2EKey.value)
+const wgetAvailable = computed(() => !!shareFileName.value && !shareHasPassword.value && !shareE2EWrapped.value)
 const wgetNoteKey = computed(() => {
   if (wgetAvailable.value) return ''
-  if (shareE2EKey.value) return 'home.shareMethod.wgetE2ENote'
+  if (shareE2EWrapped.value) return 'home.shareMethod.wgetE2ENote'
   if (shareHasPassword.value) return 'home.shareMethod.wgetPasswordNote'
   return ''
 })
@@ -274,8 +275,7 @@ const withSiteBase = (rawUrl: string, code: string): string => {
 const open = async (result: ShareResult) => {
   // 8 位分享码（/share/{code} 链接通道）
   shareCode.value = result.code
-  // E2E 密钥随链接传递（hash 路由 query，永不发往服务器）
-  shareE2EKey.value = result.e2e_key || ''
+  shareE2EWrapped.value = !!result.e2e_wrapped
   sharePickupCode.value = result.pickup_code || ''
   shareFileName.value = result.file_name || ''
   shareHasPassword.value = !!result.has_password
@@ -301,11 +301,6 @@ const open = async (result: ShareResult) => {
 
   // 站点公网地址优先（NAS 内网部署时别把内网地址发给外部用户）
   url = withSiteBase(url, result.code)
-
-  // E2E：密钥并入 hash 内 query（#/share/CODE?key=xxx；客户端可见、服务端不可见）
-  if (shareE2EKey.value) {
-    url += (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(shareE2EKey.value)
-  }
 
   shareUrl.value = url
   shareMethod.value = 'url' // 主视觉=取件码；页签默认完整链接
