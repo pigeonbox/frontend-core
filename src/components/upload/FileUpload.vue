@@ -54,6 +54,19 @@
       />
     </transition-group>
 
+    <!-- 本批合计超过站点默认的「单次发送总量」上限（**提示，不阻断**）：
+         用户级上限可能更宽松，硬拦会误杀合法上传；服务端 413 才是权威。
+         提前告知的价值是「选文件时就看见」，而不是发完才被拒。 -->
+    <div v-if="batchOverLimit" class="blocked-hint">
+      <el-icon><WarningFilled /></el-icon>
+      <span>{{
+        t('upload.batchOverLimit', {
+          size: formatFileSize(totalSize),
+          limit: formatFileSize(batchCapLimit),
+        })
+      }}</span>
+    </div>
+
     <!-- 共享设置（对所有文件生效；常驻——恒定布局，未选文件时 CTA 禁用） -->
     <ShareSettingsForm :settings="settings" show-note />
 
@@ -108,18 +121,28 @@ import FileItemRow from './FileItemRow.vue'
  */
 const { t } = useI18n()
 const configStore = useConfigStore()
-// 单文件上限文案随站点配置（maxFileSize，0=不限）——硬编码「5GB」曾与真实
-// 生效限制脱节（2026-10-19 事故）；登录用户的用户级上限超限时由服务端
-// 413 文案给出准确值
+const userStore = useUserStore()
+// 上传提示随站点配置动态化（硬编码「5GB」曾与真实生效限制脱节，2026-10-19 事故）。
+// ⚠️ **两个闸都要说**（2026-10-30 事故）：只说单文件上限（maxFileSize）⇒
+// UI 显示「单文件最大 4 GB」，登录用户却被单次发送总量上限（maxBatchSize，
+// 出厂默认 50MB）拒 ⇒ 两边对不上。
+// 总量上限**只对登录用户**有效（匿名走访客日配额），故匿名时不显示。
 const maxFileClause = computed(() => {
   const v = configStore.config?.maxFileSize ?? 0
-  return v > 0
+  const perFile = v > 0
     ? t('upload.maxFileLimited', { size: formatFileSize(v) })
     : t('upload.maxFileUnlimited')
+  const batch = userStore.isLoggedIn ? (configStore.config?.maxBatchSize ?? 0) : 0
+  return batch > 0
+    ? t('upload.maxFileAndBatchLimited', { perFile, size: formatFileSize(batch) })
+    : perFile
 })
-const userStore = useUserStore()
 const visitorUploadBlocked = computed(
   () => !userStore.isLoggedIn && configStore.config?.openUpload === false
+)
+// 单次发送总量上限（字节，0=不限）：**只对登录用户**有效（匿名走访客日配额）
+const batchCapLimit = computed(() =>
+  userStore.isLoggedIn ? (configStore.config?.maxBatchSize ?? 0) : 0
 )
 
 const emit = defineEmits<{ success: [result: ShareResult] }>()
@@ -135,6 +158,9 @@ const queue = useUploadQueue({
   // 站點級單文件上限（0=不限）——本地預檢：超限文件在發出任何請求前就攔掉
   // （服務端 presign init 也會拒，錯誤碼 30008；本地攔只是省一次往返）
   maxFileSize: () => configStore.config?.maxFileSize ?? 0,
+  // 站點默認的單次發送**總量**上限（0=不限）——**只提示不阻斷**
+  // （用戶級上限可能更寬鬆，硬攔會誤殺合法上傳；服務端 413 才是權威）
+  batchSizeCap: () => batchCapLimit.value,
   // 直传策略（管理后台"下载设置"下发）：disabled=全部关闭/authenticated=仅登录/everyone
   presignAllowed: () => {
     if (userStore.isLoggedIn) return true
@@ -159,7 +185,20 @@ const queue = useUploadQueue({
       e2e: s.e2e,
     }),
 })
-const { tasks, isUploading, canStart, blockedCount, addFiles, remove, cancel, retry, start, dispose } = queue
+const {
+  tasks,
+  isUploading,
+  canStart,
+  blockedCount,
+  totalSize,
+  batchOverLimit,
+  addFiles,
+  remove,
+  cancel,
+  retry,
+  start,
+  dispose,
+} = queue
 
 const { isDragging } = useFileDrop({ onFiles: addFiles })
 

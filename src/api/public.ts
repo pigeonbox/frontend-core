@@ -1,5 +1,28 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
+import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
+
+/**
+ * 服务端下发的**能力位**（2026-10-30，core /api/config 的 capabilities 段）。
+ *
+ * 「这个面支持什么」的一份真相源——后端按**运行时真实状态**计算，
+ * 前端据此显隐入口，不再各部署面各写一份条件判断。
+ *
+ * ⚠️ 只有**服务端知道**的事实在这里。客户端事实（WebCrypto 是否可用、
+ * Beam 入口是否挂载）**不在这里**——服务端无从得知，由前端探测
+ * （utils/e2e.ts、components/share/deliveryPath.ts）。
+ *
+ * ⚠️ 缺字段 ≠ false：老后端不下发 capabilities ⇒ 一律按"未知"处理，
+ * 不得据此隐藏功能（宁可多给入口，也别给坏入口）。
+ */
+export interface ServerCapabilities {
+  /** 部署模式：standalone | public | admin（多副本拓扑下 public=公开副本） */
+  deployment_mode?: string
+  /** 站点公网地址是否已配置（未配置 ⇒ 分享链接按请求来源拼 ⇒ 内网 IP 外发） */
+  public_url_set?: boolean
+  /** 首启建号是否需要令牌（服务端自动生成的一次性令牌或 PB_SETUP_TOKEN） */
+  setup_token_required?: boolean
+}
 
 export interface PublicConfig {
   name: string
@@ -7,6 +30,22 @@ export interface PublicConfig {
   uploadSize: number
   /** 站点级单文件上限（upload.max_file_size，字节，0=不限）；上传提示动态化数据源 */
   maxFileSize?: number
+  /**
+   * 站点默认「单次发送**总量**上限」（user.user_upload_size，字节，0=不限）。
+   *
+   * ⚠️ 与 maxFileSize（**单文件**上限）是两个不同的闸：
+   *   · maxFileSize：单个文件的体积上限
+   *   · maxBatchSize：一次发送（多文件合计）的体积上限，**只约束登录用户**
+   *     （匿名走访客日配额 upload.anonymous_daily_bytes）
+   *
+   * 2026-10-30 事故：此前前端只显示 maxFileSize ⇒ UI 说「单文件最大 4 GB」，
+   * 登录用户却被总量闸（出厂默认 50MB）拒（413「上传总大小超过限制」）⇒ 两个闸
+   * 必须一起可见，否则 UI 与真实限制必然对不上。
+   *
+   * ⚠️ 这是**站点级默认**：登录用户的**用户级**上限可能更宽松
+   * （users.max_upload_size）⇒ 前端只据此**提示**，不得硬拦截；服务端 413 才是权威。
+   */
+  maxBatchSize?: number
   enableChunk: number
   openUpload: boolean
   /** 匿名上传需登录（upload.require_login）；缺省=false */
@@ -35,27 +74,24 @@ export interface PublicConfig {
   publicUrl?: string
   /** 联邦是否启用（多副本模式下后端强制降级为 false）；取件台据此显式给出「跨站取件」提示 */
   federationEnabled?: boolean
+  /** 能力位（2026-10-30）：「这个面支持什么」的一份真相源；缺字段=未知，不得据此隐藏功能 */
+  capabilities?: ServerCapabilities
   expireStyle: string[]
   textMaxBytes: number
   initialized?: boolean
 }
 
-/** 取件元数据（GET /share/metadata/:code，免密码、不扣次数；仅用于回显有效期） */
-export interface ShareMetadata {
-  code: string
-  /** text | file */
-  type: string
-  name?: string
-  size: number
-  has_password: boolean
-  /** 过期时间（RFC3339；null=永久有效） */
-  expired_at: string | null
-  expired_count: number
-  used_count: number
-  encrypted: boolean
-  file_count: number
-  created_at: string
-}
+/**
+ * 取件元数据（GET /share/metadata/:code，免密码、不扣次数；仅用于回显有效期）
+ *
+ * 契约派生（contracts v0.20.0：ShareMetadataData，2026-10-26 自 core 的
+ * customHandler 收敛进 IDL）——此前是前端手抄的副本，后端改字段名不会编译报错。
+ *
+ * ⚠️ 可空性差异：契约里 expired_at 是 **optional**（缺省不输出；后端原为
+ * *time.Time → null），手抄版是 `string | null` ⇒ 消费面必须 `?? null` 兜底
+ * （见 components/share/ShareResultDialog.vue 的 loadExpire）。
+ */
+export type ShareMetadata = publicapiContract.ShareMetadataData
 
 // 系统初始化请求（字段名与后端 thrift 模型 snake_case 对齐）
 export interface InitializeSystemReq {

@@ -1,7 +1,7 @@
 // =============================================================================
 // PigeonBox 全局样式 — 清新柔和风(2026-10-07 自 Linear 式锐利风调整,对标上游
 // FileCodeBox 2024 主题的"简约不简单":大圆角/弥散阴影/留白呼吸感,信息密度不变)
-// 设计语言:品牌靛蓝点睛 + 中性灰阶,柔和边界,空气感间距
+// 设计语言：品牌青竹点睛 + 中性灰阶,柔和边界,空气感间距
 // =============================================================================
 
 * {
@@ -11,25 +11,19 @@
 }
 
 :root {
-  // ── 安全区（刘海 / 灵动岛 / 底部指示条 / 圆角屏 / 折叠屏内屏挖孔）──────
-  // 依赖 index.html 的 `viewport-fit=cover`（缺它时 iOS 把安全区恒为 0）。
-  // 横屏时刘海在侧边 ⇒ 左右也要内缩；竖屏时左右为 0。
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
-
-  // 主色 / 强调色 —— 紫罗兰(与配置中心默认 accent 一致,运行时 admin 可改,
+  // 主色 / 强调色 —— 青竹(与配置中心默认 accent 一致,运行时 admin 可改,
   // 见 utils/accent.ts;此处为权威默认值与首帧值,色阶公式与 accent.ts 相同)
-  --primary-color: #5e6ad2;        // 品牌靛蓝=图标渐变深端,与 favicon 呼应
-  --primary-hover: #7b85da;        // mix(white, 0.18)
-  --primary-active: #424a93;       // mix(black, 0.30)
-  --primary-bg: #eff0fb;           // mix(white, 0.90),强调色浅底(tag/选中行/hover)
-  --primary-color-rgb: 94, 106, 210;
-  --primary-gradient: linear-gradient(135deg, #5e6ad2 0%, #5e6ad2 100%); // 兼容旧引用,实为单色
+  --primary-color: #0e9f6e;        // 品牌青竹=图标渐变深端,与 favicon 呼应
+  --primary-hover: #39b088;        // mix(white, 0.18)
+  --primary-active: #0a6f4d;       // mix(black, 0.30)
+  --primary-bg: #e7f5f1;           // mix(white, 0.90),强调色浅底(tag/选中行/hover)
+  --primary-color-rgb: 14, 159, 110;
+  --primary-gradient: linear-gradient(135deg, #0e9f6e 0%, #0e9f6e 100%); // 兼容旧引用,实为单色
 
-  // 仪表盘统计卡图标色调 2-4 —— 权威默认值(紫/青绿/琥珀);accent 生效时由
-  // utils/accent.ts 按主色色相偏移(+30/-60/+160)派生同名变量覆盖
+  // 仪表盘统计卡图标色调 2-4 —— **固定语义色板**(紫/青绿/琥珀),不随主色派生:
+  // 语义四色构图恒定可辨(换任何主题色都不影响识别度)。历史实现是「主色色相
+  // 偏移」派生,只有靛蓝这类彩色主色才恰好落在紫/青绿/琥珀上,换成墨黑(灰阶)
+  // 或青竹后分别退化成「3 个几乎一样的灰」/「3 个绿」⇒ 界面发闷(2026-10-26 实录)
   --stat-tone-2-color: #7c3aed;
   --stat-tone-2-bg: rgba(124, 58, 237, 0.1);
   --stat-tone-3-color: #0d9488;
@@ -97,13 +91,13 @@
   // =============================================================================
   // Element Plus 全局主题覆盖 —— 所有 EP 组件自动跟随
   // =============================================================================
-  --el-color-primary: #5e6ad2;
-  --el-color-primary-light-3: #8e97e0;
-  --el-color-primary-light-5: #afb5e9;
-  --el-color-primary-light-7: #cfd2f2;
-  --el-color-primary-light-8: #dfe1f6;
-  --el-color-primary-light-9: #ecedfa;
-  --el-color-primary-dark-2: #4b55a8;
+  --el-color-primary: #0e9f6e;
+  --el-color-primary-light-3: #56bc9a;
+  --el-color-primary-light-5: #87cfb7;
+  --el-color-primary-light-7: #b7e2d4;
+  --el-color-primary-light-8: #cfece2;
+  --el-color-primary-light-9: #e2f3ee;
+  --el-color-primary-dark-2: #0b7f58;
 
 	--el-color-success: #15803d;
 	--el-color-warning: #a16207;
@@ -143,14 +137,15 @@
 // 暗色模式(由 theme store 注入 .dark class)
 // =============================================================================
 html.dark {
-  // 深色主色 = 浅色主色提亮 30%(与 accent.ts 同公式),保证 #0a0a0a 底对比度
-  --primary-color: #8e97e0;
-  --primary-hover: #767eb9;        // mix(#0a0a0a, 0.18)
-  --primary-active: #b0b6e9;       // mix(white, 0.30)
-  --primary-bg: rgba(142, 151, 224, 0.14);
-  --primary-color-rgb: 142, 151, 224;
+  // 深色主色 = 浅色主色提亮 30%(与 accent.ts 同公式);不足 #0a0a0a 底 4.5:1
+  // 对比度时继续提亮到达标(灰阶主色墨黑需 42% ⇒ #79797b),保证暗色下主色可当文字色用
+  --primary-color: #56bc9a;
+  --primary-hover: #489c80;        // mix(#0a0a0a, 0.18)
+  --primary-active: #89d0b8;       // mix(white, 0.30)
+  --primary-bg: rgba(86, 188, 154, 0.14);
+  --primary-color-rgb: 86, 188, 154;
 
-  // 统计卡图标色调 2-4 默认值(深色=浅色提亮,与 accent.ts 同公式)
+  // 统计卡图标色调 2-4(固定语义色板,深色=浅色提亮档,与 accent.ts 同值)
   --stat-tone-2-color: #a78bfa;
   --stat-tone-2-bg: rgba(167, 139, 250, 0.16);
   --stat-tone-3-color: #2dd4bf;
@@ -189,14 +184,14 @@ html.dark {
   --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.6);
 
-  // EP 暗色覆盖（light-N 向深底混,供浅底/hover/边框用）
-  --el-color-primary: #8e97e0;
-  --el-color-primary-light-3: #666da0;
-  --el-color-primary-light-5: #4c5175;
-  --el-color-primary-light-7: #32344a;
-  --el-color-primary-light-8: #242635;
-  --el-color-primary-light-9: #1a1b24;
-  --el-color-primary-dark-2: #a5ace6;
+  // EP 暗色覆盖(light-N 向深底混,供浅底/hover/边框用)
+  --el-color-primary: #56bc9a;
+  --el-color-primary-light-3: #3f876f;
+  --el-color-primary-light-5: #306352;
+  --el-color-primary-light-7: #213f35;
+  --el-color-primary-light-8: #192e27;
+  --el-color-primary-light-9: #131f1b;
+  --el-color-primary-dark-2: #78c9ae;
 
   --el-border-color: #262626;
   --el-border-color-light: #262626;
@@ -234,19 +229,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.2s ease, color 0.2s ease;
-  // 横向安全区（横屏时刘海/圆角在侧边）—— 纵向由顶栏与页面底部各自处理
-  padding-left: var(--safe-left);
-  padding-right: var(--safe-right);
 }
 
 #app {
   min-height: 100vh;
-  // 动态视口高度：移动端浏览器地址栏收起/展开时 100vh 不变 ⇒ 页面底部被
-  // 浏览器 chrome 遮住（滚动到底看不见）；折叠屏展开/合上时同理。
-  // 旧浏览器不认 dvh ⇒ 前一条 100vh 兜底（写在前面 ⇒ 旧浏览器取它）。
-  min-height: 100dvh;
-  // 底部安全区（home indicator / 手势条）—— 主操作按钮不能压在指示条下
-  padding-bottom: var(--safe-bottom);
 }
 
 a {
@@ -418,8 +404,9 @@ a {
 // 暗色模式 EP 适配(补充 token 无法覆盖的部分)
 // =============================================================================
 html.dark {
-  // 暗色主色提亮为 #8e97e0 后,自定义实底按钮的白字对比度跌至 ~2.5:1,
-  // 统一改为深字(EP 自带 primary 按钮由其自身变量处理,不在此列)
+  // 暗色主色是「浅色主色提亮 30%」的结果（青竹 ⇒ #56bc9a），属浅色系：
+  // 实底按钮若用白字只有 ~2.3:1（靛蓝时代同病：#8e97e0 上白字 2.5:1），
+  // ⇒ 改用深字（≈8:1）。EP 自带 primary 按钮由其自身变量处理，不在此列。
   .submit-btn,
   .get-btn {
     color: #101014;

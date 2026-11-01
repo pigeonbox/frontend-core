@@ -81,7 +81,7 @@
               <span class="field-hint">{{ t('admin.configPage.themes.hint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.appearance.accentColor')">
-              <el-input v-model="exForm.ui.accent_color" placeholder="#409eff" style="width: 220px" />
+              <el-input v-model="exForm.ui.accent_color" placeholder="#0e9f6e" style="width: 220px" />
               <span class="field-hint">{{ t('admin.configPage.appearance.accentHint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.appearance.showAdminEntry')">
@@ -123,6 +123,34 @@
             <el-form-item :label="t('admin.configPage.upload.maxFileSize')">
               <el-input-number v-model="maxFileSizeMb" :min="0" :max="1048576" :step="1024" />
               <span class="field-hint">{{ t('admin.configPage.upload.maxFileSizeHint') }}</span>
+            </el-form-item>
+            <!-- 单次发送**总量**上限（user.user_upload_size）：与上面的「单文件上限」是
+                 **两个不同的闸**——单文件上限管单个文件，本项管一次发送（多文件合计）的
+                 体积，只约束登录用户（匿名走访客日配额）。
+                 配成「总量 < 单文件」⇒ 超过单文件上限的文件永远发不出去（先被总量闸拒），
+                 而界面仍在宣称单文件上限有效 ⇒ 这里告警 + 一键对齐。
+                 编辑入口在「账户与登录」分区（user 段，PUT /admin/config/user）。 -->
+            <el-form-item :label="t('admin.configPage.upload.batchCap')">
+              <span class="field-hint">{{ t('admin.configPage.upload.batchCapCurrent', { size: batchCapText }) }}</span>
+              <el-button
+                v-if="uploadCapConflict"
+                size="small"
+                type="warning"
+                plain
+                :loading="aligningCap"
+                @click="alignUploadCap"
+              >
+                {{ t('admin.configPage.upload.batchCapAlign') }}
+              </el-button>
+              <el-alert
+                v-if="uploadCapConflict"
+                type="warning"
+                :closable="false"
+                show-icon
+                class="cap-conflict-alert"
+              >
+                {{ t('admin.configPage.upload.batchCapConflict', { total: batchCapText, perFile: maxFileSizeText }) }}
+              </el-alert>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.upload.allowedExpireStyles')">
               <el-select
@@ -220,12 +248,13 @@
 
             <el-form-item :label="t('admin.configPage.user.uploadLimit')">
               <el-input-number
-                v-model="configForm.user.useruploadsize"
-                :min="1048576"
-                :step="1048576"
+                v-model="userUploadSizeMb"
+                :min="0"
+                :max="1048576"
+                :step="1024"
                 controls-position="right"
               />
-              <span class="field-hint">{{ t('admin.configPage.user.bytesDefault') }}</span>
+              <span class="field-hint">{{ t('admin.configPage.user.uploadLimitHint') }}</span>
             </el-form-item>
 
             <el-form-item :label="t('admin.configPage.user.storageQuota')">
@@ -428,7 +457,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, type Component } from 'vue'
+import { ref, computed, watch, onMounted, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Picture, Upload, Download, User, Lock, Message, Connection } from '@element-plus/icons-vue'
@@ -438,6 +467,8 @@ import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS } from '@/config/expireStyles
 import { adminApi } from '@/api/admin'
 import { useConfigStore } from '@/stores/config'
 import { useErrorHandler } from '@/composables/useErrorHandler'
+import { uploadCapMismatch, alignedUploadCap } from '@/utils/uploadCap'
+import { formatFileSize } from '@/utils/format'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -486,7 +517,7 @@ const loading = ref(false)
 const saving = ref(false)
 const configStore = useConfigStore()
 
-const configForm = reactive({
+const configForm = ref({
   base: {
     name: '',
     description: '',
@@ -500,14 +531,16 @@ const configForm = reactive({
   },
   user: {
     allowuserregistration: 0,
-    useruploadsize: 52428800,
+    // 单次发送总量上限（字节，0 = 不限）：2026-10-30 起出厂默认即为不限
+    // （此前默认 50MB，与单文件上限默认「不限」自相矛盾）。
+    useruploadsize: 0,
     userstoragequota: 1073741824,
     sessionexpiryhours: 168
   }
 })
 
 // 公网地址未配置告警（内网部署时分享链接会带内网地址，外部用户打不开）
-const publicUrlMissing = computed(() => !configForm.base.public_url.trim())
+const publicUrlMissing = computed(() => !configForm.value.base.public_url.trim())
 
 const fetchConfig = async () => {
   loading.value = true
@@ -516,12 +549,12 @@ const fetchConfig = async () => {
     if (res.code === 200 && res.data) {
       // 映射配置数据
       if (res.data.base) {
-        Object.assign(configForm.base, res.data.base)
+        Object.assign(configForm.value.base, res.data.base)
         // 后端可能下发 null（未配置）→ 归一为空串，避免把 null 提交回配置段
-        if (!configForm.base.public_url) configForm.base.public_url = ''
+        if (!configForm.value.base.public_url) configForm.value.base.public_url = ''
       }
       if (res.data.transfer) {
-        Object.assign(configForm.transfer, res.data.transfer)
+        Object.assign(configForm.value.transfer, res.data.transfer)
       }
       // v0.7.3 扩容设置段预填
       fetchExSections(res.data as Record<string, unknown>)
@@ -542,10 +575,12 @@ const fetchUserSettings = async () => {
     const res = await adminApi.getUserSettings()
     if ((res.code === 200) && res.data) {
       const d = res.data as Record<string, unknown>
-      configForm.user.allowuserregistration = Number(d.allowuserregistration === true || d.allowuserregistration === 1)
-      if (typeof d.useruploadsize === 'number' && d.useruploadsize > 0) configForm.user.useruploadsize = d.useruploadsize
-      if (typeof d.userstoragequota === 'number' && d.userstoragequota > 0) configForm.user.userstoragequota = d.userstoragequota
-      if (typeof d.sessionexpiryhours === 'number' && d.sessionexpiryhours > 0) configForm.user.sessionexpiryhours = d.sessionexpiryhours
+      configForm.value.user.allowuserregistration = Number(d.allowuserregistration === true || d.allowuserregistration === 1)
+      // ⚠️ 0 是合法值（不限）——此前用 `> 0` 过滤 ⇒ 0 被当成「没值」而跳过，
+      // 表单永远停在默认的 52428800 ⇒ **管理员根本表达不了「不限」**。
+      if (typeof d.useruploadsize === 'number' && d.useruploadsize >= 0) configForm.value.user.useruploadsize = d.useruploadsize
+      if (typeof d.userstoragequota === 'number' && d.userstoragequota > 0) configForm.value.user.userstoragequota = d.userstoragequota
+      if (typeof d.sessionexpiryhours === 'number' && d.sessionexpiryhours > 0) configForm.value.user.sessionexpiryhours = d.sessionexpiryhours
     }
   } catch (error) {
     console.error('fetch user settings failed:', error)
@@ -554,7 +589,7 @@ const fetchUserSettings = async () => {
 
 // ==================== v0.7.3 扩容设置段（ui/download/notify/oidc/local_import/api_token）====================
 // 扁平契约：每段独立保存（adminApi.updateConfig({ 段名: 值 })），后端 nil-保留未提交段
-const exForm = reactive({
+const exForm = ref({
   ui: { background: '', accent_color: '', show_admin_addr: true, robots_text: '' },
   upload_ex: {
     open_upload: true,
@@ -589,17 +624,17 @@ const exForm = reactive({
 })
 
 // 主题预设（2026-10-07 轻量主题包）：选择=写 ui.accent_color 走既有持久化与热应用
-const themePresetKey = computed(() => matchThemePreset(exForm.ui.accent_color))
+const themePresetKey = computed(() => matchThemePreset(exForm.value.ui.accent_color))
 const applyThemePreset = (th: ThemePreset) => {
-  exForm.ui.accent_color = th.accent
+  exForm.value.ui.accent_color = th.accent
 }
 
 const origin = window.location.origin
 // 白名单目录 textarea ↔ roots 数组(逗号分隔,自动去空)
 const localImportRootsText = computed({
-  get: () => exForm.local_import.roots.join(', '),
+  get: () => exForm.value.local_import.roots.join(', '),
   set: (v: string) => {
-    exForm.local_import.roots = v.split(',').map((x) => x.trim()).filter(Boolean)
+    exForm.value.local_import.roots = v.split(',').map((x) => x.trim()).filter(Boolean)
   },
 })
 
@@ -607,13 +642,46 @@ const localImportRootsText = computed({
 // 存回时按 1MB=1048576 字节换算并取整（4GiB 上限 = 4096MB = 4294967296 精确无误差）。
 const maxFileSizeMb = computed({
   get: () => {
-    const bytes = exForm.upload_ex.max_file_size ?? 0
+    const bytes = exForm.value.upload_ex.max_file_size ?? 0
     return bytes > 0 ? Math.round((bytes / 1024 / 1024) * 100) / 100 : 0
   },
   set: (v: number | undefined) => {
     const mb = Number(v) || 0
-    exForm.upload_ex.max_file_size = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
+    exForm.value.upload_ex.max_file_size = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
   },
+})
+
+// 单次发送**总量**上限（user.user_upload_size）：配置以字节存储，界面以 MB 编辑（0 = 不限）。
+//
+// ⚠️ 2026-10-30 前该字段是「字节直填 + min=1MB + 表单把 0 当没值」⇒
+// 既显示 52428800 这种看不懂的数字，又**根本表达不了「不限」**（0）。
+const userUploadSizeMb = computed({
+  get: () => {
+    const bytes = configForm.value.user.useruploadsize ?? 0
+    return bytes > 0 ? Math.round((bytes / 1024 / 1024) * 100) / 100 : 0
+  },
+  set: (v: number | undefined) => {
+    const mb = Number(v) || 0
+    configForm.value.user.useruploadsize = mb > 0 ? Math.round(mb * 1024 * 1024) : 0
+  },
+})
+
+/**
+ * 两个上传闸口是否矛盾：「单次发送总量上限」低于「单文件上限」
+ * ⇒ 超过单文件上限的文件**永远发不出去**（先被总量闸拒）。
+ */
+const uploadCapConflict = computed(() =>
+  uploadCapMismatch(configForm.value.user.useruploadsize ?? 0, exForm.value.upload_ex.max_file_size ?? 0)
+)
+
+/** 展示用的上限文本（不限时给「不限」二字，而不是 0 字节） */
+const batchCapText = computed(() => {
+  const bytes = configForm.value.user.useruploadsize ?? 0
+  return bytes > 0 ? formatFileSize(bytes) : t('admin.configPage.upload.batchCapUnlimited')
+})
+const maxFileSizeText = computed(() => {
+  const bytes = exForm.value.upload_ex.max_file_size ?? 0
+  return bytes > 0 ? formatFileSize(bytes) : t('admin.configPage.upload.batchCapUnlimited')
 })
 
 // 联邦管理台入口（Wave B'：直传操作页已退役，/admin/p2p 现指联邦页）
@@ -625,47 +693,47 @@ const goFederationOps = () => {
 const fetchExSections = (data: Record<string, unknown>) => {
   const sec = data as Record<string, any>
   if (sec.ui) {
-    Object.assign(exForm.ui, sec.ui)
+    Object.assign(exForm.value.ui, sec.ui)
     // 旧库 ui 段无 show_admin_addr 键（后端缺省=展示），归一为开避免开关显示与实际相反
-    if (exForm.ui.show_admin_addr == null) exForm.ui.show_admin_addr = true
+    if (exForm.value.ui.show_admin_addr == null) exForm.value.ui.show_admin_addr = true
   }
   if (sec.upload_ex) {
-    Object.assign(exForm.upload_ex, sec.upload_ex)
-    if (exForm.upload_ex.open_upload == null) exForm.upload_ex.open_upload = true
-    if (exForm.upload_ex.require_login == null) exForm.upload_ex.require_login = false
-    if (!exForm.upload_ex.anonymous_daily_count) exForm.upload_ex.anonymous_daily_count = 0
-    if (!exForm.upload_ex.anonymous_daily_bytes) exForm.upload_ex.anonymous_daily_bytes = 0
+    Object.assign(exForm.value.upload_ex, sec.upload_ex)
+    if (exForm.value.upload_ex.open_upload == null) exForm.value.upload_ex.open_upload = true
+    if (exForm.value.upload_ex.require_login == null) exForm.value.upload_ex.require_login = false
+    if (!exForm.value.upload_ex.anonymous_daily_count) exForm.value.upload_ex.anonymous_daily_count = 0
+    if (!exForm.value.upload_ex.anonymous_daily_bytes) exForm.value.upload_ex.anonymous_daily_bytes = 0
     // 旧库/空值归一为空数组（=全部允许）；否则多选框拿到 null 会渲染异常
-    if (!Array.isArray(exForm.upload_ex.allowed_expire_styles)) {
-      exForm.upload_ex.allowed_expire_styles = []
+    if (!Array.isArray(exForm.value.upload_ex.allowed_expire_styles)) {
+      exForm.value.upload_ex.allowed_expire_styles = []
     }
   }
   if (sec.download) {
-    Object.assign(exForm.download, sec.download)
+    Object.assign(exForm.value.download, sec.download)
     // 旧库 download 段无直传新键 → 后端下发 null：归一为默认值（nil 语义=开启/100MB/600s）
     // 旧开关 presign_anonymous_enabled 已退役（2026-10-26）：后端读配置时已把它的
     // 语义并入 presign_policy，前端不再二次推导。
-    if (!exForm.download.presign_policy) {
-      exForm.download.presign_policy = 'everyone'
+    if (!exForm.value.download.presign_policy) {
+      exForm.value.download.presign_policy = 'everyone'
     }
-    if (!exForm.download.presign_threshold_mb) exForm.download.presign_threshold_mb = 100
-    if (!exForm.download.presign_expire_seconds) exForm.download.presign_expire_seconds = 600
+    if (!exForm.value.download.presign_threshold_mb) exForm.value.download.presign_threshold_mb = 100
+    if (!exForm.value.download.presign_expire_seconds) exForm.value.download.presign_expire_seconds = 600
     // 旧库无 code_case_insensitive 键 → 后端下发 null：归一为默认值（nil 语义=开启）
-    if (exForm.download.code_case_insensitive == null) exForm.download.code_case_insensitive = true
+    if (exForm.value.download.code_case_insensitive == null) exForm.value.download.code_case_insensitive = true
   }
   if (sec.notify) {
-    Object.assign(exForm.notify, sec.notify)
-    if (sec.notify.smtp) Object.assign(exForm.notify.smtp, sec.notify.smtp)
+    Object.assign(exForm.value.notify, sec.notify)
+    if (sec.notify.smtp) Object.assign(exForm.value.notify.smtp, sec.notify.smtp)
   }
-  if (sec.oidc) Object.assign(exForm.oidc, sec.oidc)
-  if (sec.local_import) Object.assign(exForm.local_import, sec.local_import)
-  if (sec.api_token) Object.assign(exForm.api_token, sec.api_token)
+  if (sec.oidc) Object.assign(exForm.value.oidc, sec.oidc)
+  if (sec.local_import) Object.assign(exForm.value.local_import, sec.local_import)
+  if (sec.api_token) Object.assign(exForm.value.api_token, sec.api_token)
   if (sec.p2p?.federation) {
-    Object.assign(exForm.p2p.federation, sec.p2p.federation)
+    Object.assign(exForm.value.p2p.federation, sec.p2p.federation)
     // 旧库无 p2p 段/缺键 null 归一（后端 env 种子回填见 ensureConfigLoaded）
-    if (exForm.p2p.federation.enabled == null) exForm.p2p.federation.enabled = false
+    if (exForm.value.p2p.federation.enabled == null) exForm.value.p2p.federation.enabled = false
     // 注意用 == null 而非 !x：合法 0（禁用熵门槛）不能被显示成默认 40
-    if (exForm.p2p.federation.announce_min_entropy_bits == null) exForm.p2p.federation.announce_min_entropy_bits = 40
+    if (exForm.value.p2p.federation.announce_min_entropy_bits == null) exForm.value.p2p.federation.announce_min_entropy_bits = 40
   }
 }
 
@@ -680,20 +748,42 @@ const putConfig = async (payload: Record<string, unknown>) => {
 
 const putUserSettings = async () => {
   const res = await adminApi.updateUserSettings({
-    allowuserregistration: Number(configForm.user.allowuserregistration) === 1,
-    useruploadsize: configForm.user.useruploadsize,
-    userstoragequota: configForm.user.userstoragequota,
-    sessionexpiryhours: configForm.user.sessionexpiryhours
+    allowuserregistration: Number(configForm.value.user.allowuserregistration) === 1,
+    useruploadsize: configForm.value.user.useruploadsize,
+    userstoragequota: configForm.value.user.userstoragequota,
+    sessionexpiryhours: configForm.value.user.sessionexpiryhours
   })
   if (!(res.code === 200)) {
     throw new Error(res.message || t('admin.configPage.saveFailed'))
   }
 }
 
+// ==================== 一键对齐「单次发送总量上限」（2026-10-30） ====================
+// 矛盾态：单次发送总量上限 < 单文件上限 ⇒ 超过单文件上限的文件永远发不出去。
+// 对齐动作 = 把总量上限抬到与单文件上限一致（即「允许发一个最大文件」）。
+// ⚠️ 写在 **user 段**（PUT /admin/config/user），与本分区保存的 upload_ex 段
+// 是两个端点 ⇒ 独立动作，不随本分区「保存」一起提交。
+const aligningCap = ref(false)
+const alignUploadCap = async () => {
+  const target = alignedUploadCap(exForm.value.upload_ex.max_file_size ?? 0)
+  if (target <= 0) return
+  aligningCap.value = true
+  try {
+    configForm.value.user.useruploadsize = target
+    await putUserSettings()
+    ElMessage.success(t('admin.configPage.upload.capAligned'))
+    await fetchUserSettings()
+  } catch (e) {
+    handleError(e)
+  } finally {
+    aligningCap.value = false
+  }
+}
+
 // GET 快照：契约存在 required 字段（如 block_on_limit）且不在 rlForm 中，
 // 保存时合并快照，避免缺 required 被 400
 let rlSnapshot: Record<string, unknown> = {}
-const rlForm = reactive({
+const rlForm = ref({
   enabled: true,
   global_qps: 100,
   upload_qps: 10,
@@ -718,35 +808,35 @@ const saveCurrent = async () => {
   try {
     switch (activeSection.value) {
       case 'site':
-        await putConfig({ base: configForm.base, ui: { ...exForm.ui } })
+        await putConfig({ base: configForm.value.base, ui: { ...exForm.value.ui } })
         break
       case 'share':
         await putConfig({
-          upload_ex: { ...exForm.upload_ex },
-          transfer: configForm.transfer,
-          local_import: { enabled: exForm.local_import.enabled, roots: exForm.local_import.roots },
+          upload_ex: { ...exForm.value.upload_ex },
+          transfer: configForm.value.transfer,
+          local_import: { enabled: exForm.value.local_import.enabled, roots: exForm.value.local_import.roots },
         })
         break
       case 'download':
-        await putConfig({ download: { ...exForm.download } })
+        await putConfig({ download: { ...exForm.value.download } })
         break
       case 'account':
         // 用户配置走专属端点，OIDC 走通用配置段，两段串行提交
         await putUserSettings()
-        await putConfig({ oidc: { ...exForm.oidc } })
+        await putConfig({ oidc: { ...exForm.value.oidc } })
         break
       case 'security':
         // 限流走专属端点（{config: …} 包裹），API Token 走通用配置段
         await putRateLimit()
-        await putConfig({ api_token: { ...exForm.api_token } })
+        await putConfig({ api_token: { ...exForm.value.api_token } })
         break
       case 'notify':
         await putConfig({
-          notify: { webhook_url: exForm.notify.webhook_url, smtp: { ...exForm.notify.smtp } },
+          notify: { webhook_url: exForm.value.notify.webhook_url, smtp: { ...exForm.value.notify.smtp } },
         })
         break
       case 'p2p':
-        await putConfig({ p2p: { federation: { ...exForm.p2p.federation } } })
+        await putConfig({ p2p: { federation: { ...exForm.value.p2p.federation } } })
         break
     }
     ElMessage.success(t('admin.configPage.saved'))
@@ -771,9 +861,9 @@ const fetchRateLimit = async () => {
     if (res.code === 200) {
       const data = (res.data || {}) as Record<string, unknown>
       rlSnapshot = { ...data }
-      for (const k of Object.keys(rlForm) as (keyof typeof rlForm)[]) {
+      for (const k of Object.keys(rlForm.value) as (keyof typeof rlForm.value)[]) {
         if (typeof data[k] === 'boolean' || typeof data[k] === 'number') {
-          ;(rlForm as Record<string, unknown>)[k] = data[k]
+          ;(rlForm.value as Record<string, unknown>)[k] = data[k]
         }
       }
     }

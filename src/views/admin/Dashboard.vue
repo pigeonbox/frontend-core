@@ -405,9 +405,18 @@ const recentUsers = ref<RecentUser[]>([])
 const recentFiles = ref<RecentFile[]>([])
 const trendData = ref<TrendPoint[]>([])
 
-// 图表分类色板——与品牌靛蓝同族的中饱和色,按序取色保证相邻项对比清晰;
-// 弃用旧粉紫渐变系(#f093fb/#fa709a):0.2 透明度下发灰且花哨,不符合"简约不简单"
-const typeColors = ['#5e6ad2', '#0ea5e9', '#14b8a6', '#f59e0b', '#f43f5e', '#8b5cf6']
+// 文件类型分布的分类色板——与统计卡徽标**同一套语义色**（主色 + 紫 + 青绿 +
+// 琥珀 + 玫瑰 + 天蓝），且按「相邻项色相拉开」排序（青竹主色紧邻紫、天蓝压轴）：
+// 原色板把天蓝/青绿相邻,青竹主色下第 2、3 根条几乎同色。
+// 首色用 var(--primary-color) 跟随主题,其余为固定分类色(明暗底都可读)。
+const typeColors = [
+  'var(--primary-color)',
+  '#7c3aed',
+  '#0d9488',
+  '#d97706',
+  '#f43f5e',
+  '#0ea5e9',
+]
 
 interface FileTypeStat {
   type: string
@@ -773,9 +782,10 @@ const generateMockFileTypeDist = () => {
   border-color: var(--primary-color);
 }
 
-/* 图标色调编码:用户=accent / 文件=色调2 / 存储=色调3 / 今日上传=色调4。
-   2-4 默认紫/青绿/琥珀(main.scss),accent 生效时由 utils/accent.ts 按主色
-   色相偏移派生覆盖——随颜色主题选择器联动,深浅模式变量已各自就绪 */
+/* 图标色调编码:用户=主色 / 文件=色调2(紫) / 存储=色调3(青绿) / 今日上传=色调4(琥珀)。
+   色调 2-4 是**固定语义色板**(utils/accent.ts 的 TONE_PALETTE),不随主色派生 ——
+   2026-10-26 起:原为「主色色相偏移」派生,主色一变(墨黑⇒全灰 / 青竹⇒全绿)
+   三个徽标就失去区分度。语义四色恒定 ⇒ 换任何主题都认得出。 */
 .stat-icon {
   position: relative;
   z-index: 1;

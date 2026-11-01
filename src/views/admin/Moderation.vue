@@ -41,7 +41,7 @@
 
         <el-table-column :label="t('admin.uploader')" width="160" align="center">
           <template #default="{ row }">
-            <div>{{ row.user_id ? `ID: ${row.user_id}` : t('admin.moderation.anonymous') }}</div>
+            <div>{{ row.user_id ? (row.username || `ID: ${row.user_id}`) : t('admin.moderation.anonymous') }}</div>
             <div class="ip-line">{{ row.owner_ip || '-' }}</div>
           </template>
         </el-table-column>
@@ -81,7 +81,7 @@
           <div v-if="row.text_preview" class="narrow-text-preview">{{ row.text_preview }}</div>
         </template>
         <template #uploader="{ row }">
-          <div>{{ row.user_id ? `ID: ${row.user_id}` : t('admin.moderation.anonymous') }}</div>
+          <div>{{ row.user_id ? (row.username || `ID: ${row.user_id}`) : t('admin.moderation.anonymous') }}</div>
           <div class="ip-line">{{ row.owner_ip || '-' }}</div>
         </template>
         <template #size="{ row }">{{ row.is_text ? '-' : formatFileSize(row.size) }}</template>

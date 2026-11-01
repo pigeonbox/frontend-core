@@ -19,6 +19,7 @@ import { useThemeStore } from '@/stores/theme'
 import { useConfigStore } from '@/stores/config'
 import { useLocaleStore, type AppLocale } from '@/stores/locale'
 import { applyAccent } from '@/utils/accent'
+import { applyDynamicIcons } from '@/utils/favicon'
 import { host } from '@/host'
 import NotifyBanner from '@/components/NotifyBanner.vue'
 import ErrorToast from '@/components/ErrorToast.vue'
@@ -36,7 +37,12 @@ const epLocale = computed(() => (locale.value === 'zh-CN' ? zhCn as any : en as 
 // 主题色统一入口：accent 来自 /api/config（管理后台可配）。
 // 全局应用（此前只有首页设置且从不清理，导致用户中心两套主色并存）；
 // 深浅切换 / 配置刷新（管理员改色）时按新模式重算色阶。
-const syncAccent = () => applyAccent(configStore.config?.accentColor)
+// 同一入口顺带刷新**浏览器标签图标 / iOS 主屏图标**——静态 favicon 是烘焙死的，
+// 管理员改主题色时若只改 CSS，界面 logo 变了而标签图标还是旧色（两者不一致）。
+const syncAccent = () => {
+  applyAccent(configStore.config?.accentColor)
+  void applyDynamicIcons(configStore.config?.accentColor)
+}
 
 // 宿主跟随(主题贴合宿主/语言尊重显式偏好)+打开即免登录:全部经宿主适配器
 // SPI,default 实现能力全关——非宿主部署下以下调用均为 no-op。

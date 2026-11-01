@@ -1,6 +1,15 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { publicApi, type PublicConfig } from '@/api/public'
+// ⚠️ 别名：store 里对外暴露的 computed 与工具函数同名，直接 import 会**自引用**
+// （const setupTokenRequired = computed(() => setupTokenRequired(...)) ⇒ TDZ 报错）。
+import {
+  readCapabilities,
+  setupTokenRequired as capsSetupTokenRequired,
+  deploymentMode as capsDeploymentMode,
+  publicUrlConfigured as capsPublicUrlConfigured,
+  federationUsable as capsFederationUsable,
+} from '@/utils/capabilities'
 
 export const useConfigStore = defineStore('config', () => {
   const config = ref<PublicConfig | null>(null)
@@ -61,6 +70,25 @@ export const useConfigStore = defineStore('config', () => {
   // 取件台据此显式提示「本柜没有就去联网站点找」；缺省/未下发 = 单站 → 不提示
   const federationEnabled = computed(() => config.value?.federationEnabled === true)
 
+  // 跨站取件（联邦）是否**可用**——能不能向用户承诺这个能力。
+  // = 服务端声明 **且** 不是多副本拓扑。
+  //
+  // ⚠️ 为什么不直接用 federationEnabled：多副本拓扑下联邦**架构上不可用**
+  // （节点身份是进程级 Ed25519，多副本语义未定义）。服务端虽会在启动时降级，
+  // 但运行期一次管理台保存 / 一次多副本配置广播就会把降级**复活**
+  // ⇒ 单看服务端声明等于把「能不能用」这件事**外包**给了服务端一处约束。
+  // ⇒ 前端按部署模式再兜一层（老后端能力位未知 ⇒ 不受影响）。
+  const federationUsable = computed(() =>
+    capsFederationUsable(config.value, config.value?.federationEnabled === true),
+  )
+
+  // 能力位（2026-10-30）：服务端按运行时真实状态下发的一份真相源。
+  // 读法统一走 utils/capabilities（缺字段=未知，不得据此隐藏功能）。
+  const capabilities = computed(() => readCapabilities(config.value))
+  const setupTokenRequired = computed(() => capsSetupTokenRequired(config.value))
+  const deploymentMode = computed(() => capsDeploymentMode(config.value))
+  const publicUrlConfigured = computed(() => capsPublicUrlConfigured(config.value))
+
   return {
     config,
     loading,
@@ -72,5 +100,10 @@ export const useConfigStore = defineStore('config', () => {
     publicUrl,
     siteBaseUrl,
     federationEnabled,
+    federationUsable,
+    capabilities,
+    setupTokenRequired,
+    deploymentMode,
+    publicUrlConfigured,
   }
 })
