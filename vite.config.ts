@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import Components from 'unplugin-vue-components/vite'
@@ -39,8 +40,7 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    proxy: {
-      // 所有后端 API 路由统一代理到后端，避免 dev 下 Vite fallback 返回 index.html
+    proxy: {      // 所有后端 API 路由统一代理到后端，避免 dev 下 Vite fallback 返回 index.html
       '/share': proxyTarget,
       '/user': proxyTarget,
       '/admin': proxyTarget,
@@ -59,5 +59,13 @@ export default defineConfig({
       '/ping': proxyTarget,
       '/version': proxyTarget,
     },
+  },
+  // 单测范围收窄到 `src/**`（frontend-core#45）：
+  // 浏览器级 E2E 用例也用 `.spec.ts` 命名（Playwright 约定），
+  // vitest 默认 include 是全仓 `**/*.spec.ts` ⇒ 会把 `e2e/*.spec.ts` 也吞进来，
+  // 而那些用例要的是 @playwright/test 的 runner ⇒ `npm test` 直接报错。
+  // ⇒ 两侧按目录切分：`npm test` 只跑 src 下的单测，`npm run e2e` 只跑 e2e/。
+  test: {
+    include: ['src/**/*.spec.ts'],
   },
 })

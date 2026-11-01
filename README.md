@@ -15,4 +15,19 @@ PigeonBox 公共前端(core):平台无关的 Web 应用全量(视图/stores/API/
 npm ci && npm run typecheck && npm test && npm run build   # neutral 构建
 ```
 
+## 测试分层
+
+| 层 | 命令 | 跑什么 | 需要浏览器 |
+|---|---|---|---|
+| 单测 | `npm test` | composable / store / util / 契约对齐（node 环境，无 DOM 渲染） | 否 |
+| 浏览器级 E2E | `npm run e2e` | 真实 DOM 交互 / 路由 / 表单校验 / i18n / 响应式（取件·寄件·后台三条主路径） | 是（chromium） |
+
+E2E 的后端**一律 mock**（`e2e/support/mock-api.ts`）：验的是前端自身的渲染与交互，
+后端契约由 Go 侧测试负责——E2E 连真后端会让 CI 依赖一个要部署的服务，
+且失败时无法区分「前端坏了」还是「后端坏了」。
+首次本地跑需先装浏览器：`npx playwright install chromium`。
+
+判据是否真能抓住回归，用变异自证脚本验：
+`python3 scripts/check-e2e-mutation.py`（故意改坏被测行为，判据必须转红）。
+
 License: Apache-2.0 · Copyright 2026 PigeonBox
