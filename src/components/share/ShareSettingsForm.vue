@@ -153,6 +153,7 @@ import { useI18n } from 'vue-i18n'
 import { Clock, Lock, EditPen, Key, Memo } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
+import { resolveSiteDefaultExpireValue } from '@/composables/useShareSettings'
 import type { ShareSettings, ShareExpireStyle } from '@/composables/useShareSettings'
 import { EXPIRE_STYLE_KEYS } from '@/config/expireStyles'
 import { e2eSupported } from '@/utils/e2e'
@@ -189,6 +190,7 @@ const props = withDefaults(defineProps<{
 })
 
 const userStore = useUserStore()
+const configStore = useConfigStore()
 const { t } = useI18n()
 
 // ==================== 有效期胶囊预设 ====================
@@ -235,15 +237,15 @@ const activePreset = computed({
 })
 
 onMounted(() => {
-  // 默认有效期 1 天 → 7 天（产品决策：1 天覆盖不了"周末发、周一取"）；
-  // 仅在仍是出厂默认(1 天)时改写，调用方传入的自定义初值不动
-  if (
-    props.settings.expire_value === 1 &&
-    props.settings.expire_style === 'day' &&
-    props.units.includes('day')
-  ) {
-    props.settings.expire_value = 7
-  }
+  // 出厂默认 1 天 → 站点默认（transfer.expire_default；缺省/老后端 7）。
+  // 判定收口在 resolveSiteDefaultExpireValue（有单测）：仅出厂默认被改写，
+  // 调用方自定义初值与 day 被裁剪的情形不动。
+  props.settings.expire_value = resolveSiteDefaultExpireValue(
+    props.settings.expire_value,
+    props.settings.expire_style,
+    configStore.config?.expireDefaultDays,
+    props.units.includes('day'),
+  )
 })
 
 const e2eHintKey = computed(() =>

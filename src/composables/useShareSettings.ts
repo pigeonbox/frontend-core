@@ -47,6 +47,26 @@ export function defaultShareSettings(): ShareSettings {
 }
 
 /**
+ * 有效期初值的出厂默认改写（ShareSettingsForm onMounted 调）。
+ *
+ * 出厂默认（1 天）⇒ 站点默认（transfer.expire_default，/api/config 的
+ * expireDefaultDays；2026-11-02 接线，此前硬编码 7 天——产品决策「1 天覆盖
+ * 不了周末发、周一取」）。仅在仍是出厂默认时改写，调用方传入的自定义初值
+ * 不动；day 样式被管理台白名单裁掉时也不动。
+ * 缺字段（老后端）/非法 ⇒ 兜底 7，与既有行为一致。
+ */
+export function resolveSiteDefaultExpireValue(
+  expireValue: number,
+  expireStyle: ShareExpireStyle,
+  expireDefaultDays?: number,
+  dayAllowed = true,
+): number {
+  const siteDays = expireDefaultDays && expireDefaultDays > 0 ? expireDefaultDays : 7
+  if (expireValue === 1 && expireStyle === 'day' && dayAllowed) return siteDays
+  return expireValue
+}
+
+/**
  * 分享设置表单模型（过期/密码/自定义码/E2E）——上传与文本分享等入口共用。
  * 只管状态与校验；提示 toast 由调用方按自己的文案弹。
  */
@@ -69,9 +89,20 @@ export function useShareSettings(initial?: Partial<ShareSettings>) {
     return ''
   }
 
+  /**
+   * 取件次数上限预检（transfer.max_count，/api/config 的 maxPickupCount）：
+   * 返回错误文案键（''=通过）。与服务端同语义——超限**显式拒绝**，不静默钳制。
+   * 仅「按取件次数」过期（expire_style='count'）有约束；上限 0/缺字段=不限。
+   */
+  function validatePickupCount(maxPickupCount?: number): string {
+    if (settings.expire_style !== 'count') return ''
+    if (!maxPickupCount || maxPickupCount <= 0) return ''
+    return settings.expire_value > maxPickupCount ? 'upload.pickupCountOverCap' : ''
+  }
+
   function reset() {
     Object.assign(settings, defaultShareSettings())
   }
 
-  return { settings, validate, validateE2e, reset }
+  return { settings, validate, validateE2e, validatePickupCount, reset }
 }

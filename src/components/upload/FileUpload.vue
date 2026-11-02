@@ -147,7 +147,7 @@ const batchCapLimit = computed(() =>
 
 const emit = defineEmits<{ success: [result: ShareResult] }>()
 
-const { settings, validate, validateE2e } = useShareSettings()
+const { settings, validate, validateE2e, validatePickupCount } = useShareSettings()
 const presignDialog = ref<InstanceType<typeof PresignUploadDialog> | null>(null)
 
 // 单请求体上限：后端 Hertz max body = upload_size（未知时保守取 8MB），留 1MB 表单开销余量
@@ -217,6 +217,13 @@ const handleUploadAll = async () => {
   const e2eErr = validateE2e()
   if (e2eErr) {
     ElMessage.warning(t(e2eErr))
+    return
+  }
+  // 取件次数上限预检（transfer.max_count，2026-11-02 接线）：与服务端同语义——
+  // 超限显式拒绝，不静默钳制；0/缺字段=不限（老后端无此闸，服务端行为为准）
+  const capErr = validatePickupCount(configStore.config?.maxPickupCount)
+  if (capErr) {
+    ElMessage.warning(t(capErr, { max: configStore.config?.maxPickupCount }))
     return
   }
   const outcome = await start()

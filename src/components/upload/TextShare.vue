@@ -98,7 +98,7 @@ const textMaxBytes = computed(() => configStore.config?.textMaxBytes || 222 * 10
 const byteLength = computed(() => new TextEncoder().encode(textContent.value).length)
 
 // 分享设置（过期/密码/自定义码/E2E）——与 FileUpload 共用同一状态机
-const { settings, validate, validateE2e } = useShareSettings()
+const { settings, validate, validateE2e, validatePickupCount } = useShareSettings()
 
 const handleShare = async () => {
   if (!textContent.value.trim()) {
@@ -113,6 +113,13 @@ const handleShare = async () => {
   const e2eErr = validateE2e()
   if (e2eErr) {
     ElMessage.warning(t(e2eErr))
+    return
+  }
+  // 取件次数上限预检（transfer.max_count，2026-11-02 接线）：与服务端同语义——
+  // 超限显式拒绝，不静默钳制；0/缺字段=不限（老后端无此闸，服务端行为为准）
+  const capErr = validatePickupCount(configStore.config?.maxPickupCount)
+  if (capErr) {
+    ElMessage.warning(t(capErr, { max: configStore.config?.maxPickupCount }))
     return
   }
 
