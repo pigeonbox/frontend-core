@@ -540,7 +540,6 @@ const configForm = ref({
   base: {
     name: '',
     description: '',
-    port: 12346,
     // 站点公网地址（base 值段字段，整段随 base 提交；空串=未配置→前端回退 location.origin）
     public_url: ''
   },

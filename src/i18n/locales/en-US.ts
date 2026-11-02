@@ -811,7 +811,6 @@ export default {
       basic: {
         siteName: 'Site Name',
         siteDescription: 'Site Description',
-        port: 'Port',
         publicUrl: 'Public Site URL',
         publicUrlPlaceholder: 'https://box.example.com',
         publicUrlHint: 'The address other people use to pick up. Leave empty to fall back to the address in the browser (shares from a LAN-only deployment may be unreachable outside).',

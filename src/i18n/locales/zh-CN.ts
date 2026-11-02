@@ -807,7 +807,6 @@ export default {
       basic: {
         siteName: '站点名称',
         siteDescription: '站点描述',
-        port: '端口',
         publicUrl: '站点公网地址',
         publicUrlPlaceholder: 'https://box.example.com',
         publicUrlHint: '这是别人用来取件的地址；留空则用浏览器当前地址（内网部署时分享出去可能打不开）',
