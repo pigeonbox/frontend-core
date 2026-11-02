@@ -349,6 +349,8 @@ export default {
       countUnit: 'times',
       forever: 'Forever',
     },
+    // Pickup count cap pre-check (transfer.max_count, wired 2026-11-02): reject explicitly, never clamp
+    pickupCountOverCap: 'Pickup count exceeds the site limit (max {max})',
     expires_forever: 'Forever',
     expires_1h: '1 hour',
     expires_1d: '1 day',

@@ -85,6 +85,17 @@ export interface PublicConfig {
   capabilities?: ServerCapabilities
   expireStyle: string[]
   textMaxBytes: number
+  /**
+   * 单分享可取件次数上限（transfer.max_count；0=不限）。仅「按取件次数」过期时
+   * 有约束；超限服务端**显式拒绝**（不静默钳制），前端同语义预检。
+   * ⚠️ 缺字段=老后端无此闸 ⇒ 不预检（服务端行为为准），不得当作 0。
+   */
+  maxPickupCount?: number
+  /**
+   * 创建分享**完全未指定**过期时的站点默认天数（transfer.expire_default）。
+   * 表单初值来源；缺字段=老后端 ⇒ 兜底 7（与既有出厂默认一致）。
+   */
+  expireDefaultDays?: number
   initialized?: boolean
 }
 

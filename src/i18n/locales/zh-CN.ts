@@ -348,6 +348,8 @@ export default {
       countUnit: '次',
       forever: '永久',
     },
+    // 取件次数上限预检（transfer.max_count，2026-11-02 接线）：与服务端同语义，超限显式拒绝
+    pickupCountOverCap: '取件次数超过站点上限（最多 {max} 次）',
     expires_forever: '永久',
     expires_1h: '1 小时',
     expires_1d: '1 天',
