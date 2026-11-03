@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { useUploadQueue } from '../useUploadQueue'
 import type { ShareSettings } from '../useShareSettings'
 
@@ -400,5 +400,73 @@ describe('单次发送总量上限', () => {
     expect(q.blockedCount.value).toBe(1)
     expect(q.totalSize.value).toBe(10 * MB)
     expect(q.batchOverLimit.value).toBe(false)
+  })
+})
+
+describe('useUploadQueue — presign 失败回退分片中转（2026-11-03）', () => {
+  // Mock 的宽类型（含 Constructable）与 opts.presign 函数签名不互换 ⇒ 边界处收一次
+  type PresignFn = (file: File, settings: ShareSettings) => Promise<never>
+  const mkPresignQueue = (presign: Mock) =>
+    useUploadQueue({ settings: baseSettings(), t, presignThreshold: 1 * MB, presign: presign as unknown as PresignFn })
+
+  const stubChunk = () => {
+    mocked.chunkUploadFile.mockResolvedValue('uid')
+    mocked.multiBind.mockResolvedValue({ code: 'C2', url: 'http://x/#/share/C2', share_url: '', file_count: 1 })
+  }
+
+  it('传输层失败（code 0 网络错）→ 回退 multi-chunk：chunk+multiBind 兜住，任务 success（负对照：旧实现只认 10015 ⇒ 此处必红）', async () => {
+    stubChunk()
+    const presign = vi.fn().mockRejectedValue(Object.assign(new Error('Network error'), { code: 0 }))
+    const q = mkPresignQueue(presign)
+    q.addFiles([mkFile('big.bin', 200 * MB)])
+    const out = await q.start()
+    expect(presign).toHaveBeenCalledOnce()
+    expect(mocked.chunkUploadFile).toHaveBeenCalledOnce()
+    expect(mocked.multiBind).toHaveBeenCalledOnce()
+    expect(out).toMatchObject({ code: 'C2' })
+    expect(q.tasks.value[0]!.status).toBe('success')
+  })
+
+  it('code 10015（管理开关关闭）→ 回退（原行为保留）', async () => {
+    stubChunk()
+    const presign = vi.fn().mockRejectedValue(Object.assign(new Error('disabled'), { code: 10015 }))
+    const q = mkPresignQueue(presign)
+    q.addFiles([mkFile('big.bin', 200 * MB)])
+    const out = await q.start()
+    expect(mocked.multiBind).toHaveBeenCalledOnce()
+    expect(out).toMatchObject({ code: 'C2' })
+  })
+
+  it('HTTP 5xx → 回退；错误码从 e.response.data.code 双取路径也能判', async () => {
+    stubChunk()
+    const presign = vi.fn().mockRejectedValue(Object.assign(new Error('bad gateway'), { response: { data: { code: 502 } } }))
+    const q = mkPresignQueue(presign)
+    q.addFiles([mkFile('big.bin', 200 * MB)])
+    const out = await q.start()
+    expect(mocked.multiBind).toHaveBeenCalledOnce()
+    expect(out).toMatchObject({ code: 'C2' })
+  })
+
+  it('业务失败（配额 30002）→ 不回退：任务 error，chunk/multiBind 零调用（回退重传必然同样失败）', async () => {
+    stubChunk()
+    const presign = vi.fn().mockRejectedValue(Object.assign(new Error('quota exceeded'), { code: 30002 }))
+    const q = mkPresignQueue(presign)
+    q.addFiles([mkFile('big.bin', 200 * MB)])
+    const out = await q.start()
+    expect(out).toBeNull()
+    expect(q.tasks.value[0]!.status).toBe('error')
+    expect(mocked.chunkUploadFile).not.toHaveBeenCalled()
+    expect(mocked.multiBind).not.toHaveBeenCalled()
+  })
+
+  it('用户取消（code -1）→ 不回退（用户意图，不静默换通道重传）', async () => {
+    stubChunk()
+    const presign = vi.fn().mockRejectedValue(Object.assign(new Error('Cancelled'), { code: -1 }))
+    const q = mkPresignQueue(presign)
+    q.addFiles([mkFile('big.bin', 200 * MB)])
+    const out = await q.start()
+    expect(out).toBeNull()
+    expect(mocked.chunkUploadFile).not.toHaveBeenCalled()
+    expect(mocked.multiBind).not.toHaveBeenCalled()
   })
 })

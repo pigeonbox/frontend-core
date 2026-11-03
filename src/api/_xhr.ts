@@ -14,6 +14,37 @@
 
 const DEFAULT_TIMEOUT = 300000
 
+/**
+ * 大文件直传的超时预算（2026-11-03）。
+ *
+ * 缺陷：presign 直传的 PUT 原先吃固定 DEFAULT_TIMEOUT(300s)——**与文件大小无关**。
+ * 而实测家宽上行仅 ~0.86MB/s（1.35GB 需 ~26 分钟）⇒ 300s 必然中途掐断，
+ * 表现为「上传失败」，且大文件越大越必然失败。nginx 两层的 proxy_send_timeout
+ * 同为 300s，是同一个天花板的两端。
+ *
+ * 修法：按**文件大小**给预算，留足余量。基准速度取保守的 1MB/s（低于实测
+ * 0.86MB/s？——刻意再留 1/2 余量），乘 3 倍冗余覆盖抖动与慢启动；下限仍是
+ * 300s（小文件行为不变），上限 2 小时（防挂死）。
+ */
+export const UPLOAD_MIN_TIMEOUT_MS = 300000
+export const UPLOAD_MAX_TIMEOUT_MS = 2 * 60 * 60 * 1000
+/** 基准速率 1MB/s：故意低于实测 0.86MB/s 的常见家宽上行，再乘冗余系数 */
+const UPLOAD_BASE_BYTES_PER_SEC = 1024 * 1024
+const UPLOAD_SPEED_MARGIN = 3
+
+/**
+ * 按文件字节数计算上传超时预算（毫秒）。
+ * - 小文件（≤ ~100MB@1MB/s×3）→ 300s，与旧行为一致（不改变既有语义）
+ * - 大文件 → 按体积线性放大，1.35GB ⇒ ~72 分钟
+ * - 超过 2h → 截到 2h
+ */
+export function uploadTimeoutForSize(bytes: number): number {
+  if (!Number.isFinite(bytes) || bytes <= 0) return UPLOAD_MIN_TIMEOUT_MS
+  const need = (bytes / UPLOAD_BASE_BYTES_PER_SEC) * 1000 * UPLOAD_SPEED_MARGIN
+  const budget = Math.max(UPLOAD_MIN_TIMEOUT_MS, Math.ceil(need))
+  return Math.min(budget, UPLOAD_MAX_TIMEOUT_MS)
+}
+
 /** 业务成功码：新版 resp.Success 返回 0，旧式 handler 返回 200 */
 const isOkCode = (code?: number) => code === 0 || code === 200
 

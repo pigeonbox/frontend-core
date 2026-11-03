@@ -1646,6 +1646,14 @@ export default {
       codeReady: 'Pickup code ready',
       codeReadyHint: 'Share it with the recipient now; the file can be fetched once the upload completes',
     },
+    failure: {
+      timeout: 'Upload timed out: the connection is too slow to finish this file within the time budget. Retry later or switch to a faster network (the chunked channel is tried automatically)',
+      blocked: 'Upload was interrupted: the connection could not be established or was refused. This is often browser security policy, a corporate proxy, or a cross-origin block — try another browser, disable the proxy, or use a phone hotspot',
+      quota: 'Storage quota exceeded: free up space or raise the quota in the admin console, then retry',
+      size: 'The file exceeds the allowed size limit: raise the per-file limit in Upload Settings, or send a smaller file',
+      server: 'Server error (5xx): please retry later; if it keeps failing, check the server logs',
+      unknown: 'Upload failed: check your network connection and the file size limit, then retry',
+    },
     quickUploadHit: 'Instant upload hit — the file already exists, share code issued',
   },
 
