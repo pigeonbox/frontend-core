@@ -35,8 +35,9 @@
         </span>
       </div>
       <el-progress
-        v-if="task.status === 'uploading' || task.status === 'encrypting' || task.status === 'binding' || task.status === 'success'"
-        :percentage="task.progress"
+        v-if="showProgressBar"
+        :percentage="task.status === 'encrypting' ? 0 : task.progress"
+        :indeterminate="task.status === 'encrypting'"
         :stroke-width="4"
         :show-text="false"
         :status="task.status === 'success' ? 'success' : ''"
@@ -97,6 +98,24 @@ const { t } = useI18n()
 const isBusy = computed(() =>
   props.task.status === 'uploading' || props.task.status === 'encrypting' || props.task.status === 'binding'
 )
+
+/**
+ * 行内进度条是否可信（2026-11-03）。
+ *
+ * `percentValid=false` ⇒ 该行百分比是假的（multi-direct 单请求的聚合字节被按文件
+ * 顺序均摊 ⇒ 首个文件先冲 100%、其余长期 0%）⇒ 不渲染条，改由列表顶部的
+ * 批次总进度条呈现真聚合值。
+ *
+ * success 行仍渲染（进度 100% 是真的）。
+ *
+ * ⚠️ encrypting 行走**不确定态**：加密阶段没有百分比可报（整块 AES-GCM 加密，
+ * 进度恒 0）⇒ 用脉冲条表示「在动」，别显示一个恒为 0 的条（1.35GB 加密几十秒
+ * 界面零反馈）。
+ */
+const showProgressBar = computed(() => {
+  if (props.task.status === 'success') return true
+  return isBusy.value && props.task.percentValid !== false
+})
 
 // 类型标签走 i18n（键名小写映射），不再硬编码英文
 const getFileType = (filename: string): string => {
