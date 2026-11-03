@@ -1652,6 +1652,7 @@ export default {
       blocked: 'Upload was interrupted: the connection could not be established or was refused. This is often browser security policy, a corporate proxy, or a cross-origin block — try another browser, disable the proxy, or use a phone hotspot',
       quota: 'Storage quota exceeded: free up space or raise the quota in the admin console, then retry',
       size: 'The file exceeds the allowed size limit: raise the per-file limit in Upload Settings, or send a smaller file',
+      type: 'File type or content not allowed: the content does not match the file extension, or the type is on the site block list. Try a different file, or ask an administrator to adjust the upload restrictions',
       server: 'Server error (5xx): please retry later; if it keeps failing, check the server logs',
       unknown: 'Upload failed: check your network connection and the file size limit, then retry',
     },

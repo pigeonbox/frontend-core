@@ -71,7 +71,7 @@ import {
 import { presignApi, type PresignCompleteData } from '@/api/presign'
 import { anonymousApi } from '@/api/anonymous'
 import { xhrRaw, uploadTimeoutForSize } from '@/api/_xhr'
-import { classifyUploadFailure } from '@/utils/uploadFailure'
+import { classifyUploadFailure, isPermanentUploadFailure, uploadError, SERVER_DETAIL_KINDS } from '@/utils/uploadFailure'
 
 /**
  * 预签名直传对话框（2026-10-06 W2 Promise 化：调用方 `ref.open(file, options)` 拿
@@ -195,7 +195,8 @@ const doUpload = async (retryCount = 0) => {
       pickup_code: mintedCode.value || undefined,
     })
     if (!presignApi.isOk(initRes.code) || !initRes.data) {
-      throw new Error(initRes.message || 'Init failed')
+      // uploadError 保留业务码：失败分类（classifyUploadFailure）要按码判定
+      throw uploadError(initRes.code, initRes.message || 'Init failed')
     }
     const initData = initRes.data
 
@@ -247,7 +248,9 @@ const doUpload = async (retryCount = 0) => {
       object_key: initData.object_key,
     })
     if (!presignApi.isOk(completeRes.code) || !completeRes.data) {
-      throw new Error(completeRes.message || 'Complete failed')
+      // 业务码随错误上抛（2026-11-03）：此前 throw new Error(message) 把 code
+      // 丢在门外 ⇒ 30011「文件类型不允许」被分类成 unknown、还被整份重传 2 次
+      throw uploadError(completeRes.code, completeRes.message || 'Complete failed')
     }
 
     progress.value = 100
@@ -256,24 +259,28 @@ const doUpload = async (retryCount = 0) => {
     finish(completeRes.data)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Upload failed'
+    const code = (e as { code?: number })?.code
     // 取消/中断不重试（原实现会落进重试分支静默重传）
     if (msg === 'Cancelled' || msg === 'Aborted') {
       fail(new Error(msg))
       return
     }
-    if (retryCount < 2) {
+    // 永久性业务拒绝（类型/内容被拒、配额、体积、上传关闭……）不自动重试：
+    // 同一份文件走同一条通道再传一遍必然同样失败，只会把大文件带宽再烧两遍
+    //（2026-11-03 真机实录：1.35GB 被 30011 拒后又被整份重传 2 次才报错）。
+    if (!isPermanentUploadFailure(code, msg) && retryCount < 2) {
       statusText.value = `Retrying (${retryCount + 1}/3)...`
       void doUpload(retryCount + 1)
       return
     }
     failed.value = true
     // 失败分类（2026-11-03）：旧实现只显示「上传失败」，用户无法判断是网慢、
-    // 被浏览器/代理拦截，还是配额/体积被拒 ⇒ 只能盲目重试。
-    // 现在按错误码 + 消息分类，给出**可据此行动**的文案。
-    errorMessage.value = t(`upload_view.failure.${classifyUploadFailure(
-      (e as { code?: number })?.code,
-      msg
-    )}`)
+    // 被浏览器/代理拦截，还是配额/体积/类型被拒 ⇒ 只能盲目重试。
+    // 现在按错误码 + 消息分类，给出**可据此行动**的文案；业务拒绝附服务端原文
+    //（「文件内容与扩展名不符（检测到 ELF）」这类具体原因不能被通用文案抹掉）。
+    const kind = classifyUploadFailure(code, msg)
+    const hint = t(`upload_view.failure.${kind}`)
+    errorMessage.value = SERVER_DETAIL_KINDS.has(kind) && msg ? `${hint}\n${msg}` : hint
     statusText.value = t('upload_view.presign.failed')
     fail(e)
   }
