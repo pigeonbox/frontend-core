@@ -100,6 +100,11 @@ describe('resolveDownloadUrl', () => {
     setLocation('/')
     expect(resolveDownloadUrl('/share/download?code=AB12CD')).toBe('/share/download?code=AB12CD')
   })
+
+  it('协议相对 URL 不被改写（不是本地根路径）', () => {
+    const protocolRelative = '/' + '/cdn.example.com/a.txt'
+    expect(resolveDownloadUrl(protocolRelative)).toBe(protocolRelative)
+  })
 })
 
 /** 造一个分块可控的 Response（Content-Length 可选） */

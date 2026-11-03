@@ -233,14 +233,14 @@
             >
               {{ t('admin.filesPage.restore') }}
             </el-button>
-            <el-button
+            <DownloadButton
               v-if="!row.is_text"
               size="small"
-              round
-              @click="downloadFile(row)"
-            >
-              {{ t('admin.filesPage.download') }}
-            </el-button>
+              :url="adminApi.fileDownloadUrl(row.id)"
+              :filename="row.file_name || `${row.code}.bin`"
+              :label="t('admin.filesPage.download')"
+              @error="onDownloadError"
+            />
             <el-button size="small" round @click="openEdit(row)">{{ t('admin.filesPage.edit') }}</el-button>
             <el-button
               type="danger"
@@ -303,7 +303,14 @@
             <el-button v-else type="success" size="small" round @click="setStatus(row, 'normal')">
               {{ t('admin.filesPage.restore') }}
             </el-button>
-            <el-button v-if="!row.is_text" size="small" round @click="downloadFile(row)">{{ t('admin.filesPage.download') }}</el-button>
+            <DownloadButton
+              v-if="!row.is_text"
+              size="small"
+              :url="adminApi.fileDownloadUrl(row.id)"
+              :filename="row.file_name || `${row.code}.bin`"
+              :label="t('admin.filesPage.download')"
+              @error="onDownloadError"
+            />
             <el-button size="small" round @click="openEdit(row)">{{ t('admin.filesPage.edit') }}</el-button>
             <el-button type="danger" size="small" round @click="deleteFile(row)">
               <el-icon><Delete /></el-icon>
@@ -382,12 +389,12 @@ import {
   VideoPlay, Headset, Reading
 } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
-import { request } from '@/utils/request'
 import { loadViews, saveView, deleteView } from '@/utils/savedViews'
 import { useTableQuery } from '@/composables/useTableQuery'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { useRouteParam } from '@/composables/useRouteParam'
 import NarrowCardList from '@/components/admin/NarrowCardList.vue'
+import DownloadButton from '@/components/download/DownloadButton.vue'
 
 const { t } = useI18n()
 const { handleError } = useErrorHandler()
@@ -785,32 +792,18 @@ const submitEdit = async () => {
   }
 }
 
-const downloadFile = async (row: any) => {
-  // 管理端下载：/admin/files/:id 受 AdminMiddleware 保护，window.open 带不上
-  // 凭证——改为同源请求（自动携带会话 Cookie）→ blob → 触发保存。
-  //
-  // ⚠️ 2026-10-26 审计修复：此前用**裸 axios**（`await import('axios')`）绕过统一
-  // 实例 ⇒ 裸 axios 走浏览器**根路径**，不带部署前缀 ⇒ 在「统一网关下页面挂在
-  // /app/pigeonbox/ 前缀」的部署形态（src/utils/base.ts 的 appBase() 明确支持）
-  // 下**必然 404 ⇒ 管理台一个文件都下载不了**。
-  // ⇒ 改走统一实例（src/utils/request.ts：baseURL = VITE_API_BASE_URL || appBase()）。
-  try {
-    const blob = await request<Blob>({
-      url: adminApi.fileDownloadUrl(row.id),
-      responseType: 'blob',
-      withCredentials: true,
-    })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = row.file_name || `${row.code}.bin`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  } catch (e: any) {
-    ElMessage.error(e?.response?.status === 401 ? t('admin.filesPage.sessionExpired') : t('admin.filesPage.downloadFailed'))
-  }
+/**
+ * 管理端下载：/admin/files/:id 受 AdminMiddleware 保护，window.open 带不上凭证
+ * —— 统一下载器走 fetch（同源自动带 Cookie），并能显示百分比。
+ *
+ * ⚠️ 2026-10-26 审计修复的要点**不能丢**：裸 axios 走浏览器根路径、不带部署前缀
+ * ⇒ 统一网关（/app/pigeonbox/）下必然 404。统一下载器内部用 withBase() 补前缀，
+ * 等价于统一实例的 baseURL 行为。
+ */
+const onDownloadError = (msg: string, err?: unknown) => {
+  // 401 ⇒ 会话过期（沿用改造前的区分文案）；其余走通用失败文案
+  const code = (err as { code?: number } | null)?.code
+  ElMessage.error(code === 401 ? t('admin.filesPage.sessionExpired') : msg)
 }
 
 // 仪表盘健康洞察卡跳转入口：?health=expiring_soon 等直达过滤视图。

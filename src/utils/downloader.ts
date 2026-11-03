@@ -12,7 +12,7 @@
  * 4. **DOM 能力走可注入 seam**：本仓 vitest 跑在 node 环境（无 DOM），
  *    且各浏览器能力差异大 ⇒ 能力探测与落地动作全部走 env 参数，默认实现才碰 DOM。
  */
-import { withBase } from '@/utils/base'
+import { appBase } from '@/utils/base'
 
 export type DownloadSink = 'fs' | 'blob' | 'native'
 
@@ -142,10 +142,29 @@ export function pickSink(hasFsApi: boolean, total: number, limit: number = MEMOR
   return 'blob'
 }
 
-/** 绝对 URL 原样；根绝对路径补部署前缀（统一网关场景漏前缀会 404） */
+/**
+ * 根绝对路径的部署基址。
+ *
+ * ⚠️ 必须与 axios 统一实例（src/utils/request.ts）**同一条口径**：
+ * `VITE_API_BASE_URL || appBase()`。前者是「前后端分离部署」的绝对 API 地址，
+ * 后者是「统一网关下页面挂在 /app/pigeonbox/」的前缀。
+ * ⇒ 口径分叉的后果：管理台下载在分离部署下 404（这正是 2026-10-26 审计修复
+ *   踩过的坑的同款——那次是裸 axios 丢了前缀）。
+ */
+function apiBase(): string {
+  return import.meta.env.VITE_API_BASE_URL || appBase()
+}
+
+/** 绝对 URL 原样；根绝对路径补部署基址（统一网关/分离部署两种形态都要对） */
 export function resolveDownloadUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url
-  return withBase(url)
+  // 协议相对 URL（//host/path）：不是本地根路径，别碰
+  if (url.startsWith('//')) return url
+  const base = apiBase()
+  if (!base) return url
+  // 基址本身是绝对地址（前后端分离部署）⇒ 拼绝对 URL
+  if (/^https?:\/\//i.test(base)) return base.replace(/\/+$/, '') + url
+  return base + url
 }
 
 /** 进度回报节流（毫秒）：避免大文件每 chunk 都触发 Vue 更新 */

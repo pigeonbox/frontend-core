@@ -68,7 +68,7 @@ const props = defineProps<{
   guard?: () => string | null
 }>()
 
-const emit = defineEmits<{ done: [DownloadOutcome]; error: [string] }>()
+const emit = defineEmits<{ done: [DownloadOutcome]; error: [string, unknown] }>()
 
 const { t } = useI18n()
 const dl = useDownloadProgress(t)
@@ -114,7 +114,7 @@ const onClick = async () => {
   const guardMsg = props.guard?.()
   if (guardMsg) {
     dl.fail(guardMsg)
-    emit('error', guardMsg)
+    emit('error', guardMsg, null)
     return
   }
   // ⚠️ 同步链第一句：见文件头注释
@@ -126,7 +126,7 @@ const onClick = async () => {
   })
   const out = await p
   if (out) emit('done', out)
-  else if (dl.error.value) emit('error', dl.error.value)
+  else if (dl.error.value) emit('error', dl.error.value, dl.lastError.value)
 }
 </script>
 

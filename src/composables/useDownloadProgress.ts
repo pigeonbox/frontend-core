@@ -28,6 +28,8 @@ export function useDownloadProgress(t: (key: string, params?: Record<string, str
   const etaSeconds = ref<number | null>(null)
   const error = ref('')
   const handedOff = ref(false)
+  /** 原始错误对象（供调用方按错误码细分文案，如管理台的 401 ⇒ 会话已过期） */
+  const lastError = ref<unknown>(null)
 
   let controller: AbortController | null = null
 
@@ -45,6 +47,7 @@ export function useDownloadProgress(t: (key: string, params?: Record<string, str
     etaSeconds.value = null
     error.value = ''
     handedOff.value = false
+    lastError.value = null
     controller = null
   }
 
@@ -72,6 +75,7 @@ export function useDownloadProgress(t: (key: string, params?: Record<string, str
       phase.value = out.handedOff ? 'handed-off' : 'done'
       return out
     } catch (e: unknown) {
+      lastError.value = e
       if (e instanceof DownloadCancelledError || (e as { code?: number })?.code === -1) {
         error.value = t('download.cancelled')
       } else {
@@ -102,6 +106,7 @@ export function useDownloadProgress(t: (key: string, params?: Record<string, str
     bytesPerSecond: bytesPerSecond as Ref<number>,
     etaSeconds: etaSeconds as Ref<number | null>,
     error: error as Ref<string>,
+    lastError: lastError as Ref<unknown>,
     handedOff: handedOff as Ref<boolean>,
     busy: busy as ComputedRef<boolean>,
     run,
