@@ -59,6 +59,18 @@
       >
         <el-icon><Refresh /></el-icon>
       </el-button>
+      <!-- 复制诊断（2026-11-03 失败动作）：code/message/trace_id 一键复制，
+           贴给管理员即可对服务端日志检索定位 -->
+      <el-button
+        v-if="task.status === 'error'"
+        type="info"
+        circle
+        size="small"
+        :title="t('upload.copyDiag')"
+        @click="copyDiag"
+      >
+        <el-icon><CopyDocument /></el-icon>
+      </el-button>
       <el-button
         v-if="isBusy"
         type="danger"
@@ -84,8 +96,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh, WarningFilled } from '@element-plus/icons-vue'
+import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh, WarningFilled, CopyDocument } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { formatFileSize } from '@/utils/format'
+import { copyToClipboard } from '@/utils/clipboard'
 import type { UploadTask } from '@/composables/useUploadQueue'
 
 /** 上传队列单文件行（2026-10-06 W2 自 FileUpload.vue 列表块抽出） */
@@ -97,6 +111,12 @@ const { t } = useI18n()
 const isBusy = computed(() =>
   props.task.status === 'uploading' || props.task.status === 'encrypting' || props.task.status === 'binding'
 )
+
+/** 复制诊断信息（失败行）：diag 为空（取消/老任务）时退化为复制错误文本 */
+const copyDiag = async () => {
+  const ok = await copyToClipboard(props.task.diag || props.task.error || '')
+  ElMessage[ok ? 'success' : 'error'](t(ok ? 'upload.diagCopied' : 'upload.diagCopyFailed'))
+}
 
 // 类型标签走 i18n（键名小写映射），不再硬编码英文
 const getFileType = (filename: string): string => {

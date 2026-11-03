@@ -6,6 +6,7 @@ import { multiDirect, chunkUploadFile, multiBind, type MultiShareOptions, type M
 import type { PresignCompleteData } from '@/api/presign'
 import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
+import { formatUploadDiagnostics, isSwitchChannelRequested } from '@/utils/uploadFailure'
 import { formatFileSize } from '@/utils/format'
 import { blockedExtensionOf } from '@/utils/uploadPreflight'
 import type { ShareSettings } from '@/composables/useShareSettings'
@@ -40,6 +41,8 @@ export interface UploadTask {
   progress: number
   statusText: string
   error: string
+  /** 失败诊断（可复制给管理员：code/message/trace_id；成功/拦截时为空） */
+  diag?: string
 }
 
 const DEFAULT_BODY_CAP = 8 * 1024 * 1024
@@ -148,6 +151,18 @@ export function useUploadQueue(opts: {
   /** 超限提示文案（统一口径：实际大小 + 上限） */
   const overLimitMsg = (size: number, limit: number) =>
     t('upload.maxFileExceeded', { size: formatFileSize(size), limit: formatFileSize(limit) })
+
+  /**
+   * 失败收敛：状态/用户文案/诊断三件套一起落（行内「复制诊断」按钮的数据源）。
+   * 诊断含 code + trace_id，用户贴给管理员即可对服务端日志检索定位。
+   */
+  const failTask = (task: UploadTask, msg: string, code?: number, traceId?: string) => {
+    task.status = 'error'
+    task.error = msg
+    task.diag = formatUploadDiagnostics({
+      file: task.file.name, code, message: msg, traceId,
+    })
+  }
 
   const addFiles = (files: File[] | FileList) => {
     const limit = maxFileSizeLimit()
@@ -334,10 +349,11 @@ export function useUploadQueue(opts: {
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : t('upload.e2e.failed')
+        const code = (e as { code?: number })?.code
+        const traceId = (e as { traceId?: string })?.traceId ?? (e as { trace_id?: string })?.trace_id
         for (const task of pending) {
           if (task.status !== 'success') {
-            task.status = 'error'
-            task.error = msg
+            failTask(task, msg, code, traceId)
           }
         }
         ElMessage.error(msg)
@@ -438,9 +454,11 @@ export function useUploadQueue(opts: {
           //
           // 业务码（配额/体积/类型/权限）**不回退**：换通道同样会被拒，
           // 白白重传一遍大文件。详见 isPresignFallbackEligible。
+          // 用户在失败块显式点「改用分片通道」（switchChannelError）**强制回退**
+          // ——按钮只在非永久拒绝时展示，用户自担重传成本。
           const errCode = (e as { code?: number })?.code
             ?? (e as { response?: { data?: { code?: number } } })?.response?.data?.code
-          if (isPresignFallbackEligible(errCode)) {
+          if (isPresignFallbackEligible(errCode) || isSwitchChannelRequested(e)) {
             ElMessage.info(t('upload.presignFallback'))
             plan = 'multi-chunk'
           } else {
@@ -570,8 +588,8 @@ export function useUploadQueue(opts: {
         if (task.status === 'success') continue
         // 已有终态错误（如用户取消）不覆盖——保留「已取消」与真实失败原因的区分
         if ((task.status === 'error' && task.error) || task.status === 'blocked') continue
-        task.status = 'error'
-        task.error = msg
+        failTask(task, msg, tr.code ?? undefined,
+          tr.traceId || (e as { traceId?: string })?.traceId || undefined)
       }
       // 不再弹全局 toast（2026-10-22）：行内已有逐条错误文本，重复弹窗是噪音；
       // 混合成功/失败态下全局文案也无法准确表达——行内文本才是真相。
