@@ -7,6 +7,7 @@ import type { PresignCompleteData } from '@/api/presign'
 import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
 import { formatUploadDiagnostics, isSwitchChannelRequested } from '@/utils/uploadFailure'
+import { createSpeedMeter, formatSpeed, formatEtaHms } from '@/utils/transferSpeed'
 import { formatFileSize } from '@/utils/format'
 import { blockedExtensionOf } from '@/utils/uploadPreflight'
 import type { ShareSettings } from '@/composables/useShareSettings'
@@ -394,6 +395,10 @@ export function useUploadQueue(opts: {
         task.statusText = t('upload.prepare')
         const ctrl = new AbortController()
         controllers.set(task.id, ctrl)
+        // 速度 + ETA（设计 B3）：单文件直传的任务行状态文本随进度刷新。
+        // 聚合批次（multi-direct/multi-chunk）是共享一个 HTTP 会话的聚合进度，
+        // 分摊到行内的速度口径存疑 ⇒ Phase 1 不做（PR 描述已注明，Phase 2 任务化后补）。
+        const meter = createSpeedMeter()
         // e2e 开启时 payload 必为密文（加密在上方完成），encrypted 等价于 settings.e2e
         const res = await uploadFile(
           task.payload,
@@ -409,7 +414,18 @@ export function useUploadQueue(opts: {
           },
           (loaded, total) => {
             task.progress = Math.round((loaded / Math.max(total, 1)) * 100)
-            task.statusText = t('upload.uploading')
+            meter.record(loaded)
+            const bps = meter.speedBps()
+            const eta = meter.etaSeconds(Math.max(total - loaded, 0))
+            const { h, m, s } = formatEtaHms(eta ?? 0)
+            task.statusText = eta === null
+              ? t('upload.speedOnly', { speed: formatSpeed(bps) })
+              : t('upload.speedEta', {
+                  speed: formatSpeed(bps),
+                  eta: h > 0
+                    ? t('upload.etaHms', { h: String(h), m: String(m), s: String(s) })
+                    : t('upload.etaMs', { m: String(m), s: String(s) }),
+                })
           },
           ctrl.signal
         )

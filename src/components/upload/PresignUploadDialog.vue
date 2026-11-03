@@ -36,6 +36,12 @@
         <span>{{ statusText }}</span>
       </div>
 
+      <!-- 速度 + ETA（设计 B3）；低速预估超时时黄字预警 -->
+      <div v-if="speedText && !failed && !completed" class="speed-text" :class="{ 'speed-warn': speedWarn }">
+        <span>{{ speedText }}</span>
+        <span v-if="speedWarn" class="speed-warn-hint">{{ t('upload_view.presign.slowWarn') }}</span>
+      </div>
+
       <div v-if="failed" class="error-detail">
         <el-alert
           :title="errorMessage"
@@ -91,6 +97,7 @@ import { anonymousApi } from '@/api/anonymous'
 import { xhrRaw, uploadTimeoutForSize } from '@/api/_xhr'
 import { classifyUploadFailure, isPermanentUploadFailure, uploadError, SERVER_DETAIL_KINDS, switchChannelError, formatUploadDiagnostics } from '@/utils/uploadFailure'
 import { copyToClipboard } from '@/utils/clipboard'
+import { createSpeedMeter, formatSpeed, formatEtaHms } from '@/utils/transferSpeed'
 
 /**
  * 预签名直传对话框（2026-10-06 W2 Promise 化：调用方 `ref.open(file, options)` 拿
@@ -126,6 +133,10 @@ const cancelling = ref(false)
 
 /** 失败诊断快照（「复制诊断信息」按钮数据源；open() 复位） */
 const lastDiag = ref<{ code?: number; message: string; traceId?: string } | null>(null)
+/** 实时速度/ETA（设计 B3）：滑窗测速，进度条下方展示；低速预估超时黄字预警 */
+const meter = createSpeedMeter()
+const speedText = ref('')
+const speedWarn = ref(false)
 /** 失败卡片保持打开期间的原错误（「更换文件/取消」结算给 queue 用；最终必须结算，
  *  否则 queue 永远 await） */
 let activeError: unknown = null
@@ -257,6 +268,10 @@ const doUpload = async (retryCount = 0) => {
     // 而实测家宽上行 ~0.86MB/s ⇒ 1.35GB 需 ~26 分钟 ⇒ 300s 必掐断。
     statusText.value = t('upload_view.presign.upload')
     putAbort = new AbortController()
+    meter.reset()
+    speedText.value = ''
+    speedWarn.value = false
+    const putStartedAt = Date.now()
     await xhrRaw({
       url: initData.upload_url,
       method: initData.method || 'PUT',
@@ -269,6 +284,20 @@ const doUpload = async (retryCount = 0) => {
       signal: putAbort.signal,
       onProgress: (loaded, total) => {
         progress.value = Math.round((loaded / total) * 95)
+        // 速度 + ETA（设计 B3）：滑窗测速展示在进度条下方
+        meter.record(loaded)
+        const bps = meter.speedBps()
+        const eta = meter.etaSeconds(total - loaded)
+        const { h, m, s } = formatEtaHms(eta ?? 0)
+        speedText.value = eta === null
+          ? t('upload_view.presign.speedOnly', { speed: formatSpeed(bps) })
+          : t('upload_view.presign.speedEta', {
+              speed: formatSpeed(bps),
+              eta: h > 0 ? t('upload.etaHms', { h, m, s }) : t('upload.etaMs', { m, s }),
+            })
+        // 低速预警：按当前速度 + 已耗时预估，超时预算内传不完 ⇒ 黄字提前告警
+        speedWarn.value = eta !== null
+          && Date.now() - putStartedAt + eta * 1000 > uploadTimeoutForSize(f.size)
       },
     })
     putAbort = null
@@ -443,6 +472,16 @@ defineExpose({ open })
 
 .error-detail {
   margin-top: 16px;
+}
+
+.speed-text {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #909399);
+}
+
+.speed-text.speed-warn {
+  color: var(--el-color-warning, #e6a23c);
 }
 
 .error-actions {
