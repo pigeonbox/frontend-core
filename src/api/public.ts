@@ -81,6 +81,8 @@ export interface PublicConfig {
   codeCaseInsensitive?: boolean
   /** 站点公网地址（base.public_url，空串=未配置）；分享链接/交付文本按它拼，缺省回退 location.origin */
   publicUrl?: string
+  /** PigeonBeam 设备直传客户端入口（base.beam_base_url，2026-11-03 Phase 3）：上传失败时「用 PigeonBeam 加速传」跳转交接地址；空串/缺省=前端零渲染该入口 */
+  beamBaseUrl?: string
   /** 联邦是否启用（多副本模式下后端强制降级为 false）；取件台据此显式给出「跨站取件」提示 */
   federationEnabled?: boolean
   /** 能力位（2026-10-30）：「这个面支持什么」的一份真相源；缺字段=未知，不得据此隐藏功能 */

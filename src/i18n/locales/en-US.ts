@@ -333,6 +333,7 @@ export default {
     // Pause/resume (2026-11-03 Phase 3 unified task surface): only chunked channel can pause
     pause: 'Pause',
     paused: 'Paused',
+    useBeam: 'Speed up with PigeonBeam',
     textTooLargeHint: 'Content exceeds the text-share limit; use a file share instead, or compress it and retry',
     drop_hint: 'Drag files here, or click to choose',
     paste_hint: 'Tip: you can paste images directly with Ctrl/Cmd + V',

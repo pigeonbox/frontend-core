@@ -52,6 +52,12 @@
         <!-- 失败卡片动作（2026-11-03 设计 B2）：可重试失败=重试/换分片通道/复制诊断；
              永久业务拒绝=复制诊断/更换文件（换通道同样会被拒，不给必然失败的按钮） -->
         <div class="error-actions">
+          <!-- 用 PigeonBeam 加速传（2026-11-03 Phase 3）：失败时跳转交接到 Beam
+               设备直传客户端（可重试/永久拒绝都给——它是另一条传输路径）。
+               beamBaseUrl 空=零渲染。 -->
+          <el-button v-if="beamBaseUrl" type="primary" @click="openBeam">
+            {{ t('upload.useBeam') }}
+          </el-button>
           <el-button v-if="retryable" @click="copyDiag">
             {{ t('upload_view.presign.copyDiag') }}
           </el-button>
@@ -97,6 +103,7 @@ import { anonymousApi } from '@/api/anonymous'
 import { xhrRaw, uploadTimeoutForSize } from '@/api/_xhr'
 import { classifyUploadFailure, isPermanentUploadFailure, uploadError, SERVER_DETAIL_KINDS, switchChannelError, formatUploadDiagnostics } from '@/utils/uploadFailure'
 import { copyToClipboard } from '@/utils/clipboard'
+import { useConfigStore } from '@/stores/config'
 import { createSpeedMeter, formatSpeed, formatEtaHms } from '@/utils/transferSpeed'
 
 /**
@@ -106,6 +113,16 @@ import { createSpeedMeter, formatSpeed, formatEtaHms } from '@/utils/transferSpe
  * （原实现 abort 后会落进重试分支静默重传，属存量 bug）。
  */
 const { t } = useI18n()
+
+// PigeonBeam 加速传（2026-11-03 Phase 3）：失败时跳转交接到 Beam 设备直传客户端。
+// 空 = 未配置 ⇒ 零渲染。仅跳转交接，浏览器端不编排 Beam 传输。
+const configStore = useConfigStore()
+const beamBaseUrl = computed(() => configStore.beamBaseUrl)
+const openBeam = () => {
+  const base = beamBaseUrl.value
+  if (!base) return
+  window.open(`${base}${base.includes('?') ? '&' : '?'}source=web-upload`, '_blank', 'noopener,noreferrer')
+}
 
 export interface PresignOptions {
   expire_value: number
