@@ -329,6 +329,9 @@ export default {
     resumePick: '选择文件续传',
     resumeMismatch: '所选文件与未完成任务不匹配（名称/大小/修改时间需一致）',
     resume: '续传',
+    // 暂停/恢复（2026-11-03 Phase 3 统任务面）：仅分片通道可暂停
+    pause: '暂停',
+    paused: '已暂停',
     textTooLargeHint: '内容超出文本分享上限，建议改用文件分享，或压缩后重试',
     drop_hint: '将文件拖到此处，或点击选择',
     paste_hint: '提示：可直接 Ctrl/Cmd + V 粘贴图片',

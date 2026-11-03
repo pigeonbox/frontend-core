@@ -104,6 +104,74 @@ export async function getChunkStatus(
   }
 }
 
+/**
+ * 秒传快速通道探测（2026-11-03 Phase 3）：以整文件 hash + 分享元数据发 init——
+ * 契约语义（contracts/idl/chunk.thrift ChunkUploadInitReq 注释）：携带 expire_style
+ * 即启用秒传快速通道，命中同用户同 hash+size 历史文件 ⇒ 按本次元数据**建新分享**，
+ * 响应直接给 is_quick_upload + share_code + share_url（免传分片）。
+ * 未命中 ⇒ 生成一个空的 file_hash 键会话，调用方须 chunkCancelSession 回收（不留幽灵会话）。
+ */
+export async function chunkQuickProbe(
+  file: { name: string; size: number },
+  fileHash: string,
+  chunkSize: number,
+  meta: {
+    expire_value: number
+    expire_style: string
+    require_auth: boolean
+    password?: string
+    custom_code?: string
+    note?: string
+  },
+  signal?: AbortSignal
+): Promise<{
+  hit: boolean
+  shareCode?: string
+  shareUrl?: string
+  /** 未命中时落空生成的会话主键（调用方负责 cancel 回收） */
+  missSessionId?: string
+}> {
+  const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
+  const res = await request<ApiResponse<{
+    upload_id?: string
+    is_quick_upload?: boolean
+    share_code?: string
+    share_url?: string
+  }>>({
+    url: '/chunk/upload/init/',
+    method: 'POST',
+    data: {
+      file_name: file.name,
+      file_size: file.size,
+      file_hash: fileHash,
+      chunk_size: chunkSize,
+      total_chunks: totalChunks,
+      expire_value: meta.expire_value,
+      expire_style: meta.expire_style,
+      require_auth: meta.require_auth,
+      password: meta.password || undefined,
+      custom_code: meta.custom_code || undefined,
+      note: meta.note || undefined,
+    },
+    signal,
+  })
+  const d = res.data
+  if (!d) throw new Error(res.message || 'quick probe failed')
+  if (d.is_quick_upload && d.share_code) {
+    return { hit: true, shareCode: d.share_code, shareUrl: d.share_url }
+  }
+  return { hit: false, missSessionId: d.upload_id }
+}
+
+/** 取消分片会话（秒传探测落空回收/中止在途上传后的清理） */
+export async function chunkCancelSession(uploadId: string, sessionToken?: string): Promise<void> {
+  await request<ApiResponse<unknown>>({
+    url: `/chunk/upload/cancel/${uploadId}`,
+    method: 'DELETE',
+    headers: sessionToken ? { 'X-Upload-Token': sessionToken } : undefined,
+  })
+}
+
 /** 多文件直传（multipart，字段名 files；总体积需 ≤ 后端单请求体上限） */
 export async function multiDirect(
   files: File[],
@@ -158,6 +226,12 @@ export async function chunkUploadFile(
     resumeSessionId?: string
     /** 会话坐标即时回调（init 成功即回传）——中途失败后凭 uploadId/sessionToken 续传 */
     onSession?: (s: { uploadId: string; sessionToken?: string }) => void
+    /**
+     * 片间暂停检查（2026-11-03 Phase 3 任务面）：分片边界返回 true ⇒ 抛 `Error('Paused')`。
+     * 只在片间生效（单片传输中不打断）；单请求体通道（direct/presign）无此语义，
+     * 调用方不给暂停按钮。暂停后坐标保留 ⇒ resume 可续。
+     */
+    shouldPause?: () => boolean
   }
 ): Promise<{ uploadId: string; sessionToken?: string }> {
   const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
@@ -201,6 +275,7 @@ export async function chunkUploadFile(
   const uploaded = opts?.uploaded ?? new Set<number>()
   for (let index = 0; index < totalChunks; index++) {
     if (signal?.aborted) throw new Error('Cancelled')
+    if (opts?.shouldPause?.()) throw new Error('Paused')
     if (shouldSkipChunk(index, uploaded)) {
       // 断点续传：已传分片跳过（服务端位图为准），进度按已传量起算
       onProgress?.(Math.min((index + 1) * chunkSize, file.size), file.size)

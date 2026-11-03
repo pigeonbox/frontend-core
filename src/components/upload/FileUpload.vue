@@ -52,6 +52,7 @@
         @cancel="cancel"
         @retry="handleRetry"
         @resume="handleResume"
+        @pause="handlePause"
       />
     </transition-group>
 
@@ -218,6 +219,7 @@ const {
   retry,
   resumeTask,
   resumeFrom,
+  pause,
   start,
   dispose,
 } = queue
@@ -270,6 +272,10 @@ const handleResume = async (id: string) => {
     emit('success', outcome)
   }
 }
+
+// 暂停（2026-11-03 Phase 3）：multi-chunk 通道片间边界停下（坐标保留），
+// 同步动作无返回值；恢复走 handleResume
+const handlePause = (id: string) => pause(id)
 
 // 未完成上传横幅（2026-11-03 Phase 2）：刷新/中断的任务在 localStorage 里留有
 // 续传坐标；File 不跨刷新存活 ⇒ 引导用户重选同指纹文件接管会话

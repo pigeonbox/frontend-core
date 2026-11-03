@@ -2,7 +2,8 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { pickUploadPlan, isPresignFallbackEligible } from '@/composables/useUploadPlan'
 import { uploadFile } from '@/api/share'
-import { multiDirect, chunkUploadFile, multiBind, buildFingerprint, getChunkStatus, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
+import { multiDirect, chunkUploadFile, multiBind, buildFingerprint, getChunkStatus, chunkQuickProbe, chunkCancelSession, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
+import { hashFileSha256 } from '@/utils/fileHash'
 import type { UploadTaskRecord, NewUploadTaskRecord } from '@/stores/uploadTasks'
 import type { PresignCompleteData } from '@/api/presign'
 import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
@@ -31,7 +32,7 @@ import type { ShareResult } from '@/types/share'
  * blocked 不计入 canStart、不参与整批发送；但**上限被调大后可以恢复**
  * （start()/retry() 时按当前上限重新判定），管理员调整上限后用户不必移除重加。
  */
-export type UploadTaskStatus = 'pending' | 'encrypting' | 'uploading' | 'binding' | 'success' | 'error' | 'blocked'
+export type UploadTaskStatus = 'pending' | 'encrypting' | 'uploading' | 'binding' | 'success' | 'error' | 'blocked' | 'paused'
 
 export interface UploadTask {
   id: string
@@ -40,6 +41,8 @@ export interface UploadTask {
   /** 实际上传内容（E2E 密文；未加密 === file） */
   payload: File
   status: UploadTaskStatus
+  /** 执行通道（plan 定案时写入；pause 仅 multi-chunk 可用——其余是单请求体，暂停=中止） */
+  channel?: 'direct' | 'presign' | 'multi-direct' | 'multi-chunk'
   progress: number
   statusText: string
   error: string
@@ -280,17 +283,30 @@ export function useUploadQueue(opts: {
   /**
    * 行内续传（2026-11-03 Phase 2）：同页面内 File 尚在内存 ⇒ 直接复位重跑，
    * 不必重新选文件。multi-chunk 分支会按任务记录的续传坐标跳过已传分片。
-   * 与 retry 的差别：仅收 error（blocked 是「不该发」，重试=重新判定上限，不是续传）。
+   * 与 retry 的差别：仅收 error/paused（blocked 是「不该发」，重试=重新判定上限，不是续传）。
+   * Phase 3：paused 与 error 同权走续传——坐标已在暂停时保留，恢复即从断点补缺片。
    */
   const resumeTask = async (id: string): Promise<ShareResult | null> => {
     const task = tasks.value.find((f) => f.id === id)
-    if (!task || task.status !== 'error') return null
+    if (!task || (task.status !== 'error' && task.status !== 'paused')) return null
     task.status = 'pending'
     task.error = ''
     task.statusText = ''
     task.progress = 0
     if (tasks.value.length > 1) return null
     return await start()
+  }
+
+  /**
+   * 暂停（2026-11-03 Phase 3 · 统任务面）：仅 multi-chunk 通道可暂停——
+   * direct/presign/multi-direct 是单请求体，中途"暂停"只能 abort=丢弃整个请求
+   * （无法续传），给假按钮是欺骗。multi-chunk 在**片间边界**响应暂停（单片
+   * 不打断），当前分片传完即停、坐标保留，恢复从缺片续。
+   */
+  const pause = (id: string): void => {
+    const task = tasks.value.find((f) => f.id === id)
+    if (!task || task.channel !== 'multi-chunk' || task.status !== 'uploading') return
+    task.status = 'paused'
   }
 
   /**
@@ -436,6 +452,7 @@ export function useUploadQueue(opts: {
       if (plan === 'direct') {
         const task = pending[0]!
         task.status = 'uploading'
+        task.channel = 'direct'
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.prepare')
@@ -499,6 +516,7 @@ export function useUploadQueue(opts: {
       if (plan === 'presign') {
         const task = pending[0]!
         task.status = 'uploading'
+        task.channel = 'presign'
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.largeFileHint')
@@ -552,6 +570,7 @@ export function useUploadQueue(opts: {
       if (plan === 'multi-direct') {
         for (const task of pending) {
           task.status = 'uploading'
+          task.channel = 'multi-direct'
           task.progress = 0
           task.error = ''
           task.statusText = t('upload.prepare')
@@ -602,9 +621,12 @@ export function useUploadQueue(opts: {
       const entries: Array<{ upload_id: string }> = []
       const store = opts.uploadTasks
       const recOf = new Map<string, string>()
+      // 秒传早命中的直出结果（单文件路径；命中即免绑定）
+      let quickResult: ShareResult | null = null
       for (const task of pending) {
         if (multiAbort.signal.aborted) throw new Error('Cancelled')
         task.status = 'uploading'
+        task.channel = 'multi-chunk'
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.uploading')
@@ -647,41 +669,128 @@ export function useUploadQueue(opts: {
         // 新会话里这些分片并不存在，盲跳会拼出空洞文件）。
         const st = prevUploadId ? await getChunkStatus(prevUploadId, prevToken).catch(() => null) : null
         const uploaded = new Set<number>(st?.uploadedIndexes ?? [])
+        // 已传坐标即时镜像（含首跑跳片 + 赛跑中断后的恢复输入）
+        const uploadedNow = new Set<number>(uploaded)
         const totalChunks = Math.max(1, Math.ceil(task.payload.size / chunkSize))
         let writtenChunks = 0
         // 会话坐标即时落盘（init 成功即回传）——中途失败后凭它续传
+        const firstSession: { uploadId?: string; sessionToken?: string } = {}
         const onSession = (s: { uploadId: string; sessionToken?: string }) => {
+          firstSession.uploadId = s.uploadId
+          firstSession.sessionToken = s.sessionToken
           if (rec) store!.update(rec.id, { uploadId: s.uploadId, sessionToken: s.sessionToken })
         }
 
+        // 秒传早命中（2026-11-03 Phase 3）：单文件 + **确认登录**（D1 同用户去重，
+        // 匿名探测必落空、白花两请求）+ 非 E2E（密文逐次不同，hash 恒新）时，
+        // 上传与整文件 hash 赛跑：hash 先出 ⇒ 探秒传快速通道，命中即出码并
+        // 中止冗余传输。多文件批次不探（multi-bind 无 share_code 合并形态）。
+        const quickEligible = pending.length === 1 && opts.isLoggedIn?.() === true && task.payload === task.file
+        const hashP = quickEligible
+          ? hashFileSha256(task.payload, { signal: multiAbort.signal }).catch(() => null)
+          : null
+
         try {
-          // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）+ 会话令牌
-          const { uploadId: sessionId, sessionToken } = await chunkUploadFile(
-            task.payload,
-            newId(),
-            chunkSize,
-            (loaded, total) => {
-              task.progress = Math.round((loaded / Math.max(total, 1)) * 100)
-              // 续传坐标写穿（节流：仅整片完成时写）。顺序上传 ⇒ 已完成=前缀 0..done-1
-              const done = Math.min(Math.ceil(loaded / chunkSize), totalChunks)
-              if (rec && done > writtenChunks) {
-                writtenChunks = done
-                store!.update(rec.id, {
-                  uploadedIndexes: Array.from({ length: done }, (_, i) => i),
-                })
+          const onChunkProgress = (loaded: number, total: number) => {
+            task.progress = Math.round((loaded / Math.max(total, 1)) * 100)
+            // 续传坐标写穿（节流：仅整片完成时写）。顺序上传 ⇒ 已完成=前缀 0..done-1
+            const done = Math.min(Math.ceil(loaded / chunkSize), totalChunks)
+            for (let i = writtenChunks; i < done; i++) uploadedNow.add(i)
+            if (rec && done > writtenChunks) {
+              store!.update(rec.id, {
+                uploadedIndexes: Array.from({ length: done }, (_, i) => i),
+              })
+            }
+            if (done > writtenChunks) writtenChunks = done
+          }
+          // 首跑：st 有活会话 ⇒ 跳 init 直接补缺片（Task 4 续传语义）；
+          // 赛跑中断后的恢复跑：沿用首跑刚建/续的会话坐标 + 即时位图
+          const startRun = (resume: boolean) => {
+            const resumeId = resume ? firstSession.uploadId : st?.uploadId
+            const token = resume ? firstSession.sessionToken : prevToken
+            return chunkUploadFile(task.payload, newId(), chunkSize, onChunkProgress, multiAbort.signal, {
+              uploaded: resume ? uploadedNow : uploaded,
+              sessionToken: token,
+              ...(resumeId ? { resumeSessionId: resumeId } : {}),
+              onSession,
+              // 暂停（Phase 3）：片间边界检查任务态，pause() 置 paused ⇒ 下一
+              // 片前抛 'Paused' 停下（单片不打断）。坐标由 onChunkProgress 即时
+              // 落盘，恢复走 resumeTask → startRun(true) 补缺片。
+              shouldPause: () => task.status === 'paused',
+            })
+          }
+
+          let run = startRun(false)
+          // 被赛跑替换/中止的跑动也要有人接住拒绝（防 unhandled rejection）
+          run.catch(() => {})
+
+          if (hashP) {
+            const winner = await Promise.race([run.then(() => null), hashP])
+            if (winner) {
+              // hash 先出：**先同步中止在途上传、再探测**——探测命中会真的建新分享，
+              // 不先停传就存在「探测响应到达时上传恰好成享」的双分享竞态
+              // （JS 单线程 ⇒ 检查与中止之间不可插入上传完成的处理）。
+              multiAbort.abort()
+              const probe = await chunkQuickProbe(task.payload, winner, chunkSize, multiOptions(wrappedKey)).catch(() => null)
+              if (probe?.hit) {
+                // 秒传命中：回收半途会话，直接以既有内容出码（免传分片）
+                if (firstSession.uploadId) {
+                  await chunkCancelSession(firstSession.uploadId, firstSession.sessionToken).catch(() => {})
+                }
+                task.status = 'success'
+                task.progress = 100
+                task.statusText = t('common.success')
+                if (rec) {
+                  store!.update(rec.id, {
+                    status: 'success',
+                    pickupCode: probe.shareCode,
+                    shareUrl: probe.shareUrl || undefined,
+                  })
+                }
+                ElMessage.success(`${task.file.name}: ${t('upload.dedupedSuccess')}`)
+                quickResult = {
+                  code: probe.shareCode!,
+                  share_url: probe.shareUrl || '',
+                  full_share_url: probe.shareUrl || '',
+                  e2e_wrapped: undefined,
+                  file_name: task.file.name,
+                  has_password: !!settings.password,
+                  pickup_code: probe.shareCode,
+                  expire_style: settings.expire_style,
+                  expire_value: settings.expire_value,
+                }
+                continue
               }
-            },
-            multiAbort.signal,
-            st
-              ? { uploaded, sessionToken: prevToken, resumeSessionId: st.uploadId, onSession }
-              : { uploaded, onSession }
-          )
+              // 落空：回收探测落空生成的空会话，按坐标恢复上传（只重传在途那一片）
+              if (probe?.missSessionId) {
+                await chunkCancelSession(probe.missSessionId).catch(() => {})
+              }
+              if (batchCancelled) throw new Error('Cancelled')
+              multiAbort = new AbortController()
+              run = startRun(true)
+              run.catch(() => {})
+            }
+          }
+
+          // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）+ 会话令牌
+          const { uploadId: sessionId, sessionToken } = await run
           // 绑定阶段提示（分片已传完、等待服务端合并）
           task.status = 'binding'
           task.progress = 100
           task.statusText = t('upload.prepare')
           entries.push({ upload_id: sessionId })
         } catch (e) {
+          // 暂停（Phase 3）：片间边界抛 'Paused' ⇒ 保留续传坐标、任务落 paused，
+          // 不走错误路径。恢复走 resumeTask → startRun(true) 补缺片。
+          if (e instanceof Error && e.message === 'Paused') {
+            task.status = 'paused'
+            task.statusText = t('upload.paused')
+            if (rec) {
+              // 记录留 interrupted=可续传（坐标 uploadId/sessionToken 已写穿）
+              store!.update(rec.id, { status: 'interrupted', error: '' })
+            }
+            return null
+          }
           // 失败保留续传坐标（onSession 已写 uploadId/sessionToken）：
           // 记录留 error/interrupted，用户重试/重选同指纹文件即从断点继续
           if (rec) {
@@ -694,6 +803,8 @@ export function useUploadQueue(opts: {
           throw e
         }
       }
+      // 秒传早命中已出码（单文件）：免绑定直接返回
+      if (quickResult) return quickResult
       const result = await multiBind(entries, multiOptions(wrappedKey))
       for (const task of pending) {
         task.status = 'success'
@@ -758,6 +869,7 @@ export function useUploadQueue(opts: {
     retry,
     resumeTask,
     resumeFrom,
+    pause,
     start,
     dispose,
   }

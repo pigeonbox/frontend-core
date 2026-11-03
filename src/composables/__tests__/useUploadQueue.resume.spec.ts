@@ -246,3 +246,69 @@ describe('multi-chunk 续传接线', () => {
     expect(store.recs[0]!.status).toBe('success')
   })
 })
+
+// ── 暂停/恢复（2026-11-03 Phase 3 · 统任务面）────────────────────────────────
+// 判据锚点：
+//   · pause 仅 multi-chunk 通道 + uploading 态生效（片间边界抛 'Paused' 停下）；
+//   · 暂停**保留续传坐标**（rec 的 uploadId/sessionToken/uploadedIndexes 不清），
+//     任务落 paused；恢复走 resumeTask → 按坐标跳片补缺；
+//   · 负对照：若暂停清坐标（uploadId 置空），恢复即开新会话全量传 ⇒ 断言转红。
+describe('multi-chunk 暂停/恢复', () => {
+  it('暂停保留续传坐标、任务落 paused；恢复续传按坐标跳片', async () => {
+    const file = mkFile('big.bin', BIG)
+    const store = mkStore()
+    // 门控 chunkUploadFile：onSession 落坐标后挂起，待测试 pause() 后再判 shouldPause
+    let release!: () => void
+    const gate = new Promise<void>((r) => { release = r })
+    mocked.chunkUploadFile.mockImplementation(async (_p, _id, _cs, onProgress, _sig, opts) => {
+      opts?.onSession?.({ uploadId: 'S1', sessionToken: 'T1' })
+      onProgress?.(3 * 5 * MB, BIG) // 已传 3 片
+      await gate
+      if (opts?.shouldPause?.()) throw new Error('Paused') // 片间边界：pause 后停
+      return { uploadId: 'S1', sessionToken: 'T1' }
+    })
+
+    const q = useUploadQueue({ settings: baseSettings(), t, uploadTasks: store })
+    q.addFiles([file])
+    const run = q.start()
+    // 等 chunkUploadFile 被调到并挂起在 gate
+    await new Promise((r) => setTimeout(r, 10))
+
+    const id = q.tasks.value[0]!.id
+    q.pause(id) // 置 paused ⇒ shouldPause() 将返回 true
+    release()
+    const out = await run
+
+    // 暂停：不出码、任务落 paused、坐标保留
+    expect(out).toBeNull()
+    expect(q.tasks.value[0]!.status).toBe('paused')
+    const rec = store.recs[0]!
+    expect(rec.uploadId).toBe('S1')
+    expect(rec.sessionToken).toBe('T1')
+    expect(rec.status).toBe('interrupted') // 可续传
+
+    // 恢复：从断点续传——resumeSessionId 沿用旧会话、按服务端位图跳片
+    mocked.getChunkStatus.mockResolvedValue({ uploadId: 'S1', totalChunks: 8, uploadedIndexes: [0, 1, 2], status: 'uploading' })
+    mocked.chunkUploadFile.mockResolvedValue({ uploadId: 'S1', sessionToken: 'T1' })
+    mocked.multiBind.mockResolvedValue({ code: 'C5', url: 'http://x/#/share/C5', share_url: '', file_count: 1, pickup_code: 'P5' })
+    const out2 = await q.resumeTask(id)
+    expect(out2?.pickup_code).toBe('P5')
+    const opts2 = mocked.chunkUploadFile.mock.calls.at(-1)![5]!
+    expect(opts2.resumeSessionId).toBe('S1')
+    expect(opts2.uploaded).toEqual(new Set([0, 1, 2]))
+    expect(mocked.multiBind.mock.calls.at(-1)![0]).toEqual([{ upload_id: 'S1' }])
+  })
+
+  it('pause 对非 multi-chunk 通道或非 uploading 态是 no-op（不误标 paused）', async () => {
+    const file = mkFile('big.bin', BIG)
+    const store = mkStore()
+    const q = useUploadQueue({ settings: baseSettings(), t, uploadTasks: store })
+    q.addFiles([file])
+    const id = q.tasks.value[0]!.id
+    // 还是 pending（未开跑）⇒ pause 不生效
+    q.pause(id)
+    expect(q.tasks.value[0]!.status).not.toBe('paused')
+    // channel 未设为 multi-chunk ⇒ 即便 uploading 也不该 pause（此处仍 pending，双保险）
+    expect(q.tasks.value[0]!.channel).not.toBe('multi-chunk')
+  })
+})

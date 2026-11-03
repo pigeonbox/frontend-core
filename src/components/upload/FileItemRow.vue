@@ -30,12 +30,16 @@
         <span v-else-if="task.status === 'blocked'" class="status blocked">
           <el-icon><WarningFilled /></el-icon> {{ task.error || t('upload.maxFileExceededShort') }}
         </span>
+        <!-- paused（2026-11-03 Phase 3）：分片通道暂停，坐标保留、可续传 -->
+        <span v-else-if="task.status === 'paused'" class="status paused">
+          <el-icon><VideoPause /></el-icon> {{ t('upload.paused') }}
+        </span>
         <span v-else class="status pending">
           {{ t('upload.pendingStatus') }}
         </span>
       </div>
       <el-progress
-        v-if="task.status === 'uploading' || task.status === 'encrypting' || task.status === 'binding' || task.status === 'success'"
+        v-if="task.status === 'uploading' || task.status === 'encrypting' || task.status === 'binding' || task.status === 'success' || task.status === 'paused'"
         :percentage="task.progress"
         :stroke-width="4"
         :show-text="false"
@@ -83,6 +87,30 @@
       >
         <el-icon><CopyDocument /></el-icon>
       </el-button>
+      <!-- 暂停（2026-11-03 Phase 3）：仅分片通道（multi-chunk）可暂停——
+           direct/presign/multi-direct 是单请求体，中途只能 abort=丢弃，
+           给假按钮是欺骗。canPause 判定通道，不可暂停通道不渲染。 -->
+      <el-button
+        v-if="isBusy && canPause"
+        type="warning"
+        circle
+        size="small"
+        :title="t('upload.pause')"
+        @click="emit('pause', task.id)"
+      >
+        <el-icon><VideoPause /></el-icon>
+      </el-button>
+      <!-- 恢复（2026-11-03 Phase 3）：paused 行从断点补缺片续传 -->
+      <el-button
+        v-if="task.status === 'paused'"
+        type="primary"
+        circle
+        size="small"
+        :title="t('upload.resume')"
+        @click="emit('resume', task.id)"
+      >
+        <el-icon><VideoPlay /></el-icon>
+      </el-button>
       <el-button
         v-if="isBusy"
         type="danger"
@@ -108,7 +136,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh, WarningFilled, CopyDocument } from '@element-plus/icons-vue'
+import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh, WarningFilled, CopyDocument, VideoPause, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { formatFileSize } from '@/utils/format'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -116,13 +144,16 @@ import type { UploadTask } from '@/composables/useUploadQueue'
 
 /** 上传队列单文件行（2026-10-06 W2 自 FileUpload.vue 列表块抽出） */
 const props = defineProps<{ task: UploadTask; multiMode?: boolean }>()
-const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string]; resume: [id: string] }>()
+const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string]; resume: [id: string]; pause: [id: string] }>()
 
 const { t } = useI18n()
 
 const isBusy = computed(() =>
   props.task.status === 'uploading' || props.task.status === 'encrypting' || props.task.status === 'binding'
 )
+
+/** 可暂停（2026-11-03 Phase 3）：仅 multi-chunk 通道能在片间边界停下续传 */
+const canPause = computed(() => props.task.channel === 'multi-chunk')
 
 /** 复制诊断信息（失败行）：diag 为空（取消/老任务）时退化为复制错误文本 */
 const copyDiag = async () => {
@@ -216,6 +247,7 @@ const getFileType = (filename: string): string => {
 .status.error { color: var(--color-danger); }
 /* blocked = 被单文件上限拦下：用警示色与「失败」区分（用户不该以为重试能发出去） */
 .status.blocked { color: var(--el-color-warning); }
+.status.paused { color: var(--el-color-warning); }
 .status.uploading { color: var(--primary-color); }
 .status.pending { color: var(--color-text-secondary); }
 
