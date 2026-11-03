@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 import { pickUploadPlan, isPresignFallbackEligible } from '@/composables/useUploadPlan'
 import { uploadFile } from '@/api/share'
 import { multiDirect, chunkUploadFile, multiBind, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
-import type { PresignCompleteData } from '@/api/presign'
+import type { PresignCompleteData, PresignUploadProgress } from '@/api/presign'
 import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
 import { formatFileSize } from '@/utils/format'
@@ -54,7 +54,17 @@ export function useUploadQueue(opts: {
   /** 匿名直传是否开放（后端 presign.anonymous_enabled 下发；false 时 >阈值 文件回退分片中转） */
   presignAllowed?: () => boolean
   chunkSize?: number
-  presign?: (file: File, settings: ShareSettings) => Promise<PresignCompleteData>
+  /**
+   * presign 大文件直传（>100MB）。
+   *
+   * onProgress 把弹窗内部 PUT 的**原始字节数**与阶段透给队列 ⇒ 上传列表那一行
+   * 也能显示百分比（此前弹窗里有进度、列表行恒 0%）。
+   */
+  presign?: (
+    file: File,
+    settings: ShareSettings,
+    onProgress?: (p: PresignUploadProgress) => void
+  ) => Promise<PresignCompleteData>
   /** 登录态注入（custom_code 仅登录时发送；默认视为登录） */
   isLoggedIn?: () => boolean
   /**
@@ -407,7 +417,15 @@ export function useUploadQueue(opts: {
         task.statusText = t('upload.largeFileHint')
         let r: PresignCompleteData | undefined
         try {
-          r = await opts.presign?.(task.file, settings)
+          r = await opts.presign?.(task.file, settings, (p) => {
+            if (p.phase === 'put' && p.total > 0) {
+              task.progress = Math.round((p.loaded / p.total) * 100)
+              task.statusText = t('upload.uploading')
+            } else if (p.phase === 'complete') {
+              task.progress = 100
+              task.statusText = t('upload.prepare')
+            }
+          })
           if (!r) throw new Error('presign unavailable')
         } catch (e) {
           // presign 直传失败 ⇒ **传输层失败可回退分片中转**（2026-11-03）。

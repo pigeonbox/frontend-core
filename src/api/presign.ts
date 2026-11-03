@@ -7,6 +7,23 @@ export type PresignInitData = presignContract.InitData
 
 export type PresignCompleteData = presignContract.CompleteData
 
+/** presign 直传的阶段（进度透出的共享契约，2026-11-03） */
+export type PresignUploadPhase = 'init' | 'put' | 'complete'
+
+/**
+ * presign 直传进度。
+ *
+ * ⚠️ 对外给**原始字节数**，不带弹窗内部那套 0-95/97-100 的折算——折算由调用方做
+ * （弹窗要封顶 95% 给 complete，队列要的是纯百分比）。
+ */
+export interface PresignUploadProgress {
+  phase: PresignUploadPhase
+  /** put 阶段为已传字节；其余阶段为 0 */
+  loaded: number
+  /** put 阶段为总字节；其余阶段为 0 */
+  total: number
+}
+
 export const presignApi = {
   // 业务成功码：新版 resp.Success 返回 0，旧式 handler 返回 200
   isOk: (code?: number) => code === 0 || code === 200,

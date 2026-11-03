@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { useUploadQueue } from '../useUploadQueue'
 import type { ShareSettings } from '../useShareSettings'
+import type { PresignUploadProgress } from '@/api/presign'
 
 // ---- mocks ----
 vi.mock('element-plus', () => ({
@@ -88,6 +89,24 @@ describe('useUploadQueue', () => {
     expect(presign).toHaveBeenCalledOnce()
     expect(out).toMatchObject({ code: 'P1', share_url: 'http://x/#/share/P1', full_share_url: 'http://x/#/share/P1' })
     expect(mocked.uploadFile).not.toHaveBeenCalled()
+  })
+
+  it('presign 分支：PUT 进度透出到任务行（此前列表行恒 0%，进度只在弹窗里）', async () => {
+    let seenProgress = -1
+    const presign = vi.fn().mockImplementation(
+      async (_f: File, _s: ShareSettings, onProgress?: (p: PresignUploadProgress) => void) => {
+        onProgress?.({ phase: 'put', loaded: 50, total: 100 })
+        // 回调是同步触发的 ⇒ 此时任务行的 progress 应当已被写入
+        seenProgress = q.tasks.value[0]!.progress
+        onProgress?.({ phase: 'complete', loaded: 100, total: 100 })
+        return { code: 'P1', url: 'http://x/#/share/P1', file_name: 'big.bin', file_size: 200 * MB, download_url: '' }
+      },
+    )
+    const q = useUploadQueue({ settings: baseSettings(), t, presignThreshold: 1 * MB, presign })
+    q.addFiles([mkFile('big.bin', 200 * MB)])
+    await q.start()
+    expect(seenProgress).toBe(50)
+    expect(q.tasks.value[0]!.progress).toBe(100)
   })
 
   it('多文件小体积 → multi-direct 一次调用，全部 success', async () => {

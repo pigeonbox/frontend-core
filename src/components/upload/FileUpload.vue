@@ -175,7 +175,7 @@ const queue = useUploadQueue({
   presignThreshold: () =>
     (configStore.config?.presignThresholdMb || 100) * 1024 * 1024,
   isLoggedIn: () => userStore.isLoggedIn,
-  presign: (file, s) =>
+  presign: (file, s, onProgress) =>
     presignDialog.value!.open(file, {
       expire_value: s.expire_value,
       expire_style: s.expire_style,
@@ -183,6 +183,7 @@ const queue = useUploadQueue({
       password: s.password || undefined,
       note: s.note || undefined,
       e2e: s.e2e,
+      onProgress,
     }),
 })
 const {
