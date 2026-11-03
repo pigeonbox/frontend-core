@@ -98,7 +98,7 @@ import { useI18n } from 'vue-i18n'
 import {
   Document, Loading, CircleCloseFilled
 } from '@element-plus/icons-vue'
-import { presignApi, type PresignCompleteData } from '@/api/presign'
+import { presignApi, type PresignCompleteData, type PresignUploadProgress } from '@/api/presign'
 import { anonymousApi } from '@/api/anonymous'
 import { xhrRaw, uploadTimeoutForSize } from '@/api/_xhr'
 import { classifyUploadFailure, isPermanentUploadFailure, uploadError, SERVER_DETAIL_KINDS, switchChannelError, formatUploadDiagnostics } from '@/utils/uploadFailure'
@@ -133,6 +133,13 @@ export interface PresignOptions {
   note?: string
   /** E2E 客户端加密分享（占位通道不带 encrypted 标记，先出码对其跳过） */
   e2e?: boolean
+  /**
+   * 进度透出（2026-11-03）：把内部 PUT 的原始字节数与阶段交给调用方。
+   *
+   * 此前弹窗里本就有的 xhrRaw 进度**只画在弹窗内** ⇒ 上传列表那一行恒 0%
+   * （大文件走 presign 时，用户在列表里看不到任何进度反馈）。
+   */
+  onProgress?: (p: PresignUploadProgress) => void
 }
 
 const file = ref<File | null>(null)
@@ -264,6 +271,7 @@ const doUpload = async (retryCount = 0) => {
 
     // 1.5 秒传命中：服务端已有相同哈希+大小的分享，免直传直接出码
     if (initData.existed && initData.share_code) {
+      options.value.onProgress?.({ phase: 'complete', loaded: f.size, total: f.size })
       progress.value = 100
       completed.value = true
       statusText.value = t('upload_view.quickUploadHit')
@@ -281,6 +289,7 @@ const doUpload = async (retryCount = 0) => {
     currentToken = initData.token
 
     // 2. PUT 直传（xhrRaw：进度 + 中断 + 自定义签发头；进度封顶 95% 留给 complete）
+    options.value.onProgress?.({ phase: 'init', loaded: 0, total: 0 })
     // 超时按**文件大小**给预算（2026-11-03）：原先固定 300s 与体积无关，
     // 而实测家宽上行 ~0.86MB/s ⇒ 1.35GB 需 ~26 分钟 ⇒ 300s 必掐断。
     statusText.value = t('upload_view.presign.upload')
@@ -301,6 +310,7 @@ const doUpload = async (retryCount = 0) => {
       signal: putAbort.signal,
       onProgress: (loaded, total) => {
         progress.value = Math.round((loaded / total) * 95)
+        options.value.onProgress?.({ phase: 'put', loaded, total })
         // 速度 + ETA（设计 B3）：滑窗测速展示在进度条下方
         meter.record(loaded)
         const bps = meter.speedBps()
@@ -320,6 +330,7 @@ const doUpload = async (retryCount = 0) => {
     putAbort = null
 
     // 3. Complete
+    options.value.onProgress?.({ phase: 'complete', loaded: f.size, total: f.size })
     statusText.value = t('upload_view.presign.complete')
     progress.value = 97
     const completeRes = await presignApi.complete({

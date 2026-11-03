@@ -128,25 +128,30 @@
                   <el-tag type="info" size="small">{{ formatFileSize(totalShareSize) }}</el-tag>
                   <el-tag v-if="shareData.encrypted" type="warning" size="small">{{ t('share.e2eTag') }}</el-tag>
                 </div>
-                <el-button
+                <DownloadButton
                   v-if="!shareData.encrypted && !downloadBlocked"
-                  type="primary"
+                  size="large"
                   class="download-btn"
-                  @click="downloadAll"
-                >
-                  <el-icon><Download /></el-icon>
-                  {{ t('share.zipDownload') }}
-                </el-button>
+                  :url="downloadAllUrl"
+                  :filename="downloadAllName"
+                  :label="t('share.zipDownload')"
+                  @error="onDownloadError"
+                />
               </div>
               <div class="multi-file-list">
                 <div v-for="f in shareFiles" :key="f.id" class="multi-file-item">
                   <el-icon class="icon-secondary"><Document /></el-icon>
                   <span class="m-name" :title="f.name">{{ f.name }}</span>
                   <span class="m-size">{{ formatFileSize(f.size) }}</span>
-                  <el-button v-if="!downloadBlocked" size="small" text type="primary" :loading="e2eBusy" @click="downloadFile(f.id, f.name)">
-                    <el-icon><Download /></el-icon>
-                    {{ t('common.download') }}
-                  </el-button>
+                  <DownloadButton
+                    v-if="!downloadBlocked"
+                    size="small"
+                    :url="downloadUrlFor(f.id)"
+                    :filename="downloadNameFor(f.name)"
+                    :label="t('common.download')"
+                    :guard="downloadGuard"
+                    @error="onDownloadError"
+                  />
                 </div>
               </div>
             </div>
@@ -164,10 +169,17 @@
                   </el-tag>
                 </div>
               </div>
-              <el-button v-if="!downloadBlocked" type="primary" size="large" class="download-btn" @click="downloadFile()">
-                <el-icon><Download /></el-icon>
-                {{ t('share.downloadFile') }}
-              </el-button>
+              <DownloadButton
+                v-if="!downloadBlocked"
+                size="large"
+                class="download-btn"
+                :url="downloadUrlFor()"
+                :filename="downloadNameFor()"
+                :label="t('share.downloadFile')"
+                :transform="isEncrypted ? e2eTransform : undefined"
+                :guard="downloadGuard"
+                @error="onDownloadError"
+              />
             </div>
           </div>
 
@@ -215,10 +227,11 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import {
-  HomeFilled, Document, Folder, Download, CopyDocument, Loading, Memo
+  HomeFilled, Document, Folder, CopyDocument, Loading, Memo
 } from '@element-plus/icons-vue'
 import { shareApi } from '@/api/share'
 import { decryptBytes, decryptText, unwrapKey } from '@/utils/e2e'
+import DownloadButton from '@/components/download/DownloadButton.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { translateError } from '@/utils/api-interceptor'
 import { isPasswordFamilyError, isPasswordMissingOnly } from '@/utils/password-error'
@@ -461,64 +474,47 @@ const submitE2ePassword = async () => {
   }
 }
 
-/** 解密并保存文件（E2E 分享：服务端流返回密文） */
-const fetchDecryptSave = async (url: string, name: string) => {
-  e2eBusy.value = true
-  e2eError.value = ''
-  try {
-    const resp = await fetch(url)
-    if (!resp.ok) throw new Error(t('share.downloadFailedHttp', { status: resp.status }))
-    const buf = await resp.arrayBuffer()
-    const plain = await decryptBytes(e2eKey.value, buf)
-    const blob = new Blob([plain], { type: 'application/octet-stream' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = name
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
-  } catch (e: unknown) {
-    e2eError.value = e instanceof Error ? t('share.decryptFailedMsg', { msg: e.message }) : t('share.decryptFailedShort')
-  } finally {
-    e2eBusy.value = false
-  }
+/**
+ * E2E 解密器：统一下载器的 transform 钩子。
+ *
+ * ⚠️ AES-256-GCM **不可增量解密**（认证需要完整密文+tag）⇒ 只能整块解密
+ * ⇒ 内存占用 = 文件体积（与改造前的 arrayBuffer 路径持平，不新增内存风险）。
+ */
+const e2eTransform = async (buf: ArrayBuffer): Promise<ArrayBuffer> => {
+  const key = e2eKey.value
+  if (!key) throw new Error(t('share.keyMissingParam'))
+  return decryptBytes(key, buf)
 }
 
-const downloadFile = (fileId?: number, name?: string) => {
-  if (!shareCode.value) return
-  const url = buildDownloadUrl(fileId)
-  if (!url) {
-    // 密码保护且无服务端直链：无可用下载地址（2026-10-22）
-    ElMessage.warning(t('share.passwordDownloadHint'))
-    return
-  }
-  // 文件分享的原始名存 text 字段（E2E 文本分享的 text 是密文，但文本分支不走下载）
-  const fallbackName = name || shareData.value?.file_name
-    || (shareData.value?.encrypted && shareFiles.value.length === 0 ? '' : shareData.value?.text)
-    || `${shareCode.value}.bin`
-  if (isEncrypted.value) {
-    if (!e2eKey.value) {
-      // 口令型缺的是口令（引导去输）；存量 URL-hash 分享缺的是 key 参数
-      if (needE2ePassword.value) ElMessage.warning(t('share.e2ePasswordFirst'))
-      else e2eError.value = t('share.keyMissingParam')
-      return
-    }
-    void fetchDecryptSave(url, fallbackName)
-    return
-  }
-  window.open(url, '_blank')
+/** 下载失败提示（行内错误组件已展示，这里只做全局兜底） */
+const onDownloadError = (msg: string) => {
+  ElMessage.error(msg)
 }
 
-// 打包下载（多文件分享；服务端流式 zip。E2E 分享服务端无法打包，按钮已隐藏）
-const downloadAll = () => {
-  if (!shareCode.value) return
-  const url = buildDownloadUrl()
-  if (!url) {
-    ElMessage.warning(t('share.passwordDownloadHint'))
-    return
-  }
-  window.open(url, '_blank')
+/** 下载地址（复用既有 buildDownloadUrl；口令保护且无直链时返回空串 ⇒ 按钮不渲染） */
+const downloadUrlFor = (fileId?: number): string => buildDownloadUrl(fileId)
+
+/**
+ * 下载文件名：行内给定名 > 分享文件名 > 取件码兜底。
+ *
+ * ⚠️ 旧实现的兜底链里有一项是 `shareData.text`——那是**文件分享的原始名**
+ * （文本分享的 text 是正文，不走下载）。服务端现在下发 file_name ⇒ 直接用它。
+ */
+const downloadNameFor = (name?: string): string =>
+  name || shareData.value?.file_name || `${canonicalCode.value || shareCode.value}.bin`
+
+/** 打包下载（多文件分享；服务端流式 zip。E2E 分享服务端无法打包，按钮已隐藏） */
+const downloadAllUrl = computed(() => buildDownloadUrl())
+const downloadAllName = computed(() => `${canonicalCode.value || shareCode.value}.zip`)
+
+/**
+ * 下载前置校验（E2E 分享）：缺口令或缺密钥时**不发起下载**。
+ * 口令型缺的是口令（引导去输）；存量 URL-hash 分享缺的是 key 参数。
+ */
+const downloadGuard = (): string | null => {
+  if (!isEncrypted.value) return null
+  if (e2eKey.value) return null
+  return needE2ePassword.value ? t('share.e2ePasswordFirst') : t('share.keyMissingParam')
 }
 
 // 路由参数（分享码）驱动取数：**参数变化即重取**。

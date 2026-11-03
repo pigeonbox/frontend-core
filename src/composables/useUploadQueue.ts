@@ -5,7 +5,7 @@ import { uploadFile } from '@/api/share'
 import { multiDirect, chunkUploadFile, multiBind, buildFingerprint, getChunkStatus, chunkQuickProbe, chunkCancelSession, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
 import { hashFileSha256 } from '@/utils/fileHash'
 import type { UploadTaskRecord, NewUploadTaskRecord } from '@/stores/uploadTasks'
-import type { PresignCompleteData } from '@/api/presign'
+import type { PresignCompleteData, PresignUploadProgress } from '@/api/presign'
 import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
 import { formatUploadDiagnostics, isSwitchChannelRequested } from '@/utils/uploadFailure'
@@ -48,6 +48,16 @@ export interface UploadTask {
   error: string
   /** 失败诊断（可复制给管理员：code/message/trace_id；成功/拦截时为空） */
   diag?: string
+  /**
+   * 行内百分比是否可信（2026-11-03）。
+   *
+   * `multi-direct` 是**单个 multipart 请求** ⇒ XHR 只给聚合字节数 ⇒ 把它按文件
+   * 顺序均摊会让第一个文件先冲到 100%、其余长期 0%，**是误导不是估算**。
+   * ⇒ 该通道的行内百分比关掉，改由批次总进度条呈现真聚合值。
+   *
+   * 其余通道（direct / presign / multi-chunk）本就是逐文件粒度 ⇒ 保持可信。
+   */
+  percentValid?: boolean
 }
 
 /**
@@ -73,7 +83,17 @@ export function useUploadQueue(opts: {
   /** 匿名直传是否开放（后端 presign.anonymous_enabled 下发；false 时 >阈值 文件回退分片中转） */
   presignAllowed?: () => boolean
   chunkSize?: number
-  presign?: (file: File, settings: ShareSettings) => Promise<PresignCompleteData>
+  /**
+   * presign 大文件直传（>100MB）。
+   *
+   * onProgress 把弹窗内部 PUT 的**原始字节数**与阶段透给队列 ⇒ 上传列表那一行
+   * 也能显示百分比（此前弹窗里有进度、列表行恒 0%）。
+   */
+  presign?: (
+    file: File,
+    settings: ShareSettings,
+    onProgress?: (p: PresignUploadProgress) => void
+  ) => Promise<PresignCompleteData>
   /** 登录态注入（custom_code 仅登录时发送；默认视为登录） */
   isLoggedIn?: () => boolean
   /**
@@ -107,6 +127,12 @@ export function useUploadQueue(opts: {
   const { settings, t } = opts
 
   const tasks = ref<UploadTask[]>([])
+  /**
+   * 批次总进度（2026-11-03）：**只有 multi-direct 用得上**——它是唯一拿不到
+   * 逐文件真进度的通道（单请求 ⇒ 只有聚合字节数）⇒ 由聚合 XHR 进度驱动，
+   * 列表顶部一条进度条呈现真值。
+   */
+  const batchProgress = ref({ active: false, percent: 0, loaded: 0, total: 0 })
   // 单文件直传的中断控制器（multi 用共享 controller）
   const controllers = new Map<string, AbortController>()
   let multiAbort: AbortController | null = null
@@ -203,6 +229,7 @@ export function useUploadQueue(opts: {
           : bext
             ? t('upload.blockedExt', { ext: bext })
             : '',
+        percentValid: true,
       })
     }
     if (limit > 0) {
@@ -384,6 +411,8 @@ export function useUploadQueue(opts: {
     currentBatch = pending
     batchRunning = true
     batchCancelled = false
+    // 每批重置批次总进度（上一批的聚合值不能留到下一批）
+    batchProgress.value = { active: false, percent: 0, loaded: 0, total: 0 }
 
     // E2E（口令型，2026-11-01 core#30）：单密钥 + 逐文件预加密（密文作为实际上传
     // 内容）；密钥不进链接，用口令包装成 wrapped_key 随各通道的创建请求落服务端。
@@ -456,6 +485,8 @@ export function useUploadQueue(opts: {
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.prepare')
+        // 单文件粒度 ⇒ 行内百分比可信（重试换通道后也要恢复，别留上一批的 false）
+        task.percentValid = true
         const ctrl = new AbortController()
         controllers.set(task.id, ctrl)
         // 速度 + ETA（设计 B3）：单文件直传的任务行状态文本随进度刷新。
@@ -520,9 +551,19 @@ export function useUploadQueue(opts: {
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.largeFileHint')
+        // 单文件粒度 ⇒ 行内百分比可信（presign 的 PUT 进度是逐字节真值）
+        task.percentValid = true
         let r: PresignCompleteData | undefined
         try {
-          r = await opts.presign?.(task.file, settings)
+          r = await opts.presign?.(task.file, settings, (p) => {
+            if (p.phase === 'put' && p.total > 0) {
+              task.progress = Math.round((p.loaded / p.total) * 100)
+              task.statusText = t('upload.uploading')
+            } else if (p.phase === 'complete') {
+              task.progress = 100
+              task.statusText = t('upload.prepare')
+            }
+          })
           if (!r) throw new Error('presign unavailable')
         } catch (e) {
           // presign 直传失败 ⇒ **传输层失败可回退分片中转**（2026-11-03）。
@@ -578,19 +619,22 @@ export function useUploadQueue(opts: {
         multiAbort = new AbortController()
         // 聚合进度按字节均摊到各任务行（上传的是密文（若启用 E2E）或原文件）
         const payloads = pending.map((f) => f.payload)
-        const capBytes = payloads.map((f) => f.size)
+        // ⚠️ 行内百分比不可信（2026-11-03）：multi-direct 是**单请求** ⇒ XHR 只给
+        // 聚合字节数 ⇒ 按文件顺序均摊会让第一个文件先冲到 100%、其余长期 0%
+        // （那是误导，不是估算）⇒ 关掉行内百分比，改由批次总进度条呈现真聚合值。
+        for (const task of pending) task.percentValid = false
         const result = await multiDirect(
           payloads,
           multiOptions(wrappedKey),
-          (loaded) => {
-            let acc = 0
-            for (let idx = 0; idx < pending.length; idx++) {
-              const task = pending[idx]!
-              const cap = Math.max(capBytes[idx] ?? task.file.size, 1)
-              const done = Math.min(Math.max(loaded - acc, 0), cap)
-              task.progress = Math.round((done / cap) * 100)
+          (loaded, total) => {
+            batchProgress.value = {
+              active: true,
+              percent: Math.min(100, Math.round((loaded / Math.max(total, 1)) * 100)),
+              loaded,
+              total,
+            }
+            for (const task of pending) {
               task.statusText = t('upload.uploading')
-              acc += cap
             }
           },
           multiAbort.signal
@@ -630,6 +674,8 @@ export function useUploadQueue(opts: {
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.uploading')
+        // 逐文件串行上传 ⇒ 每行的分片进度都是自己的真值 ⇒ 行内百分比可信（4.8.4 列车）
+        task.percentValid = true
 
         // 指纹用**原始 file** 三元组（E2E payload 是密文，逐次加密字节不同，不能当指纹）
         const fingerprint = buildFingerprint(task.file)
@@ -863,6 +909,11 @@ export function useUploadQueue(opts: {
     totalSize: totalSize as ComputedRef<number>,
     /** 本批合计是否超过站点默认的单次发送总量上限（提示用，不阻断） */
     batchOverLimit: batchOverLimit as ComputedRef<boolean>,
+    /**
+     * 批次总进度（仅 multi-direct 通道激活）：真聚合值。
+     * 该通道拿不到逐文件真进度 ⇒ 行内百分比被关掉（见 UploadTask.percentValid）。
+     */
+    batchProgress: batchProgress as ComputedRef<{ active: boolean; percent: number; loaded: number; total: number }>,
     addFiles,
     remove,
     cancel,

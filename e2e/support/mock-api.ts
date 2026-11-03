@@ -30,7 +30,15 @@ export interface MockHandler {
   /** 字符串按「路径包含」匹配（更稳，不受 query 顺序影响）；正则按 path 匹配 */
   url: string | RegExp
   status?: number
-  body: unknown | ((req: RecordedRequest) => unknown)
+  /** JSON 响应体；与 binary 二选一 */
+  body?: unknown | ((req: RecordedRequest) => unknown)
+  /**
+   * 二进制响应体（下载类端点，2026-11-03）。
+   *
+   * 与 body 二选一：走 binary 时按原始字节 fulfil，**不套 JSON 信封**——
+   * 下载器要的是文件字节，给个 JSON 会让「下载」变成「下到一个 JSON 文件」。
+   */
+  binary?: { contentType: string; body: Buffer }
 }
 
 /** 会被当作「后端调用」的路径前缀 */
@@ -96,11 +104,21 @@ export async function installApiMocks(page: Page, handlers: MockHandler[] = []):
       return
     }
 
+    if (hit.binary) {
+      // 二进制响应（下载类端点）：按原始字节 fulfil，不套 JSON 信封
+      await route.fulfill({
+        status: hit.status ?? 200,
+        contentType: hit.binary.contentType,
+        body: hit.binary.body,
+      })
+      return
+    }
+
     const payload = typeof hit.body === 'function' ? hit.body(record) : hit.body
     await route.fulfill({
       status: hit.status ?? 200,
       contentType: 'application/json',
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload ?? envelope({})),
     })
   })
 

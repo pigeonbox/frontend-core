@@ -15,6 +15,7 @@ declare module 'vue' {
     BrandLogo: typeof import('./components/BrandLogo.vue')['default']
     CodeBoxes: typeof import('./components/retrieve/CodeBoxes.vue')['default']
     DeliveryPathSelector: typeof import('./components/share/DeliveryPathSelector.vue')['default']
+    DownloadButton: typeof import('./components/download/DownloadButton.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
