@@ -2,7 +2,8 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { pickUploadPlan, isPresignFallbackEligible } from '@/composables/useUploadPlan'
 import { uploadFile } from '@/api/share'
-import { multiDirect, chunkUploadFile, multiBind, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
+import { multiDirect, chunkUploadFile, multiBind, buildFingerprint, getChunkStatus, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
+import type { UploadTaskRecord, NewUploadTaskRecord } from '@/stores/uploadTasks'
 import type { PresignCompleteData } from '@/api/presign'
 import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
@@ -46,6 +47,16 @@ export interface UploadTask {
   diag?: string
 }
 
+/**
+ * 任务持久化出口（2026-11-03 Phase 2）：结构化最小面——真实现是 pinia 的
+ * useUploadTasksStore（写穿 localStorage），单测传内存假实现即可，无需挂 pinia。
+ */
+export interface UploadTasksSink {
+  create: (record: NewUploadTaskRecord) => { id: string }
+  update: (id: string, patch: Partial<Omit<UploadTaskRecord, 'id' | 'createdAt'>>) => void
+  findByFingerprint: (fingerprint: string) => UploadTaskRecord | undefined
+}
+
 const DEFAULT_BODY_CAP = 8 * 1024 * 1024
 const DEFAULT_PRESIGN_THRESHOLD = 100 * 1024 * 1024
 const DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024
@@ -83,6 +94,12 @@ export function useUploadQueue(opts: {
    * 本地拦只是省一次「传完才被拒」的往返与流量（2026-11-03 1.35GB 实录）。
    */
   blockedExts?: () => string[]
+  /**
+   * 任务持久化（断点续传坐标）：缺省不持久化（既有单测零改动）。
+   * 只有 multi-chunk 通道可续传（分片会话可位图续传）⇒ 只有它写任务记录；
+   * direct/presign 一次性请求体不可断点，不写记录（不给不可续传的假希望）。
+   */
+  uploadTasks?: UploadTasksSink
 }) {
   const { settings, t } = opts
 
@@ -257,6 +274,33 @@ export function useUploadQueue(opts: {
     task.statusText = ''
     task.progress = 0
     if (tasks.value.length > 1) return null
+    return await start()
+  }
+
+  /**
+   * 行内续传（2026-11-03 Phase 2）：同页面内 File 尚在内存 ⇒ 直接复位重跑，
+   * 不必重新选文件。multi-chunk 分支会按任务记录的续传坐标跳过已传分片。
+   * 与 retry 的差别：仅收 error（blocked 是「不该发」，重试=重新判定上限，不是续传）。
+   */
+  const resumeTask = async (id: string): Promise<ShareResult | null> => {
+    const task = tasks.value.find((f) => f.id === id)
+    if (!task || task.status !== 'error') return null
+    task.status = 'pending'
+    task.error = ''
+    task.statusText = ''
+    task.progress = 0
+    if (tasks.value.length > 1) return null
+    return await start()
+  }
+
+  /**
+   * 刷新后续传（2026-11-03 Phase 2）：File 对象不跨刷新存活，用户重选同指纹文件
+   * （指纹命中的判定在 FileUpload 层，未命中提示 resumeMismatch）。
+   * 装入队列后整批发起（既有批量语义）；multi-chunk 分支内按指纹查到未完成
+   * 记录 ⇒ 沿用其续传坐标（服务端位图为准）从断点继续。
+   */
+  const resumeFrom = async (file: File): Promise<ShareResult | null> => {
+    addFiles([file])
     return await start()
   }
 
@@ -551,37 +595,119 @@ export function useUploadQueue(opts: {
         }
       }
 
-      // multi-chunk：逐文件分片上传（复用 chunk 通道任意大小能力），最后一次性绑定
+      // multi-chunk：逐文件分片上传（复用 chunk 通道任意大小能力），最后一次性绑定。
+      // 断点续传（2026-11-03 Phase 2）：每文件先查任务记录拿续传坐标，服务端会话
+      // 位图为准（getChunkStatus），缺片补传；坐标经任务 store 写穿 localStorage。
       multiAbort = new AbortController()
       const entries: Array<{ upload_id: string }> = []
+      const store = opts.uploadTasks
+      const recOf = new Map<string, string>()
       for (const task of pending) {
         if (multiAbort.signal.aborted) throw new Error('Cancelled')
         task.status = 'uploading'
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.uploading')
-        const uploadId = newId()
-        // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）+ 会话令牌
-        const { uploadId: sessionId } = await chunkUploadFile(
-          task.payload,
-          uploadId,
-          opts.chunkSize ?? DEFAULT_CHUNK_SIZE,
-          (loaded, total) => {
-            task.progress = Math.round((loaded / Math.max(total, 1)) * 100)
-          },
-          multiAbort.signal
-        )
-        // 绑定阶段提示（分片已传完、等待服务端合并）
-        task.status = 'binding'
-        task.progress = 100
-        task.statusText = t('upload.prepare')
-        entries.push({ upload_id: sessionId })
+
+        // 指纹用**原始 file** 三元组（E2E payload 是密文，逐次加密字节不同，不能当指纹）
+        const fingerprint = buildFingerprint(task.file)
+        const prev = store?.findByFingerprint(fingerprint)
+        const rec = prev ?? store?.create({
+          fingerprint,
+          fileName: task.file.name,
+          fileSize: task.file.size,
+          fileLastModified: task.file.lastModified,
+          channel: 'multi-chunk',
+          status: 'uploading',
+          uploadedIndexes: [],
+        })
+        if (rec) recOf.set(task.id, rec.id)
+
+        // 续传坐标只在「内容逐字节一致」时可信（payload === file ⇒ 未加密）。
+        // E2E 每次 start() 都重新加密（新密钥/新 IV）⇒ 与旧会话的分片不是同一内容，
+        // 续旧会话会拼出损坏密文 ⇒ 一律丢弃旧坐标、开新会话。
+        const resumable = task.payload === task.file
+        const chunkSize = (resumable ? prev?.chunkSize : undefined) ?? opts.chunkSize ?? DEFAULT_CHUNK_SIZE
+        const prevUploadId = resumable ? prev?.uploadId : undefined
+        const prevToken = resumable ? prev?.sessionToken : undefined
+        if (rec) {
+          store!.update(rec.id, {
+            status: 'uploading',
+            error: '',
+            chunkSize,
+            // 非可续传（E2E）⇒ 清旧坐标，避免下次误续到别的密文
+            uploadId: prevUploadId,
+            sessionToken: prevToken,
+            uploadedIndexes: resumable ? prev?.uploadedIndexes ?? [] : [],
+          })
+        }
+
+        // 服务端位图是唯一跳片判据（本地坐标可能滞后/会话已被清理）。
+        // 探测失败/会话不在 ⇒ 无条件开新会话 + 全量传（绝不按本地坐标盲跳——
+        // 新会话里这些分片并不存在，盲跳会拼出空洞文件）。
+        const st = prevUploadId ? await getChunkStatus(prevUploadId, prevToken).catch(() => null) : null
+        const uploaded = new Set<number>(st?.uploadedIndexes ?? [])
+        const totalChunks = Math.max(1, Math.ceil(task.payload.size / chunkSize))
+        let writtenChunks = 0
+        // 会话坐标即时落盘（init 成功即回传）——中途失败后凭它续传
+        const onSession = (s: { uploadId: string; sessionToken?: string }) => {
+          if (rec) store!.update(rec.id, { uploadId: s.uploadId, sessionToken: s.sessionToken })
+        }
+
+        try {
+          // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）+ 会话令牌
+          const { uploadId: sessionId, sessionToken } = await chunkUploadFile(
+            task.payload,
+            newId(),
+            chunkSize,
+            (loaded, total) => {
+              task.progress = Math.round((loaded / Math.max(total, 1)) * 100)
+              // 续传坐标写穿（节流：仅整片完成时写）。顺序上传 ⇒ 已完成=前缀 0..done-1
+              const done = Math.min(Math.ceil(loaded / chunkSize), totalChunks)
+              if (rec && done > writtenChunks) {
+                writtenChunks = done
+                store!.update(rec.id, {
+                  uploadedIndexes: Array.from({ length: done }, (_, i) => i),
+                })
+              }
+            },
+            multiAbort.signal,
+            st
+              ? { uploaded, sessionToken: prevToken, resumeSessionId: st.uploadId, onSession }
+              : { uploaded, onSession }
+          )
+          // 绑定阶段提示（分片已传完、等待服务端合并）
+          task.status = 'binding'
+          task.progress = 100
+          task.statusText = t('upload.prepare')
+          entries.push({ upload_id: sessionId })
+        } catch (e) {
+          // 失败保留续传坐标（onSession 已写 uploadId/sessionToken）：
+          // 记录留 error/interrupted，用户重试/重选同指纹文件即从断点继续
+          if (rec) {
+            const cancelled = e instanceof Error && (e.message === 'Cancelled' || e.message === 'Aborted')
+            store!.update(rec.id, {
+              status: cancelled ? 'interrupted' : 'error',
+              error: e instanceof Error ? e.message : String(e),
+            })
+          }
+          throw e
+        }
       }
       const result = await multiBind(entries, multiOptions(wrappedKey))
       for (const task of pending) {
         task.status = 'success'
         task.progress = 100
         task.statusText = t('common.success')
+        // 成功收尾：记录留取件码/链接（clearFinished 可清；unfinished 不再含它）
+        const rid = recOf.get(task.id)
+        if (store && rid) {
+          store.update(rid, {
+            status: 'success',
+            pickupCode: result.pickup_code || undefined,
+            shareUrl: result.share_url || result.url,
+          })
+        }
       }
       ElMessage.success(t('upload.success'))
       return {
@@ -630,6 +756,8 @@ export function useUploadQueue(opts: {
     remove,
     cancel,
     retry,
+    resumeTask,
+    resumeFrom,
     start,
     dispose,
   }

@@ -9,11 +9,17 @@ vi.mock('element-plus', () => ({
 vi.mock('@/api/share', () => ({
   uploadFile: vi.fn(),
 }))
-vi.mock('@/api/multifile', () => ({
-  multiDirect: vi.fn(),
-  chunkUploadFile: vi.fn(),
-  multiBind: vi.fn(),
-}))
+vi.mock('@/api/multifile', async (importOriginal) => {
+  // 纯工具（buildFingerprint/getChunkStatus 等）走真实实现，只 mock 网络面
+  const actual = await importOriginal<typeof import('@/api/multifile')>()
+  return {
+    ...actual,
+    multiDirect: vi.fn(),
+    chunkUploadFile: vi.fn(),
+    multiBind: vi.fn(),
+    getChunkStatus: vi.fn(),
+  }
+})
 vi.mock('@/utils/e2e', () => ({
   generateKeyB64: vi.fn(),
   encryptFile: vi.fn(),

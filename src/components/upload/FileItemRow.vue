@@ -44,13 +44,25 @@
       />
     </div>
     <div class="row-actions">
-      <!-- 单文件重试（2026-10-22）：失败行可就地重试，不必整批重跑。
-           多文件批量语义下单文件重试不成立（批量分享需整批文件同时成享），
-           此种情形下不提供行内重试（批量重跑走底部主按钮）。
-           blocked（超限被拦）也给重试入口：重试 = 按**当前**上限重新判定，
-           管理员调大上限后用户就地重发即可，不必移除重加。 -->
+      <!-- 行内续传（2026-11-03 Phase 2）：失败行从断点继续——multi-chunk 分支按
+           任务记录的续传坐标（服务端分片位图）跳过已传分片，同页面内 File 尚在
+           内存，直接复位重跑即可，不必重新选文件。 -->
       <el-button
-        v-if="(task.status === 'error' || task.status === 'blocked') && !multiMode"
+        v-if="task.status === 'error'"
+        type="primary"
+        circle
+        size="small"
+        :title="t('upload.resume')"
+        @click="emit('resume', task.id)"
+      >
+        <el-icon><Refresh /></el-icon>
+      </el-button>
+      <!-- 单文件重试（2026-10-22）：blocked（超限/禁传被拦）行的重试 = 按**当前**
+           限制重新判定，管理员调大上限后用户就地重发即可，不必移除重加。
+           多文件批量语义下不提供行内重试（批量分享需整批文件同时成享，
+           批量重跑走底部主按钮）。 -->
+      <el-button
+        v-if="task.status === 'blocked' && !multiMode"
         type="primary"
         circle
         size="small"
@@ -104,7 +116,7 @@ import type { UploadTask } from '@/composables/useUploadQueue'
 
 /** 上传队列单文件行（2026-10-06 W2 自 FileUpload.vue 列表块抽出） */
 const props = defineProps<{ task: UploadTask; multiMode?: boolean }>()
-const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string] }>()
+const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string]; resume: [id: string] }>()
 
 const { t } = useI18n()
 

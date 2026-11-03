@@ -70,6 +70,14 @@ export function chunkBackoffMs(attempt: number): number {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
 
+/**
+ * 该分片是否可跳过（断点续传判据：服务端位图含该 index 即已传）。
+ * 纯函数封装供单测/负对照锚定——判据反写必须在测试下转红。
+ */
+export function shouldSkipChunk(index: number, uploaded: ReadonlySet<number>): boolean {
+  return uploaded.has(index)
+}
+
 /** 查分片会话进度（已传分片位图）。归属：IP / 登录用户 / X-Upload-Token
  *  三选一（core 端 ownedByCaller 校验）；会话不存在/无权抛错由调用方兜底重传。 */
 export async function getChunkStatus(
@@ -140,42 +148,60 @@ export async function chunkUploadFile(
     uploaded?: Set<number>
     /** 会话令牌（init 响应头 X-Upload-Token；逐请求回传，IP 漂移后仍过归属） */
     sessionToken?: string
+    /**
+     * 续传既有会话：跳过 init 直接补缺片（2026-11-03 Phase 2，wire 实测修正）。
+     * 分片会话主键＝服务端按 file_hash 派生（空则服务端 UUID）；init 请求体里的
+     * `upload_id` 不在契约 IDL（ChunkUploadInitReq 1-11 无此字段）⇒ 会被忽略，
+     * 重 init 得到的是**另一个**新会话、旧位图作废。故续传不重 init，直接对
+     * 既有会话补缺片；会话已不存在时由上层（getChunkStatus 探测失败）改走新会话。
+     */
+    resumeSessionId?: string
+    /** 会话坐标即时回调（init 成功即回传）——中途失败后凭 uploadId/sessionToken 续传 */
+    onSession?: (s: { uploadId: string; sessionToken?: string }) => void
   }
 ): Promise<{ uploadId: string; sessionToken?: string }> {
   const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
-  const headers = opts?.sessionToken ? { 'X-Upload-Token': opts.sessionToken } : undefined
+  const headers: Record<string, string> = opts?.sessionToken ? { 'X-Upload-Token': opts.sessionToken } : {}
 
-  // 整文件哈希（2026-10-06 W2 补）：core v0.11+ 加固将 file_hash 置 required（此前不发送必 400），
-  // 且服务端以 file_hash 作为分片会话主键、据此做跨会话秒传检索。multi-chunk 批量场景下秒传命中
-  // （is_quick_upload）无法经 multi-bind 合并（entry 无 share_code 形态），故发送空串→服务端
-  // 生成 UUID 会话，保持“批量始终真实上传”的既有行为；单文件大文件的秒传由 presign 通道负责。
-  //
-  // init 幂等重入＝复活会话（core ReviveSession：同 upload_id + 归属通过 ⇒ 保留已传分片）——
-  // 断点续传靠这一点在中断后重进 init 而不丢进度。
-  const initRes = await request<ApiResponse<{ upload_id?: string }>>({
-    url: '/chunk/upload/init/',
-    method: 'POST',
-    data: {
-      file_name: file.name,
-      file_size: file.size,
-      chunk_size: chunkSize,
-      total_chunks: totalChunks,
-      upload_id: uploadId,
-      file_hash: '',
-    },
-    headers,
-    signal,
-  })
+  let sessionId: string
+  let sessionToken = opts?.sessionToken
+  if (opts?.resumeSessionId) {
+    // 断点续传：既有会话直接补缺片（见 opts.resumeSessionId 注释——重 init 另起新会话）
+    sessionId = opts.resumeSessionId
+    opts.onSession?.({ uploadId: sessionId, sessionToken })
+  } else {
+    // 整文件哈希（2026-10-06 W2 补）：core v0.11+ 加固将 file_hash 置 required（此前不发送必 400），
+    // 且服务端以 file_hash 作为分片会话主键、据此做跨会话秒传检索。multi-chunk 批量场景下秒传命中
+    // （is_quick_upload）无法经 multi-bind 合并（entry 无 share_code 形态），故发送空串→服务端
+    // 生成 UUID 会话，保持"批量始终真实上传"的既有行为；单文件大文件的秒传由 presign 通道负责。
+    const initRes = await request<ApiResponse<{ upload_id?: string }>>({
+      url: '/chunk/upload/init/',
+      method: 'POST',
+      data: {
+        file_name: file.name,
+        file_size: file.size,
+        chunk_size: chunkSize,
+        total_chunks: totalChunks,
+        upload_id: uploadId,
+        file_hash: '',
+      },
+      headers,
+      signal,
+    })
 
-  // 会话主键以服务端返回为准（file_hash 为空时服务端自生成 UUID，与客户端自报值不同）
-  const sessionId = initRes.data?.upload_id || uploadId
-  // 会话令牌：init 响应头 X-Upload-Token（由 request.ts 拦截器透传进 payload.upload_token）
-  const sessionToken = (initRes as { upload_token?: string }).upload_token || opts?.sessionToken
+    // 会话主键以服务端返回为准（file_hash 为空时服务端自生成 UUID，与客户端自报值不同）
+    sessionId = initRes.data?.upload_id || uploadId
+    // 会话令牌：init 响应头 X-Upload-Token（由 request.ts 拦截器透传进 payload.upload_token）
+    sessionToken = (initRes as { upload_token?: string }).upload_token || opts?.sessionToken
+    // 后续分片请求统一带会话令牌（IP 漂移后仍过归属校验）
+    if (sessionToken) headers['X-Upload-Token'] = sessionToken
+    opts?.onSession?.({ uploadId: sessionId, sessionToken })
+  }
 
   const uploaded = opts?.uploaded ?? new Set<number>()
   for (let index = 0; index < totalChunks; index++) {
     if (signal?.aborted) throw new Error('Cancelled')
-    if (uploaded.has(index)) {
+    if (shouldSkipChunk(index, uploaded)) {
       // 断点续传：已传分片跳过（服务端位图为准），进度按已传量起算
       onProgress?.(Math.min((index + 1) * chunkSize, file.size), file.size)
       continue

@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { buildFingerprint, chunkBackoffMs } from '@/api/multifile'
+import { buildFingerprint, chunkBackoffMs, shouldSkipChunk } from '@/api/multifile'
+
+describe('shouldSkipChunk（跳片判据：服务端位图含该 index 即已传）', () => {
+  it('位图含该 index ⇒ 跳过', () => {
+    expect(shouldSkipChunk(2, new Set([0, 2, 5]))).toBe(true)
+  })
+  it('位图不含该 index ⇒ 不跳过', () => {
+    expect(shouldSkipChunk(3, new Set([0, 2, 5]))).toBe(false)
+  })
+  it('空位图 ⇒ 全部不跳过（新会话/探测失败时全量传，绝不盲跳）', () => {
+    expect(shouldSkipChunk(0, new Set())).toBe(false)
+    expect(shouldSkipChunk(7, new Set())).toBe(false)
+  })
+})
 
 describe('buildFingerprint（续传匹配指纹）', () => {
   it('name|size|lastModified 三元组', () => {
