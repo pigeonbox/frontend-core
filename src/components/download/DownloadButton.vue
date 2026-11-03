@@ -58,6 +58,14 @@ const props = defineProps<{
   size?: 'small' | 'default' | 'large'
   headers?: Record<string, string>
   transform?: (bytes: ArrayBuffer) => Promise<ArrayBuffer>
+  /**
+   * 前置校验：返回非空字符串 ⇒ **不发起下载**，把该串当错误提示。
+   *
+   * 存在的理由：改造前取件页在 window.open 之前先校验「E2E 缺口令/缺密钥」，
+   * 避免白下一遍文件才发现解不开。改由组件发起下载后，这个校验必须保留在
+   * **发起之前**，不能塞进 transform（transform 在下载完成之后才跑）。
+   */
+  guard?: () => string | null
 }>()
 
 const emit = defineEmits<{ done: [DownloadOutcome]; error: [string] }>()
@@ -102,6 +110,13 @@ const formatDuration = (sec: number): string => {
 }
 
 const onClick = async () => {
+  // 前置校验：不合格就不发起下载（否则会把整份文件白下一遍）
+  const guardMsg = props.guard?.()
+  if (guardMsg) {
+    dl.fail(guardMsg)
+    emit('error', guardMsg)
+    return
+  }
   // ⚠️ 同步链第一句：见文件头注释
   const p = dl.run({
     url: props.url,

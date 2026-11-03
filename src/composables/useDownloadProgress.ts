@@ -88,6 +88,12 @@ export function useDownloadProgress(t: (key: string, params?: Record<string, str
     controller?.abort()
   }
 
+  /** 前置校验失败时直接落终态（不发起下载）——用于「缺口令/缺密钥」这类阻断 */
+  const fail = (message: string) => {
+    error.value = message
+    phase.value = 'done'
+  }
+
   return {
     phase: phase as Ref<DownloadUiPhase>,
     percent: percent as Ref<number>,
@@ -101,5 +107,6 @@ export function useDownloadProgress(t: (key: string, params?: Record<string, str
     run,
     cancel,
     reset,
+    fail,
   }
 }
