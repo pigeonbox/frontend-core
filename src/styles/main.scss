@@ -11,14 +11,14 @@
 }
 
 :root {
-  // 主色 / 强调色 —— 青竹(与配置中心默认 accent 一致,运行时 admin 可改,
+  // 主色 / 强调色 —— 科技蓝(与配置中心默认 accent 一致,运行时 admin 可改,
   // 见 utils/accent.ts;此处为权威默认值与首帧值,色阶公式与 accent.ts 相同)
-  --primary-color: #0e9f6e;        // 品牌青竹=图标渐变深端,与 favicon 呼应
-  --primary-hover: #39b088;        // mix(white, 0.18)
-  --primary-active: #0a6f4d;       // mix(black, 0.30)
-  --primary-bg: #e7f5f1;           // mix(white, 0.90),强调色浅底(tag/选中行/hover)
-  --primary-color-rgb: 14, 159, 110;
-  --primary-gradient: linear-gradient(135deg, #0e9f6e 0%, #0e9f6e 100%); // 兼容旧引用,实为单色
+  --primary-color: #1677ff;        // 品牌科技蓝=图标渐变深端,与 favicon 呼应
+  --primary-hover: #408fff;        // mix(white, 0.18)
+  --primary-active: #0f53b3;       // mix(black, 0.30)
+  --primary-bg: #e8f1ff;           // mix(white, 0.90),强调色浅底(tag/选中行/hover)
+  --primary-color-rgb: 22, 119, 255;
+  --primary-gradient: linear-gradient(135deg, #1677ff 0%, #1677ff 100%); // 兼容旧引用,实为单色
 
   // 仪表盘统计卡图标色调 2-4 —— **固定语义色板**(紫/青绿/琥珀),不随主色派生:
   // 语义四色构图恒定可辨(换任何主题色都不影响识别度)。历史实现是「主色色相
@@ -91,13 +91,13 @@
   // =============================================================================
   // Element Plus 全局主题覆盖 —— 所有 EP 组件自动跟随
   // =============================================================================
-  --el-color-primary: #0e9f6e;
-  --el-color-primary-light-3: #56bc9a;
-  --el-color-primary-light-5: #87cfb7;
-  --el-color-primary-light-7: #b7e2d4;
-  --el-color-primary-light-8: #cfece2;
-  --el-color-primary-light-9: #e2f3ee;
-  --el-color-primary-dark-2: #0b7f58;
+  --el-color-primary: #1677ff;
+  --el-color-primary-light-3: #5ca0ff;
+  --el-color-primary-light-5: #8bbbff;
+  --el-color-primary-light-7: #b9d6ff;
+  --el-color-primary-light-8: #d0e4ff;
+  --el-color-primary-light-9: #e3efff;
+  --el-color-primary-dark-2: #125fcc;
 
 	--el-color-success: #15803d;
 	--el-color-warning: #a16207;
@@ -139,11 +139,11 @@
 html.dark {
   // 深色主色 = 浅色主色提亮 30%(与 accent.ts 同公式);不足 #0a0a0a 底 4.5:1
   // 对比度时继续提亮到达标(灰阶主色墨黑需 42% ⇒ #79797b),保证暗色下主色可当文字色用
-  --primary-color: #56bc9a;
-  --primary-hover: #489c80;        // mix(#0a0a0a, 0.18)
-  --primary-active: #89d0b8;       // mix(white, 0.30)
-  --primary-bg: rgba(86, 188, 154, 0.14);
-  --primary-color-rgb: 86, 188, 154;
+  --primary-color: #5ca0ff;
+  --primary-hover: #4d85d3;        // mix(#0a0a0a, 0.18)
+  --primary-active: #8dbdff;       // mix(white, 0.30)
+  --primary-bg: rgba(92, 160, 255, 0.14);
+  --primary-color-rgb: 92, 160, 255;
 
   // 统计卡图标色调 2-4(固定语义色板,深色=浅色提亮档,与 accent.ts 同值)
   --stat-tone-2-color: #a78bfa;
@@ -185,13 +185,13 @@ html.dark {
   --shadow-lg: 0 24px 56px -20px rgba(0, 0, 0, 0.6);
 
   // EP 暗色覆盖(light-N 向深底混,供浅底/hover/边框用)
-  --el-color-primary: #56bc9a;
-  --el-color-primary-light-3: #3f876f;
-  --el-color-primary-light-5: #306352;
-  --el-color-primary-light-7: #213f35;
-  --el-color-primary-light-8: #192e27;
-  --el-color-primary-light-9: #131f1b;
-  --el-color-primary-dark-2: #78c9ae;
+  --el-color-primary: #5ca0ff;
+  --el-color-primary-light-3: #4373b6;
+  --el-color-primary-light-5: #335585;
+  --el-color-primary-light-7: #233754;
+  --el-color-primary-light-8: #1a283b;
+  --el-color-primary-light-9: #141c27;
+  --el-color-primary-dark-2: #7db3ff;
 
   --el-border-color: #262626;
   --el-border-color-light: #262626;
@@ -404,8 +404,8 @@ a {
 // 暗色模式 EP 适配(补充 token 无法覆盖的部分)
 // =============================================================================
 html.dark {
-  // 暗色主色是「浅色主色提亮 30%」的结果（青竹 ⇒ #56bc9a），属浅色系：
-  // 实底按钮若用白字只有 ~2.3:1（靛蓝时代同病：#8e97e0 上白字 2.5:1），
+  // 暗色主色是「浅色主色提亮 30%」的结果（科技蓝 ⇒ #5ca0ff），属浅色系：
+  // 实底按钮若用白字对比不足（靛蓝时代同病：#8e97e0 上白字 2.5:1），
   // ⇒ 改用深字（≈8:1）。EP 自带 primary 按钮由其自身变量处理，不在此列。
   .submit-btn,
   .get-btn {

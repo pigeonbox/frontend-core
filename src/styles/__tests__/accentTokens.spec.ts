@@ -72,10 +72,10 @@ const TONE_VARS = [
 ] as const
 
 describe('主题色三处一致（main.scss 预填 = accent.ts 公式 = theme-init.js 首帧）', () => {
-  it('默认主题是青竹，且注册表首项/缺省反查一致', () => {
-    expect(DEFAULT_THEME_KEY).toBe('emerald')
-    expect(DEFAULT_ACCENT).toBe('#0e9f6e')
-    expect(THEMES[0]?.key).toBe('emerald')
+  it('默认主题是科技蓝，且注册表首项/缺省反查一致', () => {
+    expect(DEFAULT_THEME_KEY).toBe('techblue')
+    expect(DEFAULT_ACCENT).toBe('#1677ff')
+    expect(THEMES[0]?.key).toBe('techblue')
     // 缺省（后端未配置 accent）时管理台高亮默认项
     expect(THEMES.map((t) => t.accent)).toContain(DEFAULT_ACCENT)
   })

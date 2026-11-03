@@ -739,6 +739,7 @@ export default {
     themes: {
       label: 'Theme Presets',
       hint: 'Picking one writes the accent color and applies it live; editing the hex value manually marks it as custom',
+      techblue: 'Tech Blue',
       indigo: 'Indigo',
       fresh: 'Fresh Blue',
       emerald: 'Emerald',

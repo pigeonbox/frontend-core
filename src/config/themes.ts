@@ -19,15 +19,16 @@ export interface ThemePreset {
 }
 
 /**
- * 默认主题（产品出厂主色）= 青竹。
+ * 默认主题（产品出厂主色）= 科技蓝。
  * 与三处保持一致：main.scss 的 --primary-* 预填值、静态图标底色
  * （scripts/gen-brand-icons.py 生成）、以及本注册表首项。
  * 后端 ui.accent_color 缺省为空 ⇒ 前端回落到 main.scss 默认值；
  * 管理台用 matchThemePreset 反查高亮，故空值也返回默认项。
  */
-export const DEFAULT_THEME_KEY = 'emerald'
+export const DEFAULT_THEME_KEY = 'techblue'
 
 export const THEMES: ThemePreset[] = [
+  { key: 'techblue', labelKey: 'admin.configPage.themes.techblue', accent: '#1677ff', swatch: '#1677ff' },
   { key: 'emerald', labelKey: 'admin.configPage.themes.emerald', accent: '#0e9f6e', swatch: '#0e9f6e' },
   { key: 'indigo', labelKey: 'admin.configPage.themes.indigo', accent: '#5e6ad2', swatch: '#5e6ad2' },
   { key: 'fresh', labelKey: 'admin.configPage.themes.fresh', accent: '#409eff', swatch: '#409eff' },
@@ -37,7 +38,7 @@ export const THEMES: ThemePreset[] = [
 ]
 
 /** 默认主色（缺省 accent 时的实际生效值，与 main.scss 一致） */
-export const DEFAULT_ACCENT = THEMES.find((t) => t.key === DEFAULT_THEME_KEY)?.accent ?? '#0e9f6e'
+export const DEFAULT_ACCENT = THEMES.find((t) => t.key === DEFAULT_THEME_KEY)?.accent ?? '#1677ff'
 
 /** 根据 accent 反查预设名（未配置=默认项；无命中=自定义） */
 export const matchThemePreset = (accent?: string): string => {

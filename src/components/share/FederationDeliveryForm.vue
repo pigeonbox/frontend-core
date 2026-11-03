@@ -96,7 +96,7 @@
     <!-- 成功：对方柜铸的取件码 + **「此码在对方柜使用」**（产品诚实性） -->
     <div v-if="result" class="fd-result">
       <div class="fd-result-head">
-        <el-icon size="20" color="#0e9f6e"><CircleCheckFilled /></el-icon>
+        <el-icon size="20" color="#1677ff"><CircleCheckFilled /></el-icon>
         <span>{{ t('home.federation.deliveredTitle') }}</span>
       </div>
 

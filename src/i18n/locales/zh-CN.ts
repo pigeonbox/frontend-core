@@ -735,6 +735,7 @@ export default {
     themes: {
       label: '主题预设',
       hint: '选择即写入主题色并热生效；手动改主题色十六进制值即自定义',
+      techblue: '科技蓝',
       indigo: '靛蓝',
       fresh: '清新蓝',
       emerald: '青竹',
