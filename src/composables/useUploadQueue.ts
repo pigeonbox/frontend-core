@@ -376,7 +376,9 @@ export function useUploadQueue(opts: {
     // E2E 也强制退出 presign（2026-11-01 core#30）：presign 通道既不收 wrapped_key
     // （init 无此字段，密钥无从交付 ⇒ 取件人永远解不开），历史实现还直传 task.file
     // 原文件（明文泄漏面）⇒ E2E 一律走 direct/multi 通道（密文 + wrapped_key）。
-    const presignAllowed = (opts.presignAllowed?.() ?? true) && !settings.e2e
+    // presign 回调未接线 ⇒ 通道不可用（矩阵 <32MB 默认 presign，缺回调会直接抛
+    // 'presign unavailable'）⇒ 视同关闭，落 direct/multi 既有分支。
+    const presignAllowed = (opts.presignAllowed?.() ?? true) && !settings.e2e && typeof opts.presign === 'function'
     let plan = pickUploadPlan({
       count: pending.length,
       totalBytes,
@@ -559,8 +561,8 @@ export function useUploadQueue(opts: {
         task.error = ''
         task.statusText = t('upload.uploading')
         const uploadId = newId()
-        // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）
-        const sessionId = await chunkUploadFile(
+        // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）+ 会话令牌
+        const { uploadId: sessionId } = await chunkUploadFile(
           task.payload,
           uploadId,
           opts.chunkSize ?? DEFAULT_CHUNK_SIZE,

@@ -80,10 +80,10 @@ describe('useUploadQueue', () => {
     expect(mocked.ElMessageSuccess).toHaveBeenCalled()
   })
 
-  it('presign 分支：走 opts.presign 且结果取 url', async () => {
-    const presign = vi.fn().mockResolvedValue({ code: 'P1', url: 'http://x/#/share/P1', file_name: 'big.bin', file_size: 200 * MB, download_url: '' })
-    const q = useUploadQueue({ settings: baseSettings(), t, presignThreshold: 1 * MB, presign })
-    q.addFiles([mkFile('big.bin', 200 * MB)])
+  it('presign 分支：走 opts.presign 且结果取 url（新矩阵：presign 仅 <32MB 快通道区间）', async () => {
+    const presign = vi.fn().mockResolvedValue({ code: 'P1', url: 'http://x/#/share/P1', file_name: 'mid.bin', file_size: 20 * MB, download_url: '' })
+    const q = useUploadQueue({ settings: baseSettings(), t, presignThreshold: 30 * MB, presign })
+    q.addFiles([mkFile('mid.bin', 20 * MB)])
     const out = await q.start()
     expect(presign).toHaveBeenCalledOnce()
     expect(out).toMatchObject({ code: 'P1', share_url: 'http://x/#/share/P1', full_share_url: 'http://x/#/share/P1' })
@@ -101,7 +101,7 @@ describe('useUploadQueue', () => {
   })
 
   it('多文件超 bodyCap → 逐文件 chunk + multiBind 一次', async () => {
-    mocked.chunkUploadFile.mockResolvedValue('uid')
+    mocked.chunkUploadFile.mockResolvedValue({ uploadId: 'uid' })
     mocked.multiBind.mockResolvedValue({ code: 'C1', url: 'http://x/#/share/C1', share_url: '', file_count: 2 })
     const q = useUploadQueue({ settings: baseSettings(), t, bodyCap: () => 6 * MB })
     q.addFiles([mkFile('a.txt', 5 * MB), mkFile('b.txt', 5 * MB)])
@@ -146,7 +146,7 @@ describe('useUploadQueue', () => {
     mocked.generateKeyB64.mockResolvedValue('k-e2e')
     mocked.wrapKey.mockReturnValue('wrapped-k')
     mocked.encryptFile.mockImplementation(async (_k: string, f: File) => f)
-    mocked.chunkUploadFile.mockResolvedValue('uid')
+    mocked.chunkUploadFile.mockResolvedValue({ uploadId: 'uid' })
     mocked.multiBind.mockResolvedValue({ code: 'C9', url: 'http://x/#/share/C9', share_url: '', file_count: 1 })
     const q = useUploadQueue({
       settings: { ...baseSettings(), e2e: true, e2e_password: 'pwd' },
@@ -307,7 +307,7 @@ describe('useUploadQueue — 单文件上限预检', () => {
   it('上限被调大后：此前 blocked 的任务在 start 时可发（start 的待发集合须含 blocked）', async () => {
     mocked.uploadFile.mockResolvedValue({ code: 'R1', url: 'http://x/#/share/R1' })
     let limit = 10 * MB
-    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => limit })
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => limit, bodyCap: () => 30 * MB })
     q.addFiles([mkFile('big.bin', 20 * MB)])
     expect(q.tasks.value[0]!.status).toBe('blocked')
     expect(q.blockedCount.value).toBe(1)
@@ -338,7 +338,7 @@ describe('useUploadQueue — 单文件上限预检', () => {
   it('blocked 的行内重试：上限已调大则恢复发送', async () => {
     mocked.uploadFile.mockResolvedValue({ code: 'R2', url: 'http://x/#/share/R2' })
     let limit = 10 * MB
-    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => limit })
+    const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => limit, bodyCap: () => 30 * MB })
     q.addFiles([mkFile('big.bin', 20 * MB)])
     const id = q.tasks.value[0]!.id
     limit = 50 * MB
@@ -407,10 +407,10 @@ describe('useUploadQueue — presign 失败回退分片中转（2026-11-03）', 
   // Mock 的宽类型（含 Constructable）与 opts.presign 函数签名不互换 ⇒ 边界处收一次
   type PresignFn = (file: File, settings: ShareSettings) => Promise<never>
   const mkPresignQueue = (presign: Mock) =>
-    useUploadQueue({ settings: baseSettings(), t, presignThreshold: 1 * MB, presign: presign as unknown as PresignFn })
+    useUploadQueue({ settings: baseSettings(), t, presignThreshold: 30 * MB, presign: presign as unknown as PresignFn })
 
   const stubChunk = () => {
-    mocked.chunkUploadFile.mockResolvedValue('uid')
+    mocked.chunkUploadFile.mockResolvedValue({ uploadId: 'uid' })
     mocked.multiBind.mockResolvedValue({ code: 'C2', url: 'http://x/#/share/C2', share_url: '', file_count: 1 })
   }
 
@@ -418,7 +418,7 @@ describe('useUploadQueue — presign 失败回退分片中转（2026-11-03）', 
     stubChunk()
     const presign = vi.fn().mockRejectedValue(Object.assign(new Error('Network error'), { code: 0 }))
     const q = mkPresignQueue(presign)
-    q.addFiles([mkFile('big.bin', 200 * MB)])
+    q.addFiles([mkFile('mid.bin', 20 * MB)])
     const out = await q.start()
     expect(presign).toHaveBeenCalledOnce()
     expect(mocked.chunkUploadFile).toHaveBeenCalledOnce()
@@ -431,7 +431,7 @@ describe('useUploadQueue — presign 失败回退分片中转（2026-11-03）', 
     stubChunk()
     const presign = vi.fn().mockRejectedValue(Object.assign(new Error('disabled'), { code: 10015 }))
     const q = mkPresignQueue(presign)
-    q.addFiles([mkFile('big.bin', 200 * MB)])
+    q.addFiles([mkFile('mid.bin', 20 * MB)])
     const out = await q.start()
     expect(mocked.multiBind).toHaveBeenCalledOnce()
     expect(out).toMatchObject({ code: 'C2' })
@@ -441,7 +441,7 @@ describe('useUploadQueue — presign 失败回退分片中转（2026-11-03）', 
     stubChunk()
     const presign = vi.fn().mockRejectedValue(Object.assign(new Error('bad gateway'), { response: { data: { code: 502 } } }))
     const q = mkPresignQueue(presign)
-    q.addFiles([mkFile('big.bin', 200 * MB)])
+    q.addFiles([mkFile('mid.bin', 20 * MB)])
     const out = await q.start()
     expect(mocked.multiBind).toHaveBeenCalledOnce()
     expect(out).toMatchObject({ code: 'C2' })
@@ -451,7 +451,7 @@ describe('useUploadQueue — presign 失败回退分片中转（2026-11-03）', 
     stubChunk()
     const presign = vi.fn().mockRejectedValue(Object.assign(new Error('quota exceeded'), { code: 30002 }))
     const q = mkPresignQueue(presign)
-    q.addFiles([mkFile('big.bin', 200 * MB)])
+    q.addFiles([mkFile('mid.bin', 20 * MB)])
     const out = await q.start()
     expect(out).toBeNull()
     expect(q.tasks.value[0]!.status).toBe('error')
@@ -463,7 +463,7 @@ describe('useUploadQueue — presign 失败回退分片中转（2026-11-03）', 
     stubChunk()
     const presign = vi.fn().mockRejectedValue(Object.assign(new Error('Cancelled'), { code: -1 }))
     const q = mkPresignQueue(presign)
-    q.addFiles([mkFile('big.bin', 200 * MB)])
+    q.addFiles([mkFile('mid.bin', 20 * MB)])
     const out = await q.start()
     expect(out).toBeNull()
     expect(mocked.chunkUploadFile).not.toHaveBeenCalled()

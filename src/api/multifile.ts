@@ -55,6 +55,47 @@ export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entr
 
 export const isOkCode = (code?: number) => code === 0 || code === 200
 
+/** 续传匹配指纹（name|size|lastModified）。浏览器 File 不持久化，刷新后靠
+ *  用户重新选文件 + 指纹匹配接管会话；三元组全同才认，防错续到别的文件。 */
+export function buildFingerprint(f: { name: string; size: number; lastModified: number }): string {
+  return `${f.name}|${f.size}|${f.lastModified}`
+}
+
+/** 分片级指数退避 1s/2s/4s/8s（设计稿 Phase 2 口径，重试预算 4 次）；
+ *  超限抛错由上层报错/降级，不无限退避。 */
+export function chunkBackoffMs(attempt: number): number {
+  if (attempt < 0 || attempt > 3) throw new Error(`chunk retry budget exceeded: attempt ${attempt}`)
+  return 1000 * 2 ** attempt
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** 查分片会话进度（已传分片位图）。归属：IP / 登录用户 / X-Upload-Token
+ *  三选一（core 端 ownedByCaller 校验）；会话不存在/无权抛错由调用方兜底重传。 */
+export async function getChunkStatus(
+  uploadId: string,
+  sessionToken?: string
+): Promise<{ uploadId: string; totalChunks: number; uploadedIndexes: number[]; status: string }> {
+  const res = await request<ApiResponse<{
+    upload_id: string
+    total_chunks: number
+    uploaded_indexes: number[]
+    status: string
+  }>>({
+    url: `/chunk/upload/status/${uploadId}`,
+    method: 'GET',
+    headers: sessionToken ? { 'X-Upload-Token': sessionToken } : undefined,
+  })
+  const d = res.data
+  if (!d) throw new Error(res.message || 'chunk status failed')
+  return {
+    uploadId: d.upload_id,
+    totalChunks: d.total_chunks,
+    uploadedIndexes: d.uploaded_indexes ?? [],
+    status: d.status,
+  }
+}
+
 /** 多文件直传（multipart，字段名 files；总体积需 ≤ 后端单请求体上限） */
 export async function multiDirect(
   files: File[],
@@ -93,14 +134,24 @@ export async function chunkUploadFile(
   uploadId: string,
   chunkSize: number,
   onProgress?: (loaded: number, total: number) => void,
-  signal?: AbortSignal
-): Promise<string> {
+  signal?: AbortSignal,
+  opts?: {
+    /** 已传分片（断点续传跳片；缺省=全传） */
+    uploaded?: Set<number>
+    /** 会话令牌（init 响应头 X-Upload-Token；逐请求回传，IP 漂移后仍过归属） */
+    sessionToken?: string
+  }
+): Promise<{ uploadId: string; sessionToken?: string }> {
   const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
+  const headers = opts?.sessionToken ? { 'X-Upload-Token': opts.sessionToken } : undefined
 
   // 整文件哈希（2026-10-06 W2 补）：core v0.11+ 加固将 file_hash 置 required（此前不发送必 400），
   // 且服务端以 file_hash 作为分片会话主键、据此做跨会话秒传检索。multi-chunk 批量场景下秒传命中
   // （is_quick_upload）无法经 multi-bind 合并（entry 无 share_code 形态），故发送空串→服务端
   // 生成 UUID 会话，保持“批量始终真实上传”的既有行为；单文件大文件的秒传由 presign 通道负责。
+  //
+  // init 幂等重入＝复活会话（core ReviveSession：同 upload_id + 归属通过 ⇒ 保留已传分片）——
+  // 断点续传靠这一点在中断后重进 init 而不丢进度。
   const initRes = await request<ApiResponse<{ upload_id?: string }>>({
     url: '/chunk/upload/init/',
     method: 'POST',
@@ -112,14 +163,23 @@ export async function chunkUploadFile(
       upload_id: uploadId,
       file_hash: '',
     },
+    headers,
     signal,
   })
 
   // 会话主键以服务端返回为准（file_hash 为空时服务端自生成 UUID，与客户端自报值不同）
   const sessionId = initRes.data?.upload_id || uploadId
+  // 会话令牌：init 响应头 X-Upload-Token（由 request.ts 拦截器透传进 payload.upload_token）
+  const sessionToken = (initRes as { upload_token?: string }).upload_token || opts?.sessionToken
 
+  const uploaded = opts?.uploaded ?? new Set<number>()
   for (let index = 0; index < totalChunks; index++) {
     if (signal?.aborted) throw new Error('Cancelled')
+    if (uploaded.has(index)) {
+      // 断点续传：已传分片跳过（服务端位图为准），进度按已传量起算
+      onProgress?.(Math.min((index + 1) * chunkSize, file.size), file.size)
+      continue
+    }
     const start = index * chunkSize
     const blob = file.slice(start, Math.min(start + chunkSize, file.size))
     const form = new FormData()
@@ -128,10 +188,10 @@ export async function chunkUploadFile(
     // 客户端重传该分片即可；非安全上下文(无 crypto.subtle)自动降级为不携带。
     const hash = await sha256Hex(blob)
     if (hash) form.append('hash', hash)
-    await uploadChunkWithRetry(sessionId, index, form, signal)
+    await uploadChunkWithRetry(sessionId, index, form, signal, headers)
     onProgress?.(Math.min(start + blob.size, file.size), file.size)
   }
-  return sessionId
+  return { uploadId: sessionId, sessionToken }
 }
 
 /** 逐片 SHA-256；非安全上下文(subtle 不可用)返回 null */
@@ -143,13 +203,17 @@ async function sha256Hex(blob: Blob): Promise<string | null> {
     .join('')
 }
 
-/** 上传单片；422（服务端哈希校验失败）时重传，最多 2 次 */
+/**
+ * 上传单片；可重试类失败（422/20009 哈希校验、code=0 网络类、5xx 服务端）走指数退避
+ * 1/2/4/8s 重传（chunkBackoffMs，上限 4 次退避=共 5 次尝试），超限抛错由上层报错。
+ */
 async function uploadChunkWithRetry(
   uploadId: string,
   index: number,
   form: FormData,
   signal?: AbortSignal,
-  maxRetries = 2
+  headers?: Record<string, string>,
+  maxRetries = 4
 ): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -159,12 +223,15 @@ async function uploadChunkWithRetry(
         data: form,
         timeout: 300000,
         signal,
+        headers,
       })
       return
     } catch (e) {
       const code = (e as { code?: number })?.code
-      if ((code === 422 || code === 20009) && attempt < maxRetries) continue
-      throw e
+      const retriable =
+        code === 422 || code === 20009 || code === 0 || (code !== undefined && code >= 500 && code < 600)
+      if (!retriable || attempt >= maxRetries) throw e
+      await sleep(chunkBackoffMs(attempt))
     }
   }
 }
