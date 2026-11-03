@@ -2,7 +2,9 @@
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.e2e.tsbuildinfo",
     "target": "ES2023",
-    "lib": ["ES2023"],
+    /* DOM：page.evaluate 的回调序列化到浏览器里执行，用到 DataTransfer/
+       DragEvent/document 等浏览器全局 —— 没有 DOM lib 时这些名字编译报 TS2304 */
+    "lib": ["ES2023", "DOM"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": ["node"],
