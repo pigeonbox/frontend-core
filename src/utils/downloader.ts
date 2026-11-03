@@ -76,6 +76,11 @@ export interface DownloaderEnv {
   saveBlob: (blob: Blob, filename: string) => void
   /** 降级：交给浏览器原生下载 */
   nativeDownload: (url: string, filename: string) => void
+  /**
+   * 内存档体积上限（字节），默认 MEMORY_SINK_LIMIT。
+   * 做成可注入是为了让「超限降级」这条路径**不必分配几十 MB 内存**就能测。
+   */
+  memoryLimit?: number
 }
 
 /** 内存档体积上限（字节）：超过即降级 native */
@@ -141,4 +146,229 @@ export function pickSink(hasFsApi: boolean, total: number, limit: number = MEMOR
 export function resolveDownloadUrl(url: string): string {
   if (/^https?:\/\//i.test(url)) return url
   return withBase(url)
+}
+
+/** 进度回报节流（毫秒）：避免大文件每 chunk 都触发 Vue 更新 */
+const REPORT_THROTTLE_MS = 80
+
+/** 默认 env：只在浏览器里才碰 DOM（node 环境测试全部走注入） */
+function defaultEnv(): DownloaderEnv {
+  const w = globalThis as unknown as {
+    showSaveFilePicker?: (opts?: { suggestedName?: string }) => Promise<{
+      createWritable(): Promise<FsWritable>
+      remove(): Promise<void>
+    }>
+  }
+  return {
+    fetchImpl: (...args: Parameters<typeof fetch>) => fetch(...args),
+    hasFsApi: typeof w.showSaveFilePicker === 'function',
+    pickTarget: async (suggestedName: string) => {
+      if (!w.showSaveFilePicker) return null
+      const handle = await w.showSaveFilePicker({ suggestedName })
+      const writable = await handle.createWritable()
+      return { writable, remove: () => handle.remove() }
+    },
+    saveBlob: (blob: Blob, filename: string) => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    },
+    nativeDownload: (url: string, filename: string) => {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    },
+  }
+}
+
+const isAbortLike = (e: unknown): boolean =>
+  e instanceof Error && (e.name === 'AbortError' || e.message === 'Cancelled' || e.message === 'Aborted')
+
+/**
+ * 统一下载入口。
+ *
+ * 次序（不可调换）：先取保存目标（用户手势同步链内）→ 再发请求 → 选档位 → 流式读取。
+ */
+export async function download(req: DownloadRequest, env?: Partial<DownloaderEnv>): Promise<DownloadOutcome> {
+  const e: DownloaderEnv = { ...defaultEnv(), ...env }
+  const url = resolveDownloadUrl(req.url)
+  const startedAt = Date.now()
+
+  let loaded = 0
+  let total = 0
+  let phase: DownloadPhase = 'preparing'
+  let lastReportAt = 0
+
+  const report = (force = false) => {
+    const now = Date.now()
+    if (!force && now - lastReportAt < REPORT_THROTTLE_MS) return
+    lastReportAt = now
+    const p = computeProgress(loaded, total, startedAt, now)
+    req.onProgress?.({
+      loaded,
+      total,
+      phase,
+      percent: p.percent,
+      bytesPerSecond: p.bytesPerSecond,
+      etaSeconds: p.etaSeconds,
+    })
+  }
+
+  // ① fs 档：保存目标必须在用户手势的同步链内取（transient activation）
+  let target: FsTarget | null = null
+  if (e.hasFsApi && e.pickTarget) {
+    try {
+      target = await e.pickTarget(req.filename)
+    } catch (err) {
+      if (isAbortLike(err)) throw new DownloadCancelledError()
+      throw err
+    }
+    if (!target) throw new DownloadCancelledError()
+  }
+
+  const cleanupFs = async () => {
+    if (!target) return
+    try {
+      await target.writable.abort?.()
+    } catch {
+      // ignore
+    }
+    try {
+      await target.remove()
+    } catch {
+      // ignore
+    }
+    target = null
+  }
+
+  // ② 发请求
+  let resp: Response
+  try {
+    resp = await e.fetchImpl(url, {
+      method: 'GET',
+      headers: req.headers,
+      signal: req.signal,
+      credentials: 'same-origin',
+    })
+  } catch (err) {
+    if (isAbortLike(err) || req.signal?.aborted) {
+      await cleanupFs()
+      throw new DownloadCancelledError()
+    }
+    // 降级：网络失败 / 跨域 CORS 未开 ⇒ 交回浏览器原生下载
+    await cleanupFs()
+    phase = 'handed-off'
+    report(true)
+    e.nativeDownload(url, req.filename)
+    return { sink: 'native', bytes: 0, handedOff: true }
+  }
+
+  if (!resp.ok) {
+    await cleanupFs()
+    const err = new Error(`HTTP ${resp.status}`) as Error & { code: number }
+    err.code = resp.status
+    throw err
+  }
+
+  const contentLength = Number(resp.headers.get('Content-Length') || '') || 0
+  total = contentLength
+  const serverName = parseContentDispositionFilename(resp.headers.get('Content-Disposition'))
+  const finalName = serverName || req.filename
+
+  const sink: DownloadSink = target ? 'fs' : pickSink(false, total, e.memoryLimit ?? MEMORY_SINK_LIMIT)
+
+  // 体积已知超限（且无文件系统 API）⇒ 立刻交回浏览器原生下载：
+  // 不占用本页内存，也不必在本页把同一份数据再下一遍。
+  if (sink === 'native') {
+    phase = 'handed-off'
+    report(true)
+    e.nativeDownload(url, req.filename)
+    return { sink: 'native', bytes: 0, handedOff: true }
+  }
+
+  // ③ 流式读取
+  const chunks: Uint8Array[] = []
+  let accumulated = 0
+  phase = 'downloading'
+  report(true)
+
+  const reader = resp.body?.getReader()
+  if (!reader) {
+    // 无流式 body 的环境：退回一次性读（仍有 %，只是不增量）
+    const buf = await resp.arrayBuffer()
+    loaded = buf.byteLength
+    total = total || loaded
+    chunks.push(new Uint8Array(buf))
+    accumulated = loaded
+    report(true)
+  } else {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (!value) continue
+        loaded += value.byteLength
+        if (sink === 'fs') {
+          await target!.writable.write(value)
+        } else {
+          chunks.push(value)
+          accumulated += value.byteLength
+          if (sink === 'blob' && accumulated > (e.memoryLimit ?? MEMORY_SINK_LIMIT)) {
+            // 内存档撑不住 ⇒ 丢弃缓冲、降级原生（不落半截文件）
+            await reader.cancel().catch(() => {})
+            phase = 'handed-off'
+            report(true)
+            e.nativeDownload(url, req.filename)
+            return { sink: 'native', bytes: loaded, handedOff: true }
+          }
+        }
+        report()
+      }
+    } catch (err) {
+      await cleanupFs()
+      if (isAbortLike(err) || req.signal?.aborted) throw new DownloadCancelledError()
+      throw err
+    }
+  }
+
+  // ④ 落地
+  if (sink === 'fs') {
+    phase = 'saving'
+    report(true)
+    await target!.writable.close()
+    target = null
+  } else {
+    const merged = new Uint8Array(accumulated)
+    let offset = 0
+    for (const c of chunks) {
+      merged.set(c, offset)
+      offset += c.byteLength
+    }
+    const buf = merged.buffer
+    if (req.transform) {
+      phase = 'transforming'
+      report(true)
+      const out = await req.transform(buf)
+      phase = 'saving'
+      report(true)
+      e.saveBlob(new Blob([out]), finalName)
+    } else {
+      phase = 'saving'
+      report(true)
+      e.saveBlob(new Blob([buf]), finalName)
+    }
+  }
+
+  phase = 'done'
+  report(true)
+  return { sink, bytes: loaded, handedOff: false }
 }
