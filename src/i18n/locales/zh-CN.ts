@@ -878,7 +878,8 @@ export default {
       download: {
         s3Direct: 'S3 直下（302）',
         s3DirectHint: 'S3 后端时下载 302 到预签名 URL，流量不过服务器',
-        timeout: '下载超时（秒）',
+        timeout: '下载停滞超时（秒）',
+        timeoutHint: '传输中连续该秒数无任何字节流动即中断下载，回收挂死连接（存储卡死、客户端消失）',
         requireLogin: '取件需登录',
         codeFold: '查询不区分大小写',
         codeFoldHint: '取件码/分享码/自定义口令查询折叠大小写（口播、手抄更友好）；6 位取件码天然不区分',

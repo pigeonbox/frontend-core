@@ -211,6 +211,7 @@
             </el-form-item>
             <el-form-item :label="t('admin.configPage.download.timeout')">
               <el-input-number v-model="exForm.download.download_timeout" :min="30" :max="3600" />
+              <span class="field-hint">{{ t('admin.configPage.download.timeoutHint') }}</span>
             </el-form-item>
             <el-form-item :label="t('admin.configPage.download.requireLogin')">
               <el-switch v-model="exForm.download.require_login" />
