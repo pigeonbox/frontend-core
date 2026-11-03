@@ -27,6 +27,12 @@ import {
   deriveKek,
 } from '../e2e'
 
+// PBKDF2-HMAC-SHA256 × 210000 迭代是确定性 CPU 重活（wrapKey/unwrapKey 每次调用
+// 两趟派生）：全量并行时多 worker 挤兑下单条可超 vitest 默认 5s ⇒ 偶发 timeout 假红
+// （2026-11-03 实录：57 文件并行下 e2e 两 spec 随机 1~7 条转红，单跑恒绿）。
+// 断言不动，只给本文件的用例钉 30s 超时。
+vi.setConfig({ testTimeout: 30000 })
+
 const hex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('')
 
 afterEach(() => {
