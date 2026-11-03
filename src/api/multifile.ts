@@ -28,6 +28,13 @@ import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
   expire_value: number
   expire_style: string
+  /**
+   * 契约里 `require_auth` 是可选的，但**前端恒发布尔**（`settings.require_auth` 必填）
+   * ⇒ 这里收窄为必填布尔：既是 wire 事实（契约必填，false 也必须显式发送），
+   * 也让「秒传探测 chunkQuickProbe」等要求 `require_auth: boolean` 的调用点
+   * 免于在每个调用点各写一遍 `?? false` 兜底。
+   */
+  require_auth: boolean
 }
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */

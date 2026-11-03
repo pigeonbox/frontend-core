@@ -313,7 +313,7 @@ describe('useUploadQueue — multi-direct 批次总进度（2026-11-03）', () =
   })
 
   it('multi-chunk 通道：逐文件串行上传 ⇒ 行内百分比仍可信', async () => {
-    mocked.chunkUploadFile.mockResolvedValue('uid')
+    mocked.chunkUploadFile.mockResolvedValue({ uploadId: 'uid' })
     mocked.multiBind.mockResolvedValue({ code: 'C3', url: 'http://x/#/share/C3', share_url: '', file_count: 2 })
     const q = useUploadQueue({ settings: baseSettings(), t, bodyCap: () => 1 * MB })
     q.addFiles([mkFile('a.bin', 5 * MB), mkFile('b.bin', 5 * MB)])

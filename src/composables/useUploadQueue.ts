@@ -752,9 +752,15 @@ export function useUploadQueue(opts: {
           // 首跑：st 有活会话 ⇒ 跳 init 直接补缺片（Task 4 续传语义）；
           // 赛跑中断后的恢复跑：沿用首跑刚建/续的会话坐标 + 即时位图
           const startRun = (resume: boolean) => {
+            // multiAbort 是外层可变变量 ⇒ tsc 无法在闭包里保持「已收窄为非空」的
+            // 推断（TS18047）。这里取调用时刻的**快照**并显式守卫：
+            // 被 abortAll() 置空后再进 ⇒ 抛 'Cancelled'（外层 catch 收敛为
+            // interrupted，可续传），而不是读 null.signal 抛 TypeError。
+            const ctrl = multiAbort
+            if (!ctrl) throw new Error('Cancelled')
             const resumeId = resume ? firstSession.uploadId : st?.uploadId
             const token = resume ? firstSession.sessionToken : prevToken
-            return chunkUploadFile(task.payload, newId(), chunkSize, onChunkProgress, multiAbort.signal, {
+            return chunkUploadFile(task.payload, newId(), chunkSize, onChunkProgress, ctrl.signal, {
               uploaded: resume ? uploadedNow : uploaded,
               sessionToken: token,
               ...(resumeId ? { resumeSessionId: resumeId } : {}),
@@ -818,8 +824,11 @@ export function useUploadQueue(opts: {
             }
           }
 
-          // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）+ 会话令牌
-          const { uploadId: sessionId, sessionToken } = await run
+          // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）
+          // 会话令牌**不**从返回值取：init 成功时已由 onSession 写穿任务记录
+          // （续传坐标 uploadId/sessionToken 都落在 store 里），此处解构出来只会
+          // 变成未读变量（TS6133）。
+          const { uploadId: sessionId } = await run
           // 绑定阶段提示（分片已传完、等待服务端合并）
           task.status = 'binding'
           task.progress = 100
