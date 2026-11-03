@@ -224,6 +224,9 @@ export async function download(req: DownloadRequest, env?: Partial<DownloaderEnv
   }
 
   // ① fs 档：保存目标必须在用户手势的同步链内取（transient activation）
+  //    先报一次 preparing：保存对话框可能停留很久，UI 需要有「准备中」的反馈
+  report(true)
+
   let target: FsTarget | null = null
   if (e.hasFsApi && e.pickTarget) {
     try {
