@@ -70,7 +70,8 @@ import {
 } from '@element-plus/icons-vue'
 import { presignApi, type PresignCompleteData } from '@/api/presign'
 import { anonymousApi } from '@/api/anonymous'
-import { xhrRaw } from '@/api/_xhr'
+import { xhrRaw, uploadTimeoutForSize } from '@/api/_xhr'
+import { classifyUploadFailure } from '@/utils/uploadFailure'
 
 /**
  * 预签名直传对话框（2026-10-06 W2 Promise 化：调用方 `ref.open(file, options)` 拿
@@ -217,6 +218,8 @@ const doUpload = async (retryCount = 0) => {
     currentToken = initData.token
 
     // 2. PUT 直传（xhrRaw：进度 + 中断 + 自定义签发头；进度封顶 95% 留给 complete）
+    // 超时按**文件大小**给预算（2026-11-03）：原先固定 300s 与体积无关，
+    // 而实测家宽上行 ~0.86MB/s ⇒ 1.35GB 需 ~26 分钟 ⇒ 300s 必掐断。
     statusText.value = t('upload_view.presign.upload')
     putAbort = new AbortController()
     await xhrRaw({
@@ -227,6 +230,7 @@ const doUpload = async (retryCount = 0) => {
         ...(f.type ? { 'Content-Type': f.type } : {}),
       },
       body: f,
+      timeout: uploadTimeoutForSize(f.size),
       signal: putAbort.signal,
       onProgress: (loaded, total) => {
         progress.value = Math.round((loaded / total) * 95)
@@ -263,7 +267,13 @@ const doUpload = async (retryCount = 0) => {
       return
     }
     failed.value = true
-    errorMessage.value = msg
+    // 失败分类（2026-11-03）：旧实现只显示「上传失败」，用户无法判断是网慢、
+    // 被浏览器/代理拦截，还是配额/体积被拒 ⇒ 只能盲目重试。
+    // 现在按错误码 + 消息分类，给出**可据此行动**的文案。
+    errorMessage.value = t(`upload_view.failure.${classifyUploadFailure(
+      (e as { code?: number })?.code,
+      msg
+    )}`)
     statusText.value = t('upload_view.presign.failed')
     fail(e)
   }

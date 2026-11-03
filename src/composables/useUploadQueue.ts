@@ -1,6 +1,6 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { pickUploadPlan } from '@/composables/useUploadPlan'
+import { pickUploadPlan, isPresignFallbackEligible } from '@/composables/useUploadPlan'
 import { uploadFile } from '@/api/share'
 import { multiDirect, chunkUploadFile, multiBind, type MultiShareOptions, type MultiShareResult } from '@/api/multifile'
 import type { PresignCompleteData } from '@/api/presign'
@@ -410,9 +410,18 @@ export function useUploadQueue(opts: {
           r = await opts.presign?.(task.file, settings)
           if (!r) throw new Error('presign unavailable')
         } catch (e) {
-          // 匿名直传被管理开关关闭(10015)：静默回退分片中转（大文件仍可传）
-          if ((e as { code?: number }).code === 10015
-            || (e as { response?: { data?: { code?: number } } })?.response?.data?.code === 10015) {
+          // presign 直传失败 ⇒ **传输层失败可回退分片中转**（2026-11-03）。
+          //
+          // 原实现只在 10015（匿名直传被管理开关关闭）时回退，其余一律抛错
+          // ⇒ 大文件（>100MB 走 presign）一旦 PUT 超时/连接被拒就**零退路**。
+          // 实测家宽上行仅 ~0.86MB/s ⇒ 1.35GB 文件必然撞 300s 超时。
+          // 分片通道（5MB/片 POST multipart）对任意体积都可用 ⇒ 传输层失败应回退。
+          //
+          // 业务码（配额/体积/类型/权限）**不回退**：换通道同样会被拒，
+          // 白白重传一遍大文件。详见 isPresignFallbackEligible。
+          const errCode = (e as { code?: number })?.code
+            ?? (e as { response?: { data?: { code?: number } } })?.response?.data?.code
+          if (isPresignFallbackEligible(errCode)) {
             ElMessage.info(t('upload.presignFallback'))
             plan = 'multi-chunk'
           } else {

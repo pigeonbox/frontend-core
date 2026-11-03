@@ -33,3 +33,39 @@ export function pickUploadPlan(input: UploadPlanInput): UploadChannel {
   if (totalBytes <= bodyCap && maxFileBytes <= bodyCap) return 'multi-direct'
   return 'multi-chunk'
 }
+
+/**
+ * presign 直传失败后**能否回退分片中转**（2026-11-03）。
+ *
+ * 背景：原实现只在错误码 10015（匿名直传被管理开关关闭）时回退，
+ * **任何传输层失败（超时 / 连接被拒 / 5xx）都直接抛错** ⇒ 大文件一旦
+ * presign PUT 失败就零退路（实测家宽上行 ~0.86MB/s，1.35GB 必撞 300s 超时）。
+ * 而分片通道（5MB/片 POST multipart）对任意体积都可用 ⇒ 传输层失败应回退。
+ *
+ * 判定口径：**只对传输层失败回退**，业务失败不回退（回退必然同样失败，
+ * 白白重传一遍大文件）：
+ *  - 回退（可换通道重试）：
+ *    · code 10015 —— 匿名直传被管理开关关闭（**原行为，保留**）
+ *    · code 0 —— 网络层错误（连接被拒/DNS/CORS 拦截，request.ts 归一为 0）
+ *    · code -1 —— 取消（用户主动取消，**不回退**：那是用户意图）
+ *    · HTTP 5xx —— 服务端临时故障，换通道可能成功
+ *    · 超时 —— xhrRaw 的 'Timeout'（request.ts 归一为 code 0，已被上条覆盖）
+ *  - 不回退（业务判定，重试无意义）：
+ *    · 4xx 业务码（配额超限 10004/文件过大 30008/类型禁止/权限不足 等）
+ *    · 10003 用户注册已关闭、10015 以外的 1xxxx 业务码
+ *
+ * @param code 归一化后的错误码（0=网络错误；-1=取消；HTTP 状态；业务码）
+ */
+export function isPresignFallbackEligible(code: number | undefined): boolean {
+  if (code === undefined) return false
+  // 取消是用户意图，不静默换通道重传
+  if (code === -1) return false
+  // 网络层错误（request.ts 把无响应归一为 0；xhrRaw 的 onerror/onTimeout 亦为 0）
+  if (code === 0) return true
+  // 匿名直传被管理开关关闭（原回退条件）
+  if (code === 10015) return true
+  // 服务端临时故障（5xx）：换通道可能成功
+  if (code >= 500 && code < 600) return true
+  // 其余（4xx 业务码、1xxxx 业务码）一律不回退
+  return false
+}
