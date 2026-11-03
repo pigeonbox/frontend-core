@@ -119,6 +119,7 @@
             </div>
             <el-progress
               :percentage="quotaPercentage"
+              :format="quotaFormat"
               :stroke-width="12"
               :status="quotaPercentage >= 90 ? 'exception' : ''"
               class="quota-progress"
@@ -289,6 +290,11 @@ const quotaPercentage = computed(() => {
   if (!userStats.value?.quota_limit) return 0
   return (userStats.value.total_size / userStats.value.quota_limit) * 100
 })
+
+// el-progress 内置文案默认原样拼 percentage ⇒ 12.640272760763766% 这种
+// 原始浮点直接露给用户（2026-11-03 截图实证）；统一收口到与下方文案同款
+// 的一位小数口径。
+const quotaFormat = (p: number) => `${p.toFixed(1)}%`
 
 const greeting = computed(() => {
   const h = new Date().getHours()
