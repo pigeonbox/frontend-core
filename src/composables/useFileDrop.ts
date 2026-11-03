@@ -12,6 +12,19 @@ import { useI18n } from 'vue-i18n'
  *  - blur（拖拽中 alt-tab/切窗）撤遮罩兜底
  *  - paste 收集 kind==='file' 项，命中时 preventDefault + toast（W3 起 i18n 化）
  *
+ * 2026-11-03 两处卡死形态收口（实证：拖一个文件到页面，遮罩永不熄灭）：
+ *  1. **drop 被子元素 stopPropagation 吞掉**——element-plus upload-dragger 的
+ *     onDrop 第一件事就是 `e.stopPropagation()`，文件释放在「将文件拖到此处」
+ *     拖拽框上（最自然落点）时，冒泡到 window 的 drop 永远不执行 ⇒ 遮罩卡死。
+ *     修法：**撤遮罩的 drop 监听挂捕获阶段**——捕获先于任何子元素的
+ *     stopPropagation，谁也吞不掉；「接收文件」仍留冒泡阶段：被吞掉的 drop
+ *     恰是子组件（el-upload on-change）已自行接走文件的场景 ⇒ 不会双计入队。
+ *  2. **拖拽静默结束**——Esc 取消、拖出窗口后在别处释放、原生层（桌面客户端
+ *     webview 的 dragDropEnabled）接管 drop 等，drop/dragleave/blur 三条熄灭
+ *     路径一条都不会来。修法：**dragover 心跳看门狗**——拖拽期间浏览器会
+ *     周期性重发 dragover（HTML 规范约每 350ms），超过约 900ms 无心跳即判
+ *     拖拽已结束，无条件下熄灭遮罩。
+ *
  * 事件接线抽为 createFileDropState（attach/detach 显式传 target），既供本
  * composable 挂 window，也供单测在 node 环境对纯 EventTarget 派发事件验证。
  */
@@ -21,27 +34,62 @@ export interface FileDropState {
   detach: (target: EventTarget) => void
 }
 
+// 看门狗：dragover 心跳缺席多少个 tick（300ms/tick）判拖拽已静默结束。
+// 规范心跳约 350ms ⇒ 3 tick（≈900ms）远大于单次心跳间隔，又远小于「遮罩
+// 卡死」的体感；负对照（心跳持续不误熄）见单测。
+const WATCHDOG_TICK_MS = 300
+const STALE_TICKS = 3
+
 export function createFileDropState(opts: { onFiles: (files: File[] | FileList) => void }): FileDropState {
   const isDragging = ref(false)
   const { t } = useI18n()
 
+  // 拖拽心跳看门狗：dragover 重置计数，连续 STALE_TICKS 个 tick 无心跳即熄灭
+  let staleTicks = 0
+  let watchdog: ReturnType<typeof setInterval> | null = null
+
+  const clear = () => {
+    isDragging.value = false
+    staleTicks = 0
+    if (watchdog !== null) {
+      clearInterval(watchdog)
+      watchdog = null
+    }
+  }
+
+  const noteDragOver = () => {
+    staleTicks = 0
+    isDragging.value = true
+    if (watchdog === null) {
+      watchdog = setInterval(() => {
+        staleTicks += 1
+        if (staleTicks >= STALE_TICKS) clear()
+      }, WATCHDOG_TICK_MS)
+    }
+  }
+
   const onWindowDragOver = (e: DragEvent) => {
     if (e.dataTransfer?.types.includes('Files')) {
       e.preventDefault()
-      isDragging.value = true
+      noteDragOver()
     }
   }
 
   const onWindowDragLeave = (e: DragEvent) => {
     if (e.relatedTarget === null) {
-      isDragging.value = false
+      clear()
     }
+  }
+
+  // 捕获阶段只撤遮罩、不接收文件（原因见文件头 2026-11-03 条目）
+  const onDropCapture = () => {
+    clear()
   }
 
   const onWindowDrop = (e: DragEvent) => {
     // 撤遮罩无条件前置：任何形态的 drop（含空 files）都必须熄灭高亮，
     // 否则遮罩卡死全页（2026-10-16 守卫修复）
-    isDragging.value = false
+    clear()
     if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
       e.preventDefault()
       opts.onFiles(e.dataTransfer.files)
@@ -49,7 +97,7 @@ export function createFileDropState(opts: { onFiles: (files: File[] | FileList) 
   }
 
   const onWindowBlur = () => {
-    isDragging.value = false
+    clear()
   }
 
   const onWindowPaste = (e: ClipboardEvent) => {
@@ -71,19 +119,22 @@ export function createFileDropState(opts: { onFiles: (files: File[] | FileList) 
     }
   }
 
-  const listeners: Array<[string, EventListener]> = [
-    ['dragover', onWindowDragOver as EventListener],
-    ['dragleave', onWindowDragLeave as EventListener],
-    ['drop', onWindowDrop as EventListener],
-    ['blur', onWindowBlur],
-    ['paste', onWindowPaste as EventListener],
+  const listeners: Array<[string, EventListener, boolean]> = [
+    ['dragover', onWindowDragOver as EventListener, false],
+    ['dragleave', onWindowDragLeave as EventListener, false],
+    // drop 双注册：捕获撤遮罩（吞不掉）在前，冒泡接收文件（不与子组件双计）在后
+    ['drop', onDropCapture, true],
+    ['drop', onWindowDrop as EventListener, false],
+    ['blur', onWindowBlur, false],
+    ['paste', onWindowPaste as EventListener, false],
   ]
 
   const attach = (target: EventTarget) => {
-    for (const [type, fn] of listeners) target.addEventListener(type, fn)
+    for (const [type, fn, capture] of listeners) target.addEventListener(type, fn, capture)
   }
   const detach = (target: EventTarget) => {
-    for (const [type, fn] of listeners) target.removeEventListener(type, fn)
+    clear()
+    for (const [type, fn, capture] of listeners) target.removeEventListener(type, fn, capture)
   }
 
   return { isDragging, attach, detach }
