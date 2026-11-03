@@ -16,7 +16,7 @@
     "@element-plus/icons-vue": "^2.3.2",
     "@noble/ciphers": "^2.4.0",
     "@noble/hashes": "^2.4.0",
-    "@pigeonbox/contracts": "https://github.com/pigeonbox/contracts/releases/download/v0.20.11/pigeonbox-contracts-0.20.11.tgz",
+    "@pigeonbox/contracts": "https://github.com/pigeonbox/contracts/releases/download/v0.20.12/pigeonbox-contracts-0.20.12.tgz",
     "axios": "1.21.0",
     "element-plus": "2.13.4",
     "highlight.js": "11.12.0",
