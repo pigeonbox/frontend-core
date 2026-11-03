@@ -7,6 +7,7 @@ import type { PresignCompleteData } from '@/api/presign'
 import { generateKeyB64, encryptFile, wrapKey } from '@/utils/e2e'
 import { translateError } from '@/utils/api-interceptor'
 import { formatFileSize } from '@/utils/format'
+import { blockedExtensionOf } from '@/utils/uploadPreflight'
 import type { ShareSettings } from '@/composables/useShareSettings'
 import type { ShareResult } from '@/types/share'
 
@@ -17,7 +18,7 @@ import type { ShareResult } from '@/types/share'
  */
 
 /**
- * blocked = 因**单文件上限**被本地拦下（2026-10-23）。
+ * blocked = 因**单文件上限**或**禁传扩展名**被本地拦下（2026-10-23 / 2026-11-03）。
  *
  * 与 error 语义分离：error 是「上传失败，可重试」；blocked 是「压根不该发」。
  * 混在一起有两个实测可见的问题：①`canStart` 统计 error ⇒ 全部文件超限时
@@ -72,6 +73,12 @@ export function useUploadQueue(opts: {
    * 本地预检的价值是「选文件时就看见」，不是替服务端做决定。
    */
   batchSizeCap?: () => number
+  /**
+   * 站点禁传扩展名黑名单（/api/config blockedExtensions，与服务端校验同源）。
+   * 命中文件在**任何通道发出前**本地拦截（blocked 终态）——服务端 30011 才是权威，
+   * 本地拦只是省一次「传完才被拒」的往返与流量（2026-11-03 1.35GB 实录）。
+   */
+  blockedExts?: () => string[]
 }) {
   const { settings, t } = opts
 
@@ -145,16 +152,21 @@ export function useUploadQueue(opts: {
   const addFiles = (files: File[] | FileList) => {
     const limit = maxFileSizeLimit()
     for (const f of Array.from(files)) {
-      // 超限文件直接落 blocked 终态：选完文件即刻可见，且不计入 canStart
+      // 超限/禁传扩展名直接落 blocked 终态：选完文件即刻可见，且不计入 canStart
       const over = limit > 0 && f.size > limit
+      const bext = blockedExtensionOf(f.name, opts.blockedExts?.())
       tasks.value.push({
         id: newId(),
         file: f,
         payload: f,
-        status: over ? 'blocked' : 'pending',
+        status: over || bext ? 'blocked' : 'pending',
         progress: 0,
         statusText: '',
-        error: over ? overLimitMsg(f.size, limit) : '',
+        error: over
+          ? overLimitMsg(f.size, limit)
+          : bext
+            ? t('upload.blockedExt', { ext: bext })
+            : '',
       })
     }
     if (limit > 0) {
@@ -213,6 +225,13 @@ export function useUploadQueue(opts: {
       const limit = maxFileSizeLimit()
       if (limit > 0 && task.file.size > limit) {
         task.error = overLimitMsg(task.file.size, limit)
+        ElMessage.error(task.error)
+        return null
+      }
+      // 禁传扩展名复检：管理员可能刚改过黑名单，按**当前**名单重新判定
+      const bext = blockedExtensionOf(task.file.name, opts.blockedExts?.())
+      if (bext) {
+        task.error = t('upload.blockedExt', { ext: bext })
         ElMessage.error(task.error)
         return null
       }

@@ -158,6 +158,8 @@ const queue = useUploadQueue({
   // 站點級單文件上限（0=不限）——本地預檢：超限文件在發出任何請求前就攔掉
   // （服務端 presign init 也會拒，錯誤碼 30008；本地攔只是省一次往返）
   maxFileSize: () => configStore.config?.maxFileSize ?? 0,
+  // 站点禁传扩展名（/api/config blockedExtensions，与服务端校验同源）：选文件时即拦
+  blockedExts: () => configStore.config?.blockedExtensions ?? [],
   // 站點默認的單次發送**總量**上限（0=不限）——**只提示不阻斷**
   // （用戶級上限可能更寬鬆，硬攔會誤殺合法上傳；服務端 413 才是權威）
   batchSizeCap: () => batchCapLimit.value,

@@ -53,6 +53,8 @@ export interface PublicConfig {
    * （users.max_upload_size）⇒ 前端只据此**提示**，不得硬拦截；服务端 413 才是权威。
    */
   maxBatchSize?: number
+  /** 禁传扩展名黑名单（与服务端校验同源 utils.GetBlockedExtensions()；缺字段=老后端，不前置拦截） */
+  blockedExtensions?: string[]
   enableChunk: number
   openUpload: boolean
   /** 匿名上传需登录（upload.require_login）；缺省=false */
