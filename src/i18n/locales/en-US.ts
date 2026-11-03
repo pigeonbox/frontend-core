@@ -882,7 +882,8 @@ export default {
       download: {
         s3Direct: 'S3 Direct Download (302)',
         s3DirectHint: 'With an S3 backend, downloads 302 to a presigned URL so traffic bypasses the server',
-        timeout: 'Download Timeout (Seconds)',
+        timeout: 'Download Stall Timeout (Seconds)',
+        timeoutHint: 'Abort a download when no bytes flow for this many seconds, reclaiming stuck connections (dead storage, vanished clients)',
         requireLogin: 'Require Login for Pickup',
         codeFold: 'Case-Insensitive Lookup',
         codeFoldHint: 'Lookup folds the case of pickup codes, share codes and custom passcodes (easier to read aloud or copy by hand); 6-digit pickup codes are case-insensitive anyway',
