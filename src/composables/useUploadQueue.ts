@@ -39,6 +39,16 @@ export interface UploadTask {
   progress: number
   statusText: string
   error: string
+  /**
+   * 行内百分比是否可信（2026-11-03）。
+   *
+   * `multi-direct` 是**单个 multipart 请求** ⇒ XHR 只给聚合字节数 ⇒ 把它按文件
+   * 顺序均摊会让第一个文件先冲到 100%、其余长期 0%，**是误导不是估算**。
+   * ⇒ 该通道的行内百分比关掉，改由批次总进度条呈现真聚合值。
+   *
+   * 其余通道（direct / presign / multi-chunk）本就是逐文件粒度 ⇒ 保持可信。
+   */
+  percentValid?: boolean
 }
 
 const DEFAULT_BODY_CAP = 8 * 1024 * 1024
@@ -86,6 +96,12 @@ export function useUploadQueue(opts: {
   const { settings, t } = opts
 
   const tasks = ref<UploadTask[]>([])
+  /**
+   * 批次总进度（2026-11-03）：**只有 multi-direct 用得上**——它是唯一拿不到
+   * 逐文件真进度的通道（单请求 ⇒ 只有聚合字节数）⇒ 由聚合 XHR 进度驱动，
+   * 列表顶部一条进度条呈现真值。
+   */
+  const batchProgress = ref({ active: false, percent: 0, loaded: 0, total: 0 })
   // 单文件直传的中断控制器（multi 用共享 controller）
   const controllers = new Map<string, AbortController>()
   let multiAbort: AbortController | null = null
@@ -165,6 +181,7 @@ export function useUploadQueue(opts: {
         progress: 0,
         statusText: '',
         error: over ? overLimitMsg(f.size, limit) : '',
+        percentValid: true,
       })
     }
     if (limit > 0) {
@@ -299,6 +316,8 @@ export function useUploadQueue(opts: {
     currentBatch = pending
     batchRunning = true
     batchCancelled = false
+    // 每批重置批次总进度（上一批的聚合值不能留到下一批）
+    batchProgress.value = { active: false, percent: 0, loaded: 0, total: 0 }
 
     // E2E（口令型，2026-11-01 core#30）：单密钥 + 逐文件预加密（密文作为实际上传
     // 内容）；密钥不进链接，用口令包装成 wrapped_key 随各通道的创建请求落服务端。
@@ -367,6 +386,8 @@ export function useUploadQueue(opts: {
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.prepare')
+        // 单文件粒度 ⇒ 行内百分比可信（重试换通道后也要恢复，别留上一批的 false）
+        task.percentValid = true
         const ctrl = new AbortController()
         controllers.set(task.id, ctrl)
         // e2e 开启时 payload 必为密文（加密在上方完成），encrypted 等价于 settings.e2e
@@ -415,6 +436,8 @@ export function useUploadQueue(opts: {
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.largeFileHint')
+        // 单文件粒度 ⇒ 行内百分比可信（presign 的 PUT 进度是逐字节真值）
+        task.percentValid = true
         let r: PresignCompleteData | undefined
         try {
           r = await opts.presign?.(task.file, settings, (p) => {
@@ -478,19 +501,22 @@ export function useUploadQueue(opts: {
         multiAbort = new AbortController()
         // 聚合进度按字节均摊到各任务行（上传的是密文（若启用 E2E）或原文件）
         const payloads = pending.map((f) => f.payload)
-        const capBytes = payloads.map((f) => f.size)
+        // ⚠️ 行内百分比不可信（2026-11-03）：multi-direct 是**单请求** ⇒ XHR 只给
+        // 聚合字节数 ⇒ 按文件顺序均摊会让第一个文件先冲到 100%、其余长期 0%
+        // （那是误导，不是估算）⇒ 关掉行内百分比，改由批次总进度条呈现真聚合值。
+        for (const task of pending) task.percentValid = false
         const result = await multiDirect(
           payloads,
           multiOptions(wrappedKey),
-          (loaded) => {
-            let acc = 0
-            for (let idx = 0; idx < pending.length; idx++) {
-              const task = pending[idx]!
-              const cap = Math.max(capBytes[idx] ?? task.file.size, 1)
-              const done = Math.min(Math.max(loaded - acc, 0), cap)
-              task.progress = Math.round((done / cap) * 100)
+          (loaded, total) => {
+            batchProgress.value = {
+              active: true,
+              percent: Math.min(100, Math.round((loaded / Math.max(total, 1)) * 100)),
+              loaded,
+              total,
+            }
+            for (const task of pending) {
               task.statusText = t('upload.uploading')
-              acc += cap
             }
           },
           multiAbort.signal
@@ -523,6 +549,8 @@ export function useUploadQueue(opts: {
         task.progress = 0
         task.error = ''
         task.statusText = t('upload.uploading')
+        // 逐文件串行上传 ⇒ 每行的分片进度都是自己的真值 ⇒ 行内百分比可信
+        task.percentValid = true
         const uploadId = newId()
         // 返回值=服务端会话主键（v0.11+ 以服务端返回为准，绑定按它合并）
         const sessionId = await chunkUploadFile(
@@ -589,6 +617,11 @@ export function useUploadQueue(opts: {
     totalSize: totalSize as ComputedRef<number>,
     /** 本批合计是否超过站点默认的单次发送总量上限（提示用，不阻断） */
     batchOverLimit: batchOverLimit as ComputedRef<boolean>,
+    /**
+     * 批次总进度（仅 multi-direct 通道激活）：真聚合值。
+     * 该通道拿不到逐文件真进度 ⇒ 行内百分比被关掉（见 UploadTask.percentValid）。
+     */
+    batchProgress: batchProgress as ComputedRef<{ active: boolean; percent: number; loaded: number; total: number }>,
     addFiles,
     remove,
     cancel,

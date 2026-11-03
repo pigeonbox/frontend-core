@@ -35,7 +35,7 @@
         </span>
       </div>
       <el-progress
-        v-if="task.status === 'uploading' || task.status === 'encrypting' || task.status === 'binding' || task.status === 'success'"
+        v-if="showProgressBar"
         :percentage="task.progress"
         :stroke-width="4"
         :show-text="false"
@@ -97,6 +97,20 @@ const { t } = useI18n()
 const isBusy = computed(() =>
   props.task.status === 'uploading' || props.task.status === 'encrypting' || props.task.status === 'binding'
 )
+
+/**
+ * 行内进度条是否可信（2026-11-03）。
+ *
+ * `percentValid=false` ⇒ 该行百分比是假的（multi-direct 单请求的聚合字节被按文件
+ * 顺序均摊 ⇒ 首个文件先冲 100%、其余长期 0%）⇒ 不渲染条，改由列表顶部的
+ * 批次总进度条呈现真聚合值。
+ *
+ * success 行仍渲染（进度 100% 是真的）。
+ */
+const showProgressBar = computed(() => {
+  if (props.task.status === 'success') return true
+  return isBusy.value && props.task.percentValid !== false
+})
 
 // 类型标签走 i18n（键名小写映射），不再硬编码英文
 const getFileType = (filename: string): string => {

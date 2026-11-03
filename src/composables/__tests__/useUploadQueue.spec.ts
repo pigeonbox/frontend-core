@@ -272,6 +272,49 @@ describe('useUploadQueue', () => {
  * （错误码 30008），反代 nginx 反而是唯一有硬顶的一层 ⇒ 大文件传一半被 nginx
  * 拒成 413。改成「服务端为权威 + 前端上传前本地拦截」，本组用例钉死前端行为。
  */
+describe('useUploadQueue — multi-direct 批次总进度（2026-11-03）', () => {
+  it('batchProgress 默认不激活', () => {
+    const q = useUploadQueue({ settings: baseSettings(), t })
+    expect(q.batchProgress.value.active).toBe(false)
+  })
+
+  it('multi-direct：行内百分比标为不可信，批次总进度呈现真聚合值', async () => {
+    mocked.multiDirect.mockImplementation(async (_files, _opts, onProgress) => {
+      onProgress?.(60, 100)
+      return { code: 'M1', url: 'http://x/#/share/M1', share_url: '', file_count: 2 }
+    })
+    // 两个 1MB 文件 + bodyCap 10MB ⇒ pickUploadPlan 判 multi-direct
+    const q = useUploadQueue({ settings: baseSettings(), t, bodyCap: () => 10 * MB })
+    q.addFiles([mkFile('a.txt', 1 * MB), mkFile('b.txt', 1 * MB)])
+    await q.start()
+
+    // 行内百分比不可信（单请求只有聚合字节数 ⇒ 均摊会让首个文件先冲 100%）
+    expect(q.tasks.value.every((f) => f.percentValid === false)).toBe(true)
+    // 批次总进度是 XHR 的真聚合值
+    expect(q.batchProgress.value.active).toBe(true)
+    expect(q.batchProgress.value.loaded).toBe(60)
+    expect(q.batchProgress.value.total).toBe(100)
+    expect(q.batchProgress.value.percent).toBe(60)
+  })
+
+  it('direct 通道：行内百分比仍可信（percentValid 不为 false）', async () => {
+    mocked.uploadFile.mockResolvedValue({ code: 'A1', url: 'http://x/#/share/A1' })
+    const q = useUploadQueue({ settings: baseSettings(), t })
+    q.addFiles([mkFile('a.txt', 1)])
+    await q.start()
+    expect(q.tasks.value[0]!.percentValid).not.toBe(false)
+  })
+
+  it('multi-chunk 通道：逐文件串行上传 ⇒ 行内百分比仍可信', async () => {
+    mocked.chunkUploadFile.mockResolvedValue('uid')
+    mocked.multiBind.mockResolvedValue({ code: 'C3', url: 'http://x/#/share/C3', share_url: '', file_count: 2 })
+    const q = useUploadQueue({ settings: baseSettings(), t, bodyCap: () => 1 * MB })
+    q.addFiles([mkFile('a.bin', 5 * MB), mkFile('b.bin', 5 * MB)])
+    await q.start()
+    expect(q.tasks.value.every((f) => f.percentValid !== false)).toBe(true)
+  })
+})
+
 describe('useUploadQueue — 单文件上限预检', () => {
   it('超限文件在 addFiles 即落 blocked 态（选完文件就能看见）', () => {
     const q = useUploadQueue({ settings: baseSettings(), t, maxFileSize: () => 10 * MB })

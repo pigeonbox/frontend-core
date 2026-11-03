@@ -41,6 +41,15 @@
       </div>
     </el-upload>
 
+    <!-- 批次总进度（仅 multi-direct 通道激活）：单请求只有聚合字节数 ⇒ 逐文件
+         百分比是假的（见 useUploadQueue 的 percentValid 注释）⇒ 真数放这里 -->
+    <div v-if="batchProgress.active" class="batch-progress">
+      <el-progress :percentage="batchProgress.percent" :stroke-width="6" />
+      <span class="batch-progress-text">
+        {{ t('upload.batchProgress', { percent: batchProgress.percent }) }}
+      </span>
+    </div>
+
     <!-- 多文件列表 -->
     <transition-group name="file-list" tag="div" class="files-list">
       <FileItemRow
@@ -193,6 +202,7 @@ const {
   blockedCount,
   totalSize,
   batchOverLimit,
+  batchProgress,
   addFiles,
   remove,
   cancel,
@@ -246,6 +256,15 @@ onBeforeUnmount(() => dispose())
 
 <style scoped>
 /* blocked 提示条：被单文件上限拦下的文件说明（禁用按钮的原因可见化） */
+.batch-progress {
+  margin-bottom: 8px;
+}
+
+.batch-progress-text {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 .blocked-hint {
   display: flex;
   align-items: center;
