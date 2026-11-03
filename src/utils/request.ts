@@ -70,6 +70,13 @@ instance.interceptors.response.use(
     if (traceId && isPlainPayload(response.data)) {
       ;(response.data as Record<string, unknown>).trace_id = traceId
     }
+    // 提取 X-Upload-Token header（分片会话 HMAC 令牌，core 在 init/复活时签发）：
+    // 透传进纯对象 payload 的 upload_token，供调用方持久化——刷新/跨设备续传时
+    // 凭该令牌对会话取得属主权（OwnedByCaller 三通道之一）。
+    const uploadToken = response.headers?.['x-upload-token'] as string | undefined
+    if (uploadToken && isPlainPayload(response.data)) {
+      ;(response.data as Record<string, unknown>).upload_token = uploadToken
+    }
     // 成功码归一化：后端两代约定并存（旧 handler=200 / resp.Success=0），
     // 视图层普遍用 res.code===200 判成功；在这里把 0 统一改写成 200，
     // 避免每个调用方自己记忆约定差异（匿名取件/config 拉取曾因此误判失败）

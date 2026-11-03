@@ -59,6 +59,10 @@ export const useConfigStore = defineStore('config', () => {
   // 空 = 未配置 → 调用方回退浏览器当前地址（内网部署会把内网地址发出去）
   const publicUrl = computed(() => (config.value?.publicUrl || '').trim())
 
+  // PigeonBeam 入口（base.beam_base_url，2026-11-03 Phase 3）：上传失败时
+  // 「用 PigeonBeam 加速传」跳转交接地址；空 = 未配置 ⇒ 前端零渲染该入口。
+  const beamBaseUrl = computed(() => (config.value?.beamBaseUrl || '').trim())
+
   // 公网地址 → 浏览器当前地址 的回退链（分享链接/交付文本统一走这里）
   const siteBaseUrl = computed(() => {
     const configured = publicUrl.value.replace(/\/+$/, '')
@@ -99,6 +103,7 @@ export const useConfigStore = defineStore('config', () => {
     siteDescription,
     publicUrl,
     siteBaseUrl,
+    beamBaseUrl,
     federationEnabled,
     federationUsable,
     capabilities,

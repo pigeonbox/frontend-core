@@ -12,6 +12,9 @@ import {
   isPermanentUploadFailure,
   uploadError,
   SERVER_DETAIL_KINDS,
+  switchChannelError,
+  isSwitchChannelRequested,
+  formatUploadDiagnostics,
 } from '../uploadFailure'
 import { uploadTimeoutForSize, UPLOAD_MIN_TIMEOUT_MS, UPLOAD_MAX_TIMEOUT_MS } from '@/api/_xhr'
 import { readSrc, stripComments } from '@/utils/__tests__/sourceScan'
@@ -148,5 +151,51 @@ describe('PresignUploadDialog.vue 接线（源码级）', () => {
   it('业务拒绝上屏服务端原文（SERVER_DETAIL_KINDS 拼接）', () => {
     // 负对照：errorMessage 只取通用 hint ⇒ 本条红
     expect(src).toMatch(/SERVER_DETAIL_KINDS\s*\.\s*has\s*\(/)
+  })
+  it('失败卡片保持打开（终局失败不再 fail(e)⇒close，动作按钮才有渲染机会）', () => {
+    // 判据＝catch 末尾**不再**紧接 fail(e)（2026-11-03 前的形态：failed=true 后
+    // 立刻 close() ⇒ error-detail 是死 UI）。负对照：恢复 fail(e) ⇒ 本条红。
+    const catchIdx = src.lastIndexOf('activeError = e')
+    expect(catchIdx).toBeGreaterThan(0)
+    expect(src.slice(catchIdx, catchIdx + 120)).not.toMatch(/fail\s*\(/)
+  })
+  it('失败卡片动作按钮：换分片通道（switchChannelError）与复制诊断（formatUploadDiagnostics）', () => {
+    // 负对照：删按钮绑定 ⇒ 本条红
+    expect(src).toMatch(/switchChannelError\s*\(/)
+    expect(src).toMatch(/formatUploadDiagnostics\s*\(/)
+  })
+  it('永久拒绝与可重试失败分流（isPermanentUploadFailure 决定卡片按钮组）', () => {
+    // 判据＝取反使用（!isPermanentUploadFailure 才是「可重试」分支形态）。
+    // 负对照：恒给全部按钮 ⇒ 本条红
+    expect(src).toMatch(/!\s*isPermanentUploadFailure\s*\(/)
+    expect(src).toMatch(/replaceFile/)
+  })
+})
+
+describe('失败诊断与换通道标记（2026-11-03 失败动作按钮配套）', () => {
+  it('uploadError 保留 code 与 traceId', () => {
+    const e = uploadError(30011, '文件类型不允许', 'tr-123') as Error & { code?: number; traceId?: string }
+    expect(e.code).toBe(30011)
+    expect(e.traceId).toBe('tr-123')
+  })
+  it('switchChannelError 可被识别（queue 据此回退分片通道）', () => {
+    expect(isSwitchChannelRequested(switchChannelError())).toBe(true)
+    expect(isSwitchChannelRequested(new Error('x'))).toBe(false)
+    expect(isSwitchChannelRequested(undefined)).toBe(false)
+  })
+  it('formatUploadDiagnostics 输出可粘贴诊断（六行，含 trace_id）', () => {
+    const s = formatUploadDiagnostics({
+      file: 'a.img', code: 30011, message: '文件类型不允许', traceId: 'tr-1', at: '2026-11-03T00:00:00Z',
+    })
+    expect(s).toContain('file: a.img')
+    expect(s).toContain('code: 30011')
+    expect(s).toContain('message: 文件类型不允许')
+    expect(s).toContain('trace_id: tr-1')
+    expect(s).toContain('time: 2026-11-03T00:00:00Z')
+  })
+  it('traceId 缺失输出占位 -（不漏 undefined）', () => {
+    expect(formatUploadDiagnostics({ message: 'm' })).toContain('trace_id: -')
+    expect(formatUploadDiagnostics({ message: 'm' })).not.toContain('undefined')
+    expect(formatUploadDiagnostics({})).toContain('code: 0')
   })
 })

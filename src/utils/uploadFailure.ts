@@ -99,9 +99,42 @@ export function isPermanentUploadFailure(
  * 上传错误构造：把**业务码**附在 Error 上，失败分类（classifyUploadFailure）
  * 才看得见它。此前 `throw new Error(completeRes.message)` 把 code 丢在门外，
  * 分类只能拿消息猜（2026-11-03 实录：30011 被分成 unknown）。
+ * traceId 同理附上（2026-11-03 失败动作按钮）：「复制诊断」要把它带给管理员。
  */
-export function uploadError(code: number | undefined, message: string): Error {
-  return Object.assign(new Error(message), { code })
+export function uploadError(code: number | undefined, message: string, traceId?: string): Error {
+  return Object.assign(new Error(message), { code, traceId })
+}
+
+/**
+ * 「换分片通道」用户显式请求：queue 据此回退 multi-chunk（不受业务码限制——
+ * 用户自己判断是传输层问题才点这个按钮；永久业务拒绝时按钮本身不展示）。
+ */
+export function switchChannelError(): Error {
+  return Object.assign(new Error('switch to chunked channel'), { switchToChunk: true })
+}
+
+export function isSwitchChannelRequested(e: unknown): boolean {
+  return (e as { switchToChunk?: boolean })?.switchToChunk === true
+}
+
+export interface UploadDiagnostics {
+  file?: string
+  code?: number
+  message?: string
+  traceId?: string
+  at?: string
+}
+
+/** 一键复制的诊断文本：用户贴给管理员即可定位（trace_id 对服务端日志检索）。 */
+export function formatUploadDiagnostics(d: UploadDiagnostics): string {
+  return [
+    'PigeonBox upload failure',
+    `file: ${d.file ?? '-'}`,
+    `code: ${d.code ?? 0}`,
+    `message: ${d.message ?? '-'}`,
+    `trace_id: ${d.traceId || '-'}`,
+    `time: ${d.at ?? new Date().toISOString()}`,
+  ].join('\n')
 }
 
 /** 这些分类的后端消息带**具体原因**（文件名/检测到的格式/上限数值），

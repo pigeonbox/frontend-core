@@ -30,6 +30,10 @@
         <span v-else-if="task.status === 'blocked'" class="status blocked">
           <el-icon><WarningFilled /></el-icon> {{ task.error || t('upload.maxFileExceededShort') }}
         </span>
+        <!-- paused（2026-11-03 Phase 3）：分片通道暂停，坐标保留、可续传 -->
+        <span v-else-if="task.status === 'paused'" class="status paused">
+          <el-icon><VideoPause /></el-icon> {{ t('upload.paused') }}
+        </span>
         <span v-else class="status pending">
           {{ t('upload.pendingStatus') }}
         </span>
@@ -45,13 +49,25 @@
       />
     </div>
     <div class="row-actions">
-      <!-- 单文件重试（2026-10-22）：失败行可就地重试，不必整批重跑。
-           多文件批量语义下单文件重试不成立（批量分享需整批文件同时成享），
-           此种情形下不提供行内重试（批量重跑走底部主按钮）。
-           blocked（超限被拦）也给重试入口：重试 = 按**当前**上限重新判定，
-           管理员调大上限后用户就地重发即可，不必移除重加。 -->
+      <!-- 行内续传（2026-11-03 Phase 2）：失败行从断点继续——multi-chunk 分支按
+           任务记录的续传坐标（服务端分片位图）跳过已传分片，同页面内 File 尚在
+           内存，直接复位重跑即可，不必重新选文件。 -->
       <el-button
-        v-if="(task.status === 'error' || task.status === 'blocked') && !multiMode"
+        v-if="task.status === 'error'"
+        type="primary"
+        circle
+        size="small"
+        :title="t('upload.resume')"
+        @click="emit('resume', task.id)"
+      >
+        <el-icon><Refresh /></el-icon>
+      </el-button>
+      <!-- 单文件重试（2026-10-22）：blocked（超限/禁传被拦）行的重试 = 按**当前**
+           限制重新判定，管理员调大上限后用户就地重发即可，不必移除重加。
+           多文件批量语义下不提供行内重试（批量分享需整批文件同时成享，
+           批量重跑走底部主按钮）。 -->
+      <el-button
+        v-if="task.status === 'blocked' && !multiMode"
         type="primary"
         circle
         size="small"
@@ -59,6 +75,54 @@
         @click="emit('retry', task.id)"
       >
         <el-icon><Refresh /></el-icon>
+      </el-button>
+      <!-- 复制诊断（2026-11-03 失败动作）：code/message/trace_id 一键复制，
+           贴给管理员即可对服务端日志检索定位 -->
+      <el-button
+        v-if="task.status === 'error'"
+        type="info"
+        circle
+        size="small"
+        :title="t('upload.copyDiag')"
+        @click="copyDiag"
+      >
+        <el-icon><CopyDocument /></el-icon>
+      </el-button>
+      <!-- 用 PigeonBeam 加速传（2026-11-03 Phase 3）：失败时跳转交接设备直传客户端。
+           beamBaseUrl 空=零渲染。仅跳转交接，不编排 Beam 传输。 -->
+      <el-button
+        v-if="task.status === 'error' && beamBaseUrl"
+        type="primary"
+        circle
+        size="small"
+        :title="t('upload.useBeam')"
+        @click="openBeam"
+      >
+        <el-icon><Promotion /></el-icon>
+      </el-button>
+      <!-- 暂停（2026-11-03 Phase 3）：仅分片通道（multi-chunk）可暂停——
+           direct/presign/multi-direct 是单请求体，中途只能 abort=丢弃，
+           给假按钮是欺骗。canPause 判定通道，不可暂停通道不渲染。 -->
+      <el-button
+        v-if="isBusy && canPause"
+        type="warning"
+        circle
+        size="small"
+        :title="t('upload.pause')"
+        @click="emit('pause', task.id)"
+      >
+        <el-icon><VideoPause /></el-icon>
+      </el-button>
+      <!-- 恢复（2026-11-03 Phase 3）：paused 行从断点补缺片续传 -->
+      <el-button
+        v-if="task.status === 'paused'"
+        type="primary"
+        circle
+        size="small"
+        :title="t('upload.resume')"
+        @click="emit('resume', task.id)"
+      >
+        <el-icon><VideoPlay /></el-icon>
       </el-button>
       <el-button
         v-if="isBusy"
@@ -85,19 +149,41 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh, WarningFilled } from '@element-plus/icons-vue'
+import { Document, Close, CircleCheckFilled, CircleCloseFilled, Refresh, WarningFilled, CopyDocument, VideoPause, VideoPlay, Promotion } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { formatFileSize } from '@/utils/format'
+import { copyToClipboard } from '@/utils/clipboard'
+import { useConfigStore } from '@/stores/config'
 import type { UploadTask } from '@/composables/useUploadQueue'
 
 /** 上传队列单文件行（2026-10-06 W2 自 FileUpload.vue 列表块抽出） */
 const props = defineProps<{ task: UploadTask; multiMode?: boolean }>()
-const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string] }>()
+const emit = defineEmits<{ remove: [id: string]; cancel: [id: string]; retry: [id: string]; resume: [id: string]; pause: [id: string] }>()
 
 const { t } = useI18n()
 
 const isBusy = computed(() =>
   props.task.status === 'uploading' || props.task.status === 'encrypting' || props.task.status === 'binding'
 )
+
+/** 可暂停（2026-11-03 Phase 3）：仅 multi-chunk 通道能在片间边界停下续传 */
+const canPause = computed(() => props.task.channel === 'multi-chunk')
+
+// PigeonBeam 加速传（2026-11-03 Phase 3）：失败时跳转交接到 Beam 设备直传客户端。
+// 空 = 未配置 ⇒ 零渲染（不给必然打不开的坏入口）。仅跳转交接，浏览器端不编排 Beam 传输。
+const configStore = useConfigStore()
+const beamBaseUrl = computed(() => configStore.beamBaseUrl)
+const openBeam = () => {
+  const base = beamBaseUrl.value
+  if (!base) return
+  window.open(`${base}${base.includes('?') ? '&' : '?'}source=web-upload`, '_blank', 'noopener,noreferrer')
+}
+
+/** 复制诊断信息（失败行）：diag 为空（取消/老任务）时退化为复制错误文本 */
+const copyDiag = async () => {
+  const ok = await copyToClipboard(props.task.diag || props.task.error || '')
+  ElMessage[ok ? 'success' : 'error'](t(ok ? 'upload.diagCopied' : 'upload.diagCopyFailed'))
+}
 
 /**
  * 行内进度条是否可信（2026-11-03）。
@@ -106,14 +192,15 @@ const isBusy = computed(() =>
  * 顺序均摊 ⇒ 首个文件先冲 100%、其余长期 0%）⇒ 不渲染条，改由列表顶部的
  * 批次总进度条呈现真聚合值。
  *
- * success 行仍渲染（进度 100% 是真的）。
+ * success 行仍渲染（进度 100% 是真的）；paused 行也渲染（暂停点进度是真值，
+ * Phase 3 续传语义要靠它显示「传到哪了」）。
  *
  * ⚠️ encrypting 行走**不确定态**：加密阶段没有百分比可报（整块 AES-GCM 加密，
  * 进度恒 0）⇒ 用脉冲条表示「在动」，别显示一个恒为 0 的条（1.35GB 加密几十秒
  * 界面零反馈）。
  */
 const showProgressBar = computed(() => {
-  if (props.task.status === 'success') return true
+  if (props.task.status === 'success' || props.task.status === 'paused') return true
   return isBusy.value && props.task.percentValid !== false
 })
 
@@ -203,6 +290,7 @@ const getFileType = (filename: string): string => {
 .status.error { color: var(--color-danger); }
 /* blocked = 被单文件上限拦下：用警示色与「失败」区分（用户不该以为重试能发出去） */
 .status.blocked { color: var(--el-color-warning); }
+.status.paused { color: var(--el-color-warning); }
 .status.uploading { color: var(--primary-color); }
 .status.pending { color: var(--color-text-secondary); }
 

@@ -28,6 +28,13 @@ import type { publicapi as publicapiContract } from '@pigeonbox/contracts'
 export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
   expire_value: number
   expire_style: string
+  /**
+   * 契约里 `require_auth` 是可选的，但**前端恒发布尔**（`settings.require_auth` 必填）
+   * ⇒ 这里收窄为必填布尔：既是 wire 事实（契约必填，false 也必须显式发送），
+   * 也让「秒传探测 chunkQuickProbe」等要求 `require_auth: boolean` 的调用点
+   * 免于在每个调用点各写一遍 `?? false` 兜底。
+   */
+  require_auth: boolean
 }
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
@@ -54,6 +61,123 @@ export type MultiShareBindBody = Omit<publicapiContract.MultiShareBindReq, 'entr
 }
 
 export const isOkCode = (code?: number) => code === 0 || code === 200
+
+/** 续传匹配指纹（name|size|lastModified）。浏览器 File 不持久化，刷新后靠
+ *  用户重新选文件 + 指纹匹配接管会话；三元组全同才认，防错续到别的文件。 */
+export function buildFingerprint(f: { name: string; size: number; lastModified: number }): string {
+  return `${f.name}|${f.size}|${f.lastModified}`
+}
+
+/** 分片级指数退避 1s/2s/4s/8s（设计稿 Phase 2 口径，重试预算 4 次）；
+ *  超限抛错由上层报错/降级，不无限退避。 */
+export function chunkBackoffMs(attempt: number): number {
+  if (attempt < 0 || attempt > 3) throw new Error(`chunk retry budget exceeded: attempt ${attempt}`)
+  return 1000 * 2 ** attempt
+}
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/**
+ * 该分片是否可跳过（断点续传判据：服务端位图含该 index 即已传）。
+ * 纯函数封装供单测/负对照锚定——判据反写必须在测试下转红。
+ */
+export function shouldSkipChunk(index: number, uploaded: ReadonlySet<number>): boolean {
+  return uploaded.has(index)
+}
+
+/** 查分片会话进度（已传分片位图）。归属：IP / 登录用户 / X-Upload-Token
+ *  三选一（core 端 ownedByCaller 校验）；会话不存在/无权抛错由调用方兜底重传。 */
+export async function getChunkStatus(
+  uploadId: string,
+  sessionToken?: string
+): Promise<{ uploadId: string; totalChunks: number; uploadedIndexes: number[]; status: string }> {
+  const res = await request<ApiResponse<{
+    upload_id: string
+    total_chunks: number
+    uploaded_indexes: number[]
+    status: string
+  }>>({
+    url: `/chunk/upload/status/${uploadId}`,
+    method: 'GET',
+    headers: sessionToken ? { 'X-Upload-Token': sessionToken } : undefined,
+  })
+  const d = res.data
+  if (!d) throw new Error(res.message || 'chunk status failed')
+  return {
+    uploadId: d.upload_id,
+    totalChunks: d.total_chunks,
+    uploadedIndexes: d.uploaded_indexes ?? [],
+    status: d.status,
+  }
+}
+
+/**
+ * 秒传快速通道探测（2026-11-03 Phase 3）：以整文件 hash + 分享元数据发 init——
+ * 契约语义（contracts/idl/chunk.thrift ChunkUploadInitReq 注释）：携带 expire_style
+ * 即启用秒传快速通道，命中同用户同 hash+size 历史文件 ⇒ 按本次元数据**建新分享**，
+ * 响应直接给 is_quick_upload + share_code + share_url（免传分片）。
+ * 未命中 ⇒ 生成一个空的 file_hash 键会话，调用方须 chunkCancelSession 回收（不留幽灵会话）。
+ */
+export async function chunkQuickProbe(
+  file: { name: string; size: number },
+  fileHash: string,
+  chunkSize: number,
+  meta: {
+    expire_value: number
+    expire_style: string
+    require_auth: boolean
+    password?: string
+    custom_code?: string
+    note?: string
+  },
+  signal?: AbortSignal
+): Promise<{
+  hit: boolean
+  shareCode?: string
+  shareUrl?: string
+  /** 未命中时落空生成的会话主键（调用方负责 cancel 回收） */
+  missSessionId?: string
+}> {
+  const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
+  const res = await request<ApiResponse<{
+    upload_id?: string
+    is_quick_upload?: boolean
+    share_code?: string
+    share_url?: string
+  }>>({
+    url: '/chunk/upload/init/',
+    method: 'POST',
+    data: {
+      file_name: file.name,
+      file_size: file.size,
+      file_hash: fileHash,
+      chunk_size: chunkSize,
+      total_chunks: totalChunks,
+      expire_value: meta.expire_value,
+      expire_style: meta.expire_style,
+      require_auth: meta.require_auth,
+      password: meta.password || undefined,
+      custom_code: meta.custom_code || undefined,
+      note: meta.note || undefined,
+    },
+    signal,
+  })
+  const d = res.data
+  if (!d) throw new Error(res.message || 'quick probe failed')
+  if (d.is_quick_upload && d.share_code) {
+    return { hit: true, shareCode: d.share_code, shareUrl: d.share_url }
+  }
+  return { hit: false, missSessionId: d.upload_id }
+}
+
+/** 取消分片会话（秒传探测落空回收/中止在途上传后的清理） */
+export async function chunkCancelSession(uploadId: string, sessionToken?: string): Promise<void> {
+  await request<ApiResponse<unknown>>({
+    url: `/chunk/upload/cancel/${uploadId}`,
+    method: 'DELETE',
+    headers: sessionToken ? { 'X-Upload-Token': sessionToken } : undefined,
+  })
+}
 
 /** 多文件直传（multipart，字段名 files；总体积需 ≤ 后端单请求体上限） */
 export async function multiDirect(
@@ -93,33 +217,77 @@ export async function chunkUploadFile(
   uploadId: string,
   chunkSize: number,
   onProgress?: (loaded: number, total: number) => void,
-  signal?: AbortSignal
-): Promise<string> {
+  signal?: AbortSignal,
+  opts?: {
+    /** 已传分片（断点续传跳片；缺省=全传） */
+    uploaded?: Set<number>
+    /** 会话令牌（init 响应头 X-Upload-Token；逐请求回传，IP 漂移后仍过归属） */
+    sessionToken?: string
+    /**
+     * 续传既有会话：跳过 init 直接补缺片（2026-11-03 Phase 2，wire 实测修正）。
+     * 分片会话主键＝服务端按 file_hash 派生（空则服务端 UUID）；init 请求体里的
+     * `upload_id` 不在契约 IDL（ChunkUploadInitReq 1-11 无此字段）⇒ 会被忽略，
+     * 重 init 得到的是**另一个**新会话、旧位图作废。故续传不重 init，直接对
+     * 既有会话补缺片；会话已不存在时由上层（getChunkStatus 探测失败）改走新会话。
+     */
+    resumeSessionId?: string
+    /** 会话坐标即时回调（init 成功即回传）——中途失败后凭 uploadId/sessionToken 续传 */
+    onSession?: (s: { uploadId: string; sessionToken?: string }) => void
+    /**
+     * 片间暂停检查（2026-11-03 Phase 3 任务面）：分片边界返回 true ⇒ 抛 `Error('Paused')`。
+     * 只在片间生效（单片传输中不打断）；单请求体通道（direct/presign）无此语义，
+     * 调用方不给暂停按钮。暂停后坐标保留 ⇒ resume 可续。
+     */
+    shouldPause?: () => boolean
+  }
+): Promise<{ uploadId: string; sessionToken?: string }> {
   const totalChunks = Math.max(1, Math.ceil(file.size / chunkSize))
+  const headers: Record<string, string> = opts?.sessionToken ? { 'X-Upload-Token': opts.sessionToken } : {}
 
-  // 整文件哈希（2026-10-06 W2 补）：core v0.11+ 加固将 file_hash 置 required（此前不发送必 400），
-  // 且服务端以 file_hash 作为分片会话主键、据此做跨会话秒传检索。multi-chunk 批量场景下秒传命中
-  // （is_quick_upload）无法经 multi-bind 合并（entry 无 share_code 形态），故发送空串→服务端
-  // 生成 UUID 会话，保持“批量始终真实上传”的既有行为；单文件大文件的秒传由 presign 通道负责。
-  const initRes = await request<ApiResponse<{ upload_id?: string }>>({
-    url: '/chunk/upload/init/',
-    method: 'POST',
-    data: {
-      file_name: file.name,
-      file_size: file.size,
-      chunk_size: chunkSize,
-      total_chunks: totalChunks,
-      upload_id: uploadId,
-      file_hash: '',
-    },
-    signal,
-  })
+  let sessionId: string
+  let sessionToken = opts?.sessionToken
+  if (opts?.resumeSessionId) {
+    // 断点续传：既有会话直接补缺片（见 opts.resumeSessionId 注释——重 init 另起新会话）
+    sessionId = opts.resumeSessionId
+    opts.onSession?.({ uploadId: sessionId, sessionToken })
+  } else {
+    // 整文件哈希（2026-10-06 W2 补）：core v0.11+ 加固将 file_hash 置 required（此前不发送必 400），
+    // 且服务端以 file_hash 作为分片会话主键、据此做跨会话秒传检索。multi-chunk 批量场景下秒传命中
+    // （is_quick_upload）无法经 multi-bind 合并（entry 无 share_code 形态），故发送空串→服务端
+    // 生成 UUID 会话，保持"批量始终真实上传"的既有行为；单文件大文件的秒传由 presign 通道负责。
+    const initRes = await request<ApiResponse<{ upload_id?: string }>>({
+      url: '/chunk/upload/init/',
+      method: 'POST',
+      data: {
+        file_name: file.name,
+        file_size: file.size,
+        chunk_size: chunkSize,
+        total_chunks: totalChunks,
+        upload_id: uploadId,
+        file_hash: '',
+      },
+      headers,
+      signal,
+    })
 
-  // 会话主键以服务端返回为准（file_hash 为空时服务端自生成 UUID，与客户端自报值不同）
-  const sessionId = initRes.data?.upload_id || uploadId
+    // 会话主键以服务端返回为准（file_hash 为空时服务端自生成 UUID，与客户端自报值不同）
+    sessionId = initRes.data?.upload_id || uploadId
+    // 会话令牌：init 响应头 X-Upload-Token（由 request.ts 拦截器透传进 payload.upload_token）
+    sessionToken = (initRes as { upload_token?: string }).upload_token || opts?.sessionToken
+    // 后续分片请求统一带会话令牌（IP 漂移后仍过归属校验）
+    if (sessionToken) headers['X-Upload-Token'] = sessionToken
+    opts?.onSession?.({ uploadId: sessionId, sessionToken })
+  }
 
+  const uploaded = opts?.uploaded ?? new Set<number>()
   for (let index = 0; index < totalChunks; index++) {
     if (signal?.aborted) throw new Error('Cancelled')
+    if (opts?.shouldPause?.()) throw new Error('Paused')
+    if (shouldSkipChunk(index, uploaded)) {
+      // 断点续传：已传分片跳过（服务端位图为准），进度按已传量起算
+      onProgress?.(Math.min((index + 1) * chunkSize, file.size), file.size)
+      continue
+    }
     const start = index * chunkSize
     const blob = file.slice(start, Math.min(start + chunkSize, file.size))
     const form = new FormData()
@@ -128,10 +296,10 @@ export async function chunkUploadFile(
     // 客户端重传该分片即可；非安全上下文(无 crypto.subtle)自动降级为不携带。
     const hash = await sha256Hex(blob)
     if (hash) form.append('hash', hash)
-    await uploadChunkWithRetry(sessionId, index, form, signal)
+    await uploadChunkWithRetry(sessionId, index, form, signal, headers)
     onProgress?.(Math.min(start + blob.size, file.size), file.size)
   }
-  return sessionId
+  return { uploadId: sessionId, sessionToken }
 }
 
 /** 逐片 SHA-256；非安全上下文(subtle 不可用)返回 null */
@@ -143,13 +311,17 @@ async function sha256Hex(blob: Blob): Promise<string | null> {
     .join('')
 }
 
-/** 上传单片；422（服务端哈希校验失败）时重传，最多 2 次 */
+/**
+ * 上传单片；可重试类失败（422/20009 哈希校验、code=0 网络类、5xx 服务端）走指数退避
+ * 1/2/4/8s 重传（chunkBackoffMs，上限 4 次退避=共 5 次尝试），超限抛错由上层报错。
+ */
 async function uploadChunkWithRetry(
   uploadId: string,
   index: number,
   form: FormData,
   signal?: AbortSignal,
-  maxRetries = 2
+  headers?: Record<string, string>,
+  maxRetries = 4
 ): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     try {
@@ -159,12 +331,15 @@ async function uploadChunkWithRetry(
         data: form,
         timeout: 300000,
         signal,
+        headers,
       })
       return
     } catch (e) {
       const code = (e as { code?: number })?.code
-      if ((code === 422 || code === 20009) && attempt < maxRetries) continue
-      throw e
+      const retriable =
+        code === 422 || code === 20009 || code === 0 || (code !== undefined && code >= 500 && code < 600)
+      if (!retriable || attempt >= maxRetries) throw e
+      await sleep(chunkBackoffMs(attempt))
     }
   }
 }

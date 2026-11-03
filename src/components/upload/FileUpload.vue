@@ -60,6 +60,8 @@
         @remove="remove"
         @cancel="cancel"
         @retry="handleRetry"
+        @resume="handleResume"
+        @pause="handlePause"
       />
     </transition-group>
 
@@ -75,6 +77,18 @@
         })
       }}</span>
     </div>
+
+    <!-- 未完成的上传（续传入口，2026-11-03 Phase 2）：刷新/中断的任务在此恢复。
+         浏览器 File 对象不跨刷新存活 ⇒ 需用户重选同指纹文件（名称/大小/修改时间
+         全同才认），命中的未完成任务从服务端分片位图断点继续。 -->
+    <div v-if="unfinishedTasks.length > 0" class="blocked-hint resume-hint">
+      <el-icon><WarningFilled /></el-icon>
+      <span>{{ t('upload.unfinishedHint', { count: unfinishedTasks.length }) }}</span>
+      <el-button size="small" type="primary" @click="pickResumeFile">
+        {{ t('upload.resumePick') }}
+      </el-button>
+    </div>
+    <input ref="resumeInput" type="file" style="display: none" @change="onResumeFilePicked" />
 
     <!-- 共享设置（对所有文件生效；常驻——恒定布局，未选文件时 CTA 禁用） -->
     <ShareSettingsForm :settings="settings" show-note />
@@ -117,6 +131,8 @@ import { useUserStore } from '@/stores/user'
 import { useShareSettings } from '@/composables/useShareSettings'
 import { useUploadQueue } from '@/composables/useUploadQueue'
 import { useFileDrop } from '@/composables/useFileDrop'
+import { useUploadTasksStore } from '@/stores/uploadTasks'
+import { buildFingerprint } from '@/api/multifile'
 import type { ShareResult } from '@/types/share'
 import PresignUploadDialog from './PresignUploadDialog.vue'
 import ShareSettingsForm from '@/components/share/ShareSettingsForm.vue'
@@ -131,6 +147,7 @@ import FileItemRow from './FileItemRow.vue'
 const { t } = useI18n()
 const configStore = useConfigStore()
 const userStore = useUserStore()
+const uploadTasksStore = useUploadTasksStore()
 // 上传提示随站点配置动态化（硬编码「5GB」曾与真实生效限制脱节，2026-10-19 事故）。
 // ⚠️ **两个闸都要说**（2026-10-30 事故）：只说单文件上限（maxFileSize）⇒
 // UI 显示「单文件最大 4 GB」，登录用户却被单次发送总量上限（maxBatchSize，
@@ -167,6 +184,8 @@ const queue = useUploadQueue({
   // 站點級單文件上限（0=不限）——本地預檢：超限文件在發出任何請求前就攔掉
   // （服務端 presign init 也會拒，錯誤碼 30008；本地攔只是省一次往返）
   maxFileSize: () => configStore.config?.maxFileSize ?? 0,
+  // 站点禁传扩展名（/api/config blockedExtensions，与服务端校验同源）：选文件时即拦
+  blockedExts: () => configStore.config?.blockedExtensions ?? [],
   // 站點默認的單次發送**總量**上限（0=不限）——**只提示不阻斷**
   // （用戶級上限可能更寬鬆，硬攔會誤殺合法上傳；服務端 413 才是權威）
   batchSizeCap: () => batchCapLimit.value,
@@ -194,6 +213,8 @@ const queue = useUploadQueue({
       e2e: s.e2e,
       onProgress,
     }),
+  // 任务持久化（断点续传坐标写穿 localStorage）：multi-chunk 分支消费
+  uploadTasks: uploadTasksStore,
 })
 const {
   tasks,
@@ -207,6 +228,9 @@ const {
   remove,
   cancel,
   retry,
+  resumeTask,
+  resumeFrom,
+  pause,
   start,
   dispose,
 } = queue
@@ -246,6 +270,41 @@ const handleUploadAll = async () => {
 // 行内单文件重试（2026-10-22）：失败任务复位后重跑该文件，成功同样走 success 事件
 const handleRetry = async (id: string) => {
   const outcome = await retry(id)
+  if (outcome) {
+    emit('success', outcome)
+  }
+}
+
+// 行内续传（2026-11-03 Phase 2）：同页面内 File 尚在内存，复位重跑即从断点继续
+// （multi-chunk 分支按任务记录的续传坐标跳过已传分片）
+const handleResume = async (id: string) => {
+  const outcome = await resumeTask(id)
+  if (outcome) {
+    emit('success', outcome)
+  }
+}
+
+// 暂停（2026-11-03 Phase 3）：multi-chunk 通道片间边界停下（坐标保留），
+// 同步动作无返回值；恢复走 handleResume
+const handlePause = (id: string) => pause(id)
+
+// 未完成上传横幅（2026-11-03 Phase 2）：刷新/中断的任务在 localStorage 里留有
+// 续传坐标；File 不跨刷新存活 ⇒ 引导用户重选同指纹文件接管会话
+const unfinishedTasks = computed(() => uploadTasksStore.unfinished)
+const resumeInput = ref<HTMLInputElement | null>(null)
+const pickResumeFile = () => resumeInput.value?.click()
+const onResumeFilePicked = async (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = '' // 允许连续选同一文件（不重置则 change 不再触发）
+  if (!file) return
+  // 指纹匹配（name|size|lastModified 全同才认）：防错续到别的文件
+  const rec = uploadTasksStore.findByFingerprint(buildFingerprint(file))
+  if (!rec) {
+    ElMessage.warning(t('upload.resumeMismatch'))
+    return
+  }
+  const outcome = await resumeFrom(file)
   if (outcome) {
     emit('success', outcome)
   }

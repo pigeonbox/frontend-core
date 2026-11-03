@@ -56,6 +56,20 @@ function occurrences(name: string, exceptFile?: string): number {
   return total
 }
 
+/**
+ * 按路径/URL 被引用（2026-11-03 Phase 3）：Worker 入口（`new Worker(new URL(
+ * './hashWorker.ts'))`）、动态 `import('./x')` 等以**文件名字符串**加载、不走
+ * export 导入的模块。这类模块零导出但**不是死代码**（运行时按路径加载）。
+ * 判据：模块名（去扩展名）以 `./name` 或 `name.ts` 形式出现在**其它文件**里。
+ * 真死模块既无导出被引用、也不会出现在任何路径引用里，仍会被抓。
+ */
+function referencedByPath(f: string): boolean {
+  const base = f.replace(/\.ts$/, '').split('/').pop() ?? ''
+  if (!base) return false
+  const re = new RegExp(`(\\./${base}(?![\\w])|${base}\\.ts)`, 'g')
+  return ALL_FILES.some(([pf, src]) => pf !== f && re.test(src))
+}
+
 describe('孤儿导出扫描（utils/ 与 composables/）', () => {
   it('每个导出符号在全仓至少被引用 1 次（只定义没人用 ⇒ 死导出）', () => {
     expect(DEF_FILES.length, '应能枚举到 utils/ 与 composables/ 的模块').toBeGreaterThan(10)
@@ -73,7 +87,7 @@ describe('孤儿导出扫描（utils/ 与 composables/）', () => {
     const deadModules: string[] = []
     for (const f of DEF_FILES) {
       const names = exportedNames(stripComments(readSrc(f)))
-      const usedOutside = names.some((n) => occurrences(n, f) > 0)
+      const usedOutside = names.some((n) => occurrences(n, f) > 0) || referencedByPath(f)
       if (!usedOutside) deadModules.push(`${f}（导出：${names.join(', ') || '无'}）`)
     }
     expect(

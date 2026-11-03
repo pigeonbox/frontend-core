@@ -17,6 +17,10 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { defaultShareSettings } from '@/composables/useShareSettings'
 import { wrapKey, generateKeyB64 } from '@/utils/e2e'
 
+// 同 e2e.spec.ts：PBKDF2-210k 重活在全量并行挤兑下会撞默认 5s 超时（偶发假红），
+// 断言不动，只钉 30s 超时。
+vi.setConfig({ testTimeout: 30000 })
+
 const PASSPHRASE = 'my-secret-passphrase-2026'
 
 /** 捕获 request() 真正要发出去的请求体（按 url 索引；FormData 或 JSON body）。 */

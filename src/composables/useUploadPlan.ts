@@ -20,15 +20,27 @@ export interface UploadPlanInput {
   presignAllowed?: boolean
 }
 
+/**
+ * 分片续传默认阈值（2026-11-03 Phase 2 设计稿通道策略）：
+ * ≥32MB 默认走分片通道——分片会话可断点续传（可靠性优先，用户拍板）；
+ * <32MB 走 presign 快通道（少一次会话开销，init 带 hash 白捡秒传检索）。
+ * 管理员 presignThresholdMb 语义收窄为「presign 快通道上限」：
+ * 小文件超它时兜底 direct 单发（不进 presign）。
+ */
+export const DEFAULT_CHUNK_RESUME_THRESHOLD = 32 * 1024 * 1024
+
 export function pickUploadPlan(input: UploadPlanInput): UploadChannel {
   const { count, totalBytes, maxFileBytes, bodyCap, presignThreshold, presignAllowed } = input
   if (count <= 0) throw new Error('no files to upload')
   if (count === 1) {
     if (presignAllowed === false) {
-      // 匿名直传被管理开关关闭：≤bodyCap 直接单发，>bodyCap 分片中转
+      // 匿名直传被管理开关关闭：≤bodyCap 直接单发，>bodyCap 分片中转（现状保留）
       return maxFileBytes > bodyCap ? 'multi-chunk' : 'direct'
     }
-    return maxFileBytes > presignThreshold ? 'presign' : 'direct'
+    // 可续传优先（2026-11-03）：≥32MB 默认分片（断点续传/跨设备接管）；
+    // 小文件走 presign 快通道；管理员把 presign 上限调小后超上限兜底 direct
+    if (maxFileBytes >= DEFAULT_CHUNK_RESUME_THRESHOLD) return 'multi-chunk'
+    return maxFileBytes > presignThreshold ? 'direct' : 'presign'
   }
   if (totalBytes <= bodyCap && maxFileBytes <= bodyCap) return 'multi-direct'
   return 'multi-chunk'

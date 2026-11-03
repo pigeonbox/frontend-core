@@ -36,6 +36,12 @@
         <span>{{ statusText }}</span>
       </div>
 
+      <!-- 速度 + ETA（设计 B3）；低速预估超时时黄字预警 -->
+      <div v-if="speedText && !failed && !completed" class="speed-text" :class="{ 'speed-warn': speedWarn }">
+        <span>{{ speedText }}</span>
+        <span v-if="speedWarn" class="speed-warn-hint">{{ t('upload_view.presign.slowWarn') }}</span>
+      </div>
+
       <div v-if="failed" class="error-detail">
         <el-alert
           :title="errorMessage"
@@ -43,15 +49,39 @@
           :closable="false"
           show-icon
         />
+        <!-- 失败卡片动作（2026-11-03 设计 B2）：可重试失败=重试/换分片通道/复制诊断；
+             永久业务拒绝=复制诊断/更换文件（换通道同样会被拒，不给必然失败的按钮） -->
+        <div class="error-actions">
+          <!-- 用 PigeonBeam 加速传（2026-11-03 Phase 3）：失败时跳转交接到 Beam
+               设备直传客户端（可重试/永久拒绝都给——它是另一条传输路径）。
+               beamBaseUrl 空=零渲染。 -->
+          <el-button v-if="beamBaseUrl" type="primary" @click="openBeam">
+            {{ t('upload.useBeam') }}
+          </el-button>
+          <el-button v-if="retryable" @click="copyDiag">
+            {{ t('upload_view.presign.copyDiag') }}
+          </el-button>
+          <el-button v-if="retryable" type="warning" @click="switchChannel">
+            {{ t('upload_view.presign.switchChannel') }}
+          </el-button>
+          <el-button v-if="retryable" type="primary" @click="retry">
+            {{ t('upload.retry') }}
+          </el-button>
+          <template v-else>
+            <el-button @click="copyDiag">
+              {{ t('upload_view.presign.copyDiag') }}
+            </el-button>
+            <el-button type="primary" @click="replaceFile">
+              {{ t('upload_view.presign.replaceFile') }}
+            </el-button>
+          </template>
+        </div>
       </div>
     </div>
 
     <template #footer>
       <el-button v-if="!completed" @click="handleCancel" :disabled="cancelling">
         {{ t('common.cancel') }}
-      </el-button>
-      <el-button v-if="failed" type="primary" @click="retry">
-        {{ t('common.confirm') }}
       </el-button>
       <el-button v-if="completed" type="primary" @click="close">
         {{ t('common.confirm') }}
@@ -71,7 +101,10 @@ import {
 import { presignApi, type PresignCompleteData, type PresignUploadProgress } from '@/api/presign'
 import { anonymousApi } from '@/api/anonymous'
 import { xhrRaw, uploadTimeoutForSize } from '@/api/_xhr'
-import { classifyUploadFailure, isPermanentUploadFailure, uploadError, SERVER_DETAIL_KINDS } from '@/utils/uploadFailure'
+import { classifyUploadFailure, isPermanentUploadFailure, uploadError, SERVER_DETAIL_KINDS, switchChannelError, formatUploadDiagnostics } from '@/utils/uploadFailure'
+import { copyToClipboard } from '@/utils/clipboard'
+import { useConfigStore } from '@/stores/config'
+import { createSpeedMeter, formatSpeed, formatEtaHms } from '@/utils/transferSpeed'
 
 /**
  * 预签名直传对话框（2026-10-06 W2 Promise 化：调用方 `ref.open(file, options)` 拿
@@ -80,6 +113,16 @@ import { classifyUploadFailure, isPermanentUploadFailure, uploadError, SERVER_DE
  * （原实现 abort 后会落进重试分支静默重传，属存量 bug）。
  */
 const { t } = useI18n()
+
+// PigeonBeam 加速传（2026-11-03 Phase 3）：失败时跳转交接到 Beam 设备直传客户端。
+// 空 = 未配置 ⇒ 零渲染。仅跳转交接，浏览器端不编排 Beam 传输。
+const configStore = useConfigStore()
+const beamBaseUrl = computed(() => configStore.beamBaseUrl)
+const openBeam = () => {
+  const base = beamBaseUrl.value
+  if (!base) return
+  window.open(`${base}${base.includes('?') ? '&' : '?'}source=web-upload`, '_blank', 'noopener,noreferrer')
+}
 
 export interface PresignOptions {
   expire_value: number
@@ -112,6 +155,21 @@ const errorMessage = ref('')
 const completed = ref(false)
 const cancelling = ref(false)
 
+/** 失败诊断快照（「复制诊断信息」按钮数据源；open() 复位） */
+const lastDiag = ref<{ code?: number; message: string; traceId?: string } | null>(null)
+/** 实时速度/ETA（设计 B3）：滑窗测速，进度条下方展示；低速预估超时黄字预警 */
+const meter = createSpeedMeter()
+const speedText = ref('')
+const speedWarn = ref(false)
+/** 失败卡片保持打开期间的原错误（「更换文件/取消」结算给 queue 用；最终必须结算，
+ *  否则 queue 永远 await） */
+let activeError: unknown = null
+/** 可重试失败（非永久业务拒绝）：卡片给 重试/换分片通道/复制诊断；
+ *  永久拒绝（类型/配额/体积）只给 复制诊断/更换文件——换通道同样会被拒，不给坏按钮 */
+const retryable = computed(
+  () => lastDiag.value !== null && !isPermanentUploadFailure(lastDiag.value.code, lastDiag.value.message)
+)
+
 const progressStatus = computed(() => {
   if (failed.value) return 'exception'
   if (completed.value) return 'success'
@@ -128,6 +186,8 @@ const open = (f: File, opts: PresignOptions): Promise<PresignCompleteData> => {
   failed.value = false
   completed.value = false
   errorMessage.value = ''
+  lastDiag.value = null
+  activeError = null
   visible.value = true
   return new Promise<PresignCompleteData>((resolve, reject) => {
     activeResolve = resolve
@@ -157,6 +217,7 @@ let currentToken = ''
 const doUpload = async (retryCount = 0) => {
   const f = file.value
   if (!f) return
+  activeError = null
   failed.value = false
   completed.value = false
   progress.value = 0
@@ -203,7 +264,8 @@ const doUpload = async (retryCount = 0) => {
     })
     if (!presignApi.isOk(initRes.code) || !initRes.data) {
       // uploadError 保留业务码：失败分类（classifyUploadFailure）要按码判定
-      throw uploadError(initRes.code, initRes.message || 'Init failed')
+      throw uploadError(initRes.code, initRes.message || 'Init failed',
+        (initRes as { trace_id?: string }).trace_id)
     }
     const initData = initRes.data
 
@@ -232,6 +294,10 @@ const doUpload = async (retryCount = 0) => {
     // 而实测家宽上行 ~0.86MB/s ⇒ 1.35GB 需 ~26 分钟 ⇒ 300s 必掐断。
     statusText.value = t('upload_view.presign.upload')
     putAbort = new AbortController()
+    meter.reset()
+    speedText.value = ''
+    speedWarn.value = false
+    const putStartedAt = Date.now()
     await xhrRaw({
       url: initData.upload_url,
       method: initData.method || 'PUT',
@@ -245,6 +311,20 @@ const doUpload = async (retryCount = 0) => {
       onProgress: (loaded, total) => {
         progress.value = Math.round((loaded / total) * 95)
         options.value.onProgress?.({ phase: 'put', loaded, total })
+        // 速度 + ETA（设计 B3）：滑窗测速展示在进度条下方
+        meter.record(loaded)
+        const bps = meter.speedBps()
+        const eta = meter.etaSeconds(total - loaded)
+        const { h, m, s } = formatEtaHms(eta ?? 0)
+        speedText.value = eta === null
+          ? t('upload_view.presign.speedOnly', { speed: formatSpeed(bps) })
+          : t('upload_view.presign.speedEta', {
+              speed: formatSpeed(bps),
+              eta: h > 0 ? t('upload.etaHms', { h, m, s }) : t('upload.etaMs', { m, s }),
+            })
+        // 低速预警：按当前速度 + 已耗时预估，超时预算内传不完 ⇒ 黄字提前告警
+        speedWarn.value = eta !== null
+          && Date.now() - putStartedAt + eta * 1000 > uploadTimeoutForSize(f.size)
       },
     })
     putAbort = null
@@ -261,7 +341,8 @@ const doUpload = async (retryCount = 0) => {
     if (!presignApi.isOk(completeRes.code) || !completeRes.data) {
       // 业务码随错误上抛（2026-11-03）：此前 throw new Error(message) 把 code
       // 丢在门外 ⇒ 30011「文件类型不允许」被分类成 unknown、还被整份重传 2 次
-      throw uploadError(completeRes.code, completeRes.message || 'Complete failed')
+      throw uploadError(completeRes.code, completeRes.message || 'Complete failed',
+        (completeRes as { trace_id?: string }).trace_id)
     }
 
     progress.value = 100
@@ -293,12 +374,47 @@ const doUpload = async (retryCount = 0) => {
     const hint = t(`upload_view.failure.${kind}`)
     errorMessage.value = SERVER_DETAIL_KINDS.has(kind) && msg ? `${hint}\n${msg}` : hint
     statusText.value = t('upload_view.presign.failed')
-    fail(e)
+    // 失败卡片**保持打开**（2026-11-03 设计 B2）：此前这里直接 fail(e) ⇒ close()
+    // 连带把 failed/errorMessage 重置 ⇒ error-detail 从未真正渲染过（死 UI，
+    // #69 的服务端原文上屏在这个面上从未显示）。现在等用户选动作——
+    // 重试 / 换分片通道（reject switchChannelError ⇒ queue 回退 multi-chunk）/
+    // 复制诊断信息 / 更换文件或取消（reject 原错误 ⇒ queue 落任务行）。
+    lastDiag.value = {
+      code,
+      message: msg,
+      traceId: (e as { traceId?: string })?.traceId ?? (e as { trace_id?: string })?.trace_id,
+    }
+    activeError = e
   }
 }
 
 const retry = () => {
+  activeError = null
   void doUpload(0)
+}
+
+/** 换分片通道：拒绝并让 queue 回退 multi-chunk（isSwitchChannelRequested 分支） */
+const switchChannel = () => {
+  activeError = null
+  fail(switchChannelError())
+}
+
+/** 更换文件：把原错误结算给 queue（任务行显示原因），用户移除该行换文件 */
+const replaceFile = () => {
+  const e = activeError ?? new Error('Upload failed')
+  activeError = null
+  fail(e)
+}
+
+/** 复制诊断信息：code/message/trace_id 一键复制（贴给管理员即可对日志检索） */
+const copyDiag = async () => {
+  const d = lastDiag.value
+  const ok = await copyToClipboard(formatUploadDiagnostics({
+    file: file.value?.name, code: d?.code, message: d?.message, traceId: d?.traceId,
+  }))
+  ElMessage[ok ? 'success' : 'error'](
+    t(ok ? 'upload_view.presign.diagCopied' : 'upload_view.presign.diagCopyFailed')
+  )
 }
 
 const handleCancel = async () => {
@@ -384,6 +500,23 @@ defineExpose({ open })
 
 .error-detail {
   margin-top: 16px;
+}
+
+.speed-text {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #909399);
+}
+
+.speed-text.speed-warn {
+  color: var(--el-color-warning, #e6a23c);
+}
+
+.error-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .icon-primary {

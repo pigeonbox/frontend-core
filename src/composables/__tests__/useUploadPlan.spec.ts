@@ -1,18 +1,27 @@
 import { describe, it, expect } from 'vitest'
-import { pickUploadPlan, isPresignFallbackEligible } from '../useUploadPlan'
+import { pickUploadPlan, isPresignFallbackEligible, DEFAULT_CHUNK_RESUME_THRESHOLD } from '../useUploadPlan'
 
 const MB = 1024 * 1024
 const base = { bodyCap: 8 * MB, presignThreshold: 100 * MB }
 
-describe('pickUploadPlan', () => {
-  it('单文件 ≤ 阈值 → direct', () => {
-    expect(pickUploadPlan({ ...base, count: 1, totalBytes: 5 * MB, maxFileBytes: 5 * MB })).toBe('direct')
+describe('pickUploadPlan（2026-11-03 Phase 2 矩阵：≥32MB 可续传优先）', () => {
+  it('单文件 <32MB 且 ≤ presign 上限 → presign（快通道+秒传检索）', () => {
+    expect(pickUploadPlan({ ...base, count: 1, totalBytes: 5 * MB, maxFileBytes: 5 * MB })).toBe('presign')
   })
-  it('单文件 > 阈值 → presign', () => {
-    expect(pickUploadPlan({ ...base, count: 1, totalBytes: 101 * MB, maxFileBytes: 101 * MB })).toBe('presign')
+  it('单文件 ≥32MB → multi-chunk（默认分片，可续传）', () => {
+    expect(pickUploadPlan({ ...base, count: 1, totalBytes: 32 * MB, maxFileBytes: 32 * MB })).toBe('multi-chunk')
+    expect(pickUploadPlan({ ...base, count: 1, totalBytes: 1350 * MB, maxFileBytes: 1350 * MB })).toBe('multi-chunk')
   })
-  it('单文件恰好等于阈值 → direct（> 才走 presign，钉现状）', () => {
-    expect(pickUploadPlan({ ...base, count: 1, totalBytes: 100 * MB, maxFileBytes: 100 * MB })).toBe('direct')
+  it('阈值常量=32MB（设计稿口径）', () => {
+    expect(DEFAULT_CHUNK_RESUME_THRESHOLD).toBe(32 * MB)
+  })
+  it('管理员把 presign 上限调到 32MB 以下：小文件超上限兜底 direct 单发', () => {
+    expect(
+      pickUploadPlan({ count: 1, totalBytes: 20 * MB, maxFileBytes: 20 * MB, bodyCap: 49 * MB, presignThreshold: 10 * MB, presignAllowed: true })
+    ).toBe('direct')
+    expect(
+      pickUploadPlan({ count: 1, totalBytes: 5 * MB, maxFileBytes: 5 * MB, bodyCap: 49 * MB, presignThreshold: 10 * MB, presignAllowed: true })
+    ).toBe('presign')
   })
   it('多文件总体积与单文件均 ≤ bodyCap → multi-direct', () => {
     expect(pickUploadPlan({ ...base, count: 3, totalBytes: 6 * MB, maxFileBytes: 3 * MB })).toBe('multi-direct')
@@ -53,10 +62,10 @@ describe('presignAllowed=false（匿名直传被管理开关关闭）', () => {
       pickUploadPlan({ count: 3, totalBytes: 300 * MB, maxFileBytes: 120 * MB, bodyCap: 49 * MB, presignThreshold: 100 * MB, presignAllowed: false })
     ).toBe('multi-chunk')
   })
-  it('缺省 presignAllowed（undefined）→ 保持旧行为（>阈值 presign）', () => {
+  it('缺省 presignAllowed（undefined）→ ≥32MB 仍 multi-chunk（可续传优先同规）', () => {
     expect(
       pickUploadPlan({ count: 1, totalBytes: 200 * MB, maxFileBytes: 200 * MB, bodyCap: 49 * MB, presignThreshold: 100 * MB })
-    ).toBe('presign')
+    ).toBe('multi-chunk')
   })
 })
 
