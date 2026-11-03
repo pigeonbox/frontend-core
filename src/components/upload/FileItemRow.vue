@@ -36,7 +36,8 @@
       </div>
       <el-progress
         v-if="showProgressBar"
-        :percentage="task.progress"
+        :percentage="task.status === 'encrypting' ? 0 : task.progress"
+        :indeterminate="task.status === 'encrypting'"
         :stroke-width="4"
         :show-text="false"
         :status="task.status === 'success' ? 'success' : ''"
@@ -106,6 +107,10 @@ const isBusy = computed(() =>
  * 批次总进度条呈现真聚合值。
  *
  * success 行仍渲染（进度 100% 是真的）。
+ *
+ * ⚠️ encrypting 行走**不确定态**：加密阶段没有百分比可报（整块 AES-GCM 加密，
+ * 进度恒 0）⇒ 用脉冲条表示「在动」，别显示一个恒为 0 的条（1.35GB 加密几十秒
+ * 界面零反馈）。
  */
 const showProgressBar = computed(() => {
   if (props.task.status === 'success') return true
