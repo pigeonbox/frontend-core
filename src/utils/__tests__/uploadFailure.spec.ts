@@ -7,7 +7,12 @@
 //     PUT 超时必须用 uploadTimeoutForSize 按文件大小给预算（而非固定 300s），
 //     且失败文案必须走 classifyUploadFailure 分类。
 import { describe, it, expect } from 'vitest'
-import { classifyUploadFailure } from '../uploadFailure'
+import {
+  classifyUploadFailure,
+  isPermanentUploadFailure,
+  uploadError,
+  SERVER_DETAIL_KINDS,
+} from '../uploadFailure'
 import { uploadTimeoutForSize, UPLOAD_MIN_TIMEOUT_MS, UPLOAD_MAX_TIMEOUT_MS } from '@/api/_xhr'
 import { readSrc, stripComments } from '@/utils/__tests__/sourceScan'
 
@@ -31,6 +36,11 @@ describe('classifyUploadFailure（失败分类）', () => {
   it('code 30002（存储配额超限）→ quota', () => {
     expect(classifyUploadFailure(30002, '存储配额不足')).toBe('quota')
     expect(classifyUploadFailure(30002)).toBe('quota')
+  })
+
+  it('code 30011（文件类型/内容被拒）→ type（2026-11-03：.AppImage 误杀实录）', () => {
+    expect(classifyUploadFailure(30011, '文件内容与扩展名不符（检测到 ELF (linux executable)）')).toBe('type')
+    expect(classifyUploadFailure(30011)).toBe('type')
   })
 
   it.each([10010, 30008])('code %i（体积被拒）→ size', (code) => {
@@ -77,6 +87,46 @@ describe('uploadTimeoutForSize（PUT 超时按文件大小给预算）', () => {
   })
 })
 
+describe('isPermanentUploadFailure（永久性业务拒绝不重试）', () => {
+  it.each([
+    [30011, '文件内容与扩展名不符（检测到 ELF）'], // 类型/内容被拒（真机实录）
+    [30002, '存储配额超限'],
+    [10010, '文件过大: 最大允许 4294967296 字节'],
+    [10012, '上传已关闭'],
+    [30013, '内容未通过审核'],
+    [30014, '上传会话已完成'],
+  ])('code %i 是永久性拒绝（重试同通道必然同样失败）', (code, msg) => {
+    expect(isPermanentUploadFailure(code, msg)).toBe(true)
+    expect(isPermanentUploadFailure(code)).toBe(true)
+  })
+
+  it.each([
+    [0, 'Timeout'],
+    [0, 'Network error'],
+    [500, 'Internal Error'],
+    [undefined, 'something odd'],
+    [10004, '资源不存在'],
+  ])('code %i / %s 可重试（传输层抖动或未知失败）', (code, msg) => {
+    expect(isPermanentUploadFailure(code, msg)).toBe(false)
+  })
+})
+
+describe('uploadError（业务码随错误上抛）', () => {
+  it('Error 携带 code，分类才看得见业务码', () => {
+    const e = uploadError(30011, '文件内容与扩展名不符（检测到 ELF）')
+    expect(e).toBeInstanceOf(Error)
+    expect((e as { code?: number }).code).toBe(30011)
+    expect(e.message).toContain('扩展名')
+    expect(classifyUploadFailure((e as { code?: number }).code, e.message)).toBe('type')
+  })
+  it('type 分类要附服务端原文（具体原因不能被通用文案抹掉）', () => {
+    expect(SERVER_DETAIL_KINDS.has('type')).toBe(true)
+    expect(SERVER_DETAIL_KINDS.has('quota')).toBe(true)
+    expect(SERVER_DETAIL_KINDS.has('size')).toBe(true)
+    expect(SERVER_DETAIL_KINDS.has('timeout')).toBe(false)
+  })
+})
+
 describe('PresignUploadDialog.vue 接线（源码级）', () => {
   const src = stripComments(readSrc('components/upload/PresignUploadDialog.vue'))
 
@@ -85,5 +135,18 @@ describe('PresignUploadDialog.vue 接线（源码级）', () => {
   })
   it('失败文案走 classifyUploadFailure 分类（不再裸上屏单句「上传失败」）', () => {
     expect(src).toMatch(/classifyUploadFailure\s*\(/)
+  })
+  it('init/complete 的业务错误用 uploadError 上抛（code 不得丢失，至少 2 处）', () => {
+    expect(src.match(/uploadError\s*\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+  })
+  it('重试分支以 isPermanentUploadFailure 把关（永久性业务拒绝不整文件重传）', () => {
+    // 判据＝**取反使用**（!isPermanentUploadFailure(...) 才是把关形态）：
+    // 仅「调用存在」挡不住 `false && isPermanentUploadFailure(...)` 这类废除变异。
+    // 负对照：还原成无脑 `retryCount < 2` 重试 ⇒ 本条红
+    expect(src).toMatch(/!\s*isPermanentUploadFailure\s*\(/)
+  })
+  it('业务拒绝上屏服务端原文（SERVER_DETAIL_KINDS 拼接）', () => {
+    // 负对照：errorMessage 只取通用 hint ⇒ 本条红
+    expect(src).toMatch(/SERVER_DETAIL_KINDS\s*\.\s*has\s*\(/)
   })
 })
