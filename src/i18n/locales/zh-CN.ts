@@ -306,6 +306,9 @@ export default {
   upload: {
     title: '上传文件',
     dragHint: '将文件拖到此处，或点击选择',
+    selectFolder: '上传文件夹',
+    folderHint: '保留目录结构：取件页按目录展示，打包 zip 保持层级',
+    emptyFolder: '所选文件夹里没有文件（空目录不会产生文件）',
     clickHint: '支持多文件上传，{clause}',
     maxFileLimited: '单文件最大 {size}',
     maxFileUnlimited: '单文件大小不限',

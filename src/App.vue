@@ -14,6 +14,9 @@ import { useI18n } from 'vue-i18n'
 import { ElConfigProvider } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import en from 'element-plus/es/locale/lang/en'
+import ja from 'element-plus/es/locale/lang/ja'
+import de from 'element-plus/es/locale/lang/de'
+import ru from 'element-plus/es/locale/lang/ru'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 import { useConfigStore } from '@/stores/config'
@@ -32,7 +35,14 @@ const localeStore = useLocaleStore()
 
 // Element Plus 内置文案（No Data / 分页 / 日期选择器等）跟随当前语言
 // 类型断言：EP locale 模块的类型声明与 ConfigProvider 期望的 Language 类型存在版本差异
-const epLocale = computed(() => (locale.value === 'zh-CN' ? zhCn as any : en as any))
+const EP_LOCALES: Record<string, any> = {
+  'zh-CN': zhCn,
+  'en-US': en,
+  'ja-JP': ja,
+  'de-DE': de,
+  'ru-RU': ru,
+}
+const epLocale = computed(() => EP_LOCALES[locale.value] ?? zhCn)
 
 // 主题色统一入口：accent 来自 /api/config（管理后台可配）。
 // 全局应用（此前只有首页设置且从不清理，导致用户中心两套主色并存）；
