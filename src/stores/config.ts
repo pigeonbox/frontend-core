@@ -9,6 +9,7 @@ import {
   deploymentMode as capsDeploymentMode,
   publicUrlConfigured as capsPublicUrlConfigured,
   federationUsable as capsFederationUsable,
+  emailPasswordResetAvailable as capsEmailPasswordReset,
 } from '@/utils/capabilities'
 
 export const useConfigStore = defineStore('config', () => {
@@ -92,6 +93,8 @@ export const useConfigStore = defineStore('config', () => {
   const setupTokenRequired = computed(() => capsSetupTokenRequired(config.value))
   const deploymentMode = computed(() => capsDeploymentMode(config.value))
   const publicUrlConfigured = computed(() => capsPublicUrlConfigured(config.value))
+  // 5.2.0 邮箱自助找回密码：只认服务端明确说 true（缺字段=老后端无该端点）
+  const emailPasswordReset = computed(() => capsEmailPasswordReset(config.value))
 
   return {
     config,
@@ -110,5 +113,6 @@ export const useConfigStore = defineStore('config', () => {
     setupTokenRequired,
     deploymentMode,
     publicUrlConfigured,
+    emailPasswordReset,
   }
 })

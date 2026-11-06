@@ -52,6 +52,22 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'route.register' },
   },
   {
+    // 邮箱自助找回密码（5.2.0）：匿名页——用户此刻通常正处于登录不上的状态
+    path: '/user/forgot-password',
+    name: 'ForgotPassword',
+    component: () => import('@/views/user/ForgotPassword.vue'),
+    meta: { title: 'route.forgotPassword' },
+  },
+  {
+    // 重置密码：路径**必须正好** /reset-password —— 服务端发的邮件链接是
+    // /#/reset-password?token=…（core 侧硬编码），改这里会让全部重置链接失效。
+    // token 落在 fragment（# 之后）⇒ 不进访问日志、不随 Referer 外发。
+    path: '/reset-password',
+    name: 'ResetPassword',
+    component: () => import('@/views/user/ResetPassword.vue'),
+    meta: { title: 'route.resetPassword' },
+  },
+  {
     path: '/setup',
     name: 'Setup',
     component: () => import('@/views/setup/Index.vue'),
@@ -91,6 +107,13 @@ const routes: RouteRecordRaw[] = [
         name: 'UserTokens',
         component: () => import('@/views/user/Tokens.vue'),
         meta: { title: 'route.userTokens', requiresAuth: true },
+      },
+      {
+        // 账号与信任（5.2.0）：二次验证 + 登录设备
+        path: 'security',
+        name: 'UserSecurity',
+        component: () => import('@/views/user/Security.vue'),
+        meta: { title: 'route.userSecurity', requiresAuth: true },
       },
       {
         path: 'requests',

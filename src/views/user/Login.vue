@@ -51,6 +51,23 @@
           />
         </el-form-item>
 
+        <!-- 二次验证码（5.2.0）：账号开启 2FA 后，服务端对「口令正确但缺验证码」
+             回 40012（HTTP 401，但**不计失败锁定**）⇒ 这里据此增量显示第二个输入框，
+             不重置已填的口令。-->
+        <el-form-item v-if="needTotp" :label="t('login.totpCode')" prop="totpCode">
+          <el-input
+            ref="totpInputRef"
+            v-model="loginForm.totpCode"
+            :placeholder="t('login.totpCodePlaceholder')"
+            prefix-icon="Key"
+            size="large"
+            maxlength="9"
+            clearable
+            @keyup.enter="handleLogin"
+          />
+          <div class="totp-hint">{{ t('login.totpHint') }}</div>
+        </el-form-item>
+
         <el-form-item>
           <el-button
             type="primary"
@@ -69,6 +86,14 @@
             {{ t('login.oidc') }}
           </el-button>
         </el-form-item>
+
+        <!-- 找回密码入口：只有站级 SMTP 配好（且后端是 5.2.0+）才出现——
+             没配 SMTP 时端点恒返回成功但不发信，给了入口用户只会等一封不来的邮件。-->
+        <div v-if="configStore.emailPasswordReset" class="login-footer extra">
+          <el-link type="primary" underline="never" @click="$router.push('/user/forgot-password')">
+            {{ t('login.forgotPassword') }}
+          </el-link>
+        </div>
 
         <div v-if="registerVisible" class="login-footer">
           <el-link type="primary" underline="never" @click="$router.push('/user/register')">
@@ -140,11 +165,22 @@ onMounted(() => {
 })
 
 const loginFormRef = ref<FormInstance>()
+const totpInputRef = ref<{ focus?: () => void }>()
 const loading = ref(false)
+
+/**
+ * 是否进入「第二阶段」登录（账号已开二验）。
+ *
+ * 判据只有一个：服务端回 40012。
+ * ⚠️ 不要用「先查账号是否开二验」来预告这一步——那是一个**账号枚举面**
+ * （未登录就能问出某账号有没有 2FA），服务端也不提供该查询。
+ */
+const needTotp = ref(false)
 
 const loginForm = reactive({
   username: '',
-  password: ''
+  password: '',
+  totpCode: ''
 })
 
 const rules: FormRules = {
@@ -155,6 +191,12 @@ const rules: FormRules = {
   password: [
     { required: true, message: () => t('login.passwordPlaceholder'), trigger: 'blur' },
     { min: 6, max: 20, message: t('login.passwordRule'), trigger: 'blur' }
+  ],
+  // 只在第二阶段要求；恢复码是 10 位（含连字符 14 位）⇒ 上限放到 20，
+  // 下限放到 6（6 位 TOTP / 归一化后的恢复码都可能更短）
+  totpCode: [
+    { required: true, message: () => t('login.totpCodePlaceholder'), trigger: 'blur' },
+    { min: 6, max: 20, message: t('login.totpCodeRule'), trigger: 'blur' }
   ]
 }
 
@@ -165,7 +207,11 @@ const handleLogin = async () => {
     await loginFormRef.value.validate()
     loading.value = true
 
-    await userStore.login(loginForm.username, loginForm.password)
+    await userStore.login(
+      loginForm.username,
+      loginForm.password,
+      needTotp.value ? loginForm.totpCode.trim() : undefined,
+    )
 
     ElMessage.success(t('login.success'))
 
@@ -173,6 +219,15 @@ const handleLogin = async () => {
     const redirect = router.currentRoute.value.query.redirect as string
     router.push(redirect || '/')
   } catch (error: any) {
+    // 40012 = 口令已对、只缺二次验证码（服务端刻意不把它算作失败，也不锁账号）
+    // ⇒ 切到第二阶段，保留已填的用户名口令，只多要一个码。
+    if (error?.code === 40012) {
+      needTotp.value = true
+      ElMessage.warning(t('login.totpRequired'))
+      // 下一帧再聚焦：此时输入框刚由 v-if 挂上
+      setTimeout(() => totpInputRef.value?.focus?.(), 0)
+      return
+    }
     // 走统一错误映射（英文界面否则直接显示后端中文原文，2026-10-22 审计）
     // ⚠️ `t(k) || fallback` 是死代码（vue-i18n 缺键返回键名本身，非空串）⇒
     // 用 te() 判存在性（2026-10-26 审计）
@@ -255,5 +310,18 @@ const handleLogin = async () => {
 .login-footer {
   text-align: center;
   margin-top: var(--spacing-sm);
+}
+
+/* 找回密码链接与注册链接两行之间留一点缝，避免贴在一起像一个按钮 */
+.login-footer.extra {
+  margin-bottom: var(--spacing-xs);
+}
+
+/* 二验输入框下方的说明（「也支持恢复码」） */
+.totp-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-top: var(--spacing-xs);
 }
 </style>
