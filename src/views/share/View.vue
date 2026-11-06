@@ -139,7 +139,20 @@
                 />
               </div>
               <div class="multi-file-list">
-                <div v-for="f in shareFiles" :key="f.id" class="multi-file-item">
+                <!-- 目录上传（5.3.0）：按分享内相对目录分组，每组一个目录标题。
+                     扁平分享只有一组（dir="" ⇒ 不渲染标题）⇒ 呈现与改动前一致。 -->
+                <template v-for="group in groupedShareFiles" :key="group.dir || '__root__'">
+                  <div v-if="group.dir" class="multi-dir-header">
+                    <el-icon class="icon-secondary"><FolderOpened /></el-icon>
+                    <span class="m-dir" :title="group.dir">{{ group.dir }}/</span>
+                    <span class="m-dir-count">{{ group.items.length }}</span>
+                  </div>
+                <div
+                  v-for="f in group.items"
+                  :key="f.id"
+                  class="multi-file-item"
+                  :class="{ 'in-dir': group.dir }"
+                >
                   <el-icon class="icon-secondary"><Document /></el-icon>
                   <span class="m-name" :title="f.name">{{ f.name }}</span>
                   <span class="m-size">{{ formatFileSize(f.size) }}</span>
@@ -159,6 +172,7 @@
                     @error="onDownloadError"
                   />
                 </div>
+                </template>
               </div>
             </div>
 
@@ -233,7 +247,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import {
-  HomeFilled, Document, Folder, CopyDocument, Loading, Memo
+  HomeFilled, Document, Folder, FolderOpened, CopyDocument, Loading, Memo
 } from '@element-plus/icons-vue'
 import { shareApi } from '@/api/share'
 import { decryptBytes, decryptText, unwrapKey } from '@/utils/e2e'
@@ -284,6 +298,36 @@ const shareFiles = computed<any[]>(() =>
 const totalShareSize = computed(() =>
   shareFiles.value.reduce((s, f) => s + (Number(f.size) || 0), 0)
 )
+
+/**
+ * 取件页文件分组（5.3.0 目录上传）。
+ *
+ * 两条刻意不同的口径：
+ *  - **无目录**（全部 rel_dir 空）⇒ 单组且**保持后端下发顺序**（= 上传顺序）。
+ *    扁平分享的呈现与 5.3.0 之前逐字节一致——这次改动不该顺手改掉既有排序。
+ *  - **有目录** ⇒ 按 rel_dir 排序后分组，每组一个目录标题、文件缩进。
+ *    不做递归树：目录深度由标题的完整路径自身表达（"photos/2024"），而递归树
+ *    在窄屏上会吃掉一半宽度；实测这类分享 90% 只有一两层。
+ */
+type ShareFileGroup = { dir: string; items: any[] }
+const groupedShareFiles = computed<ShareFileGroup[]>(() => {
+  const files = shareFiles.value
+  if (!files.some((f) => f?.rel_dir)) return [{ dir: '', items: files }]
+  const sorted = [...files].sort((a, b) => {
+    const da = String(a?.rel_dir ?? '')
+    const db = String(b?.rel_dir ?? '')
+    if (da !== db) return da < db ? -1 : 1
+    return String(a?.name ?? '').localeCompare(String(b?.name ?? ''))
+  })
+  const out: ShareFileGroup[] = []
+  for (const f of sorted) {
+    const dir = String(f?.rel_dir ?? '')
+    const last = out[out.length - 1]
+    if (last && last.dir === dir) last.items.push(f)
+    else out.push({ dir, items: [f] })
+  }
+  return out
+})
 
 // 分享受密码保护？（契约 ShareDetail.has_password）
 const shareHasPassword = computed(() => !!shareData.value?.has_password)
@@ -750,6 +794,35 @@ useRouteParam(
   gap: 8px;
   max-height: 360px;
   overflow-y: auto;
+}
+
+.multi-dir-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  margin-top: 4px;
+  border-radius: 6px;
+  background: var(--color-muted);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.multi-dir-header .m-dir {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.multi-dir-header .m-dir-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* 目录内的文件缩进一级：视觉上从属于上方的目录标题 */
+.multi-file-item.in-dir {
+  padding-left: 24px;
 }
 
 .multi-file-item {

@@ -41,6 +41,27 @@
       </div>
     </el-upload>
 
+    <!-- 上传文件夹（5.3.0）：el-upload 不支持 webkitdirectory（它的 input 由组件
+         内部创建，没有地方挂属性）⇒ 单独一个隐藏原生 input 驱动。
+         webkitdirectory + directory 双写：Chrome/Edge/Safari 认前者，
+         部分 Chromium 分支/旧内核认后者。 -->
+    <div v-if="!visitorUploadBlocked" class="folder-picker">
+      <el-button size="small" plain @click="pickFolder">
+        <el-icon><FolderAdd /></el-icon>
+        <span>{{ t('upload.selectFolder') }}</span>
+      </el-button>
+      <span class="folder-hint">{{ t('upload.folderHint') }}</span>
+      <input
+        ref="folderInput"
+        type="file"
+        webkitdirectory
+        directory
+        multiple
+        class="folder-input"
+        @change="onFolderPicked"
+      />
+    </div>
+
     <!-- 批次总进度（仅 multi-direct 通道激活）：单请求只有聚合字节数 ⇒ 逐文件
          百分比是假的（见 useUploadQueue 的 percentValid 注释）⇒ 真数放这里 -->
     <div v-if="batchProgress.active" class="batch-progress">
@@ -128,7 +149,7 @@
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { ElMessage, type UploadFile } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { UploadFilled, Promotion, WarningFilled } from '@element-plus/icons-vue'
+import { UploadFilled, Promotion, WarningFilled, FolderAdd } from '@element-plus/icons-vue'
 import { useConfigStore } from '@/stores/config'
 import { formatFileSize } from '@/utils/format'
 import { useUserStore } from '@/stores/user'
@@ -179,6 +200,28 @@ const emit = defineEmits<{ success: [result: ShareResult] }>()
 
 const { settings, validate, validateE2e, validatePickupCount } = useShareSettings()
 const presignDialog = ref<InstanceType<typeof PresignUploadDialog> | null>(null)
+
+// 目录上传（5.3.0）：文件选择器本身由浏览器渲染，点按钮即触发。
+const folderInput = ref<HTMLInputElement | null>(null)
+const pickFolder = () => folderInput.value?.click()
+
+// onFolderPicked 收下一整个文件夹。
+//
+// 两处刻意的「说出来」而不是静默：
+//  ① 空目录：浏览器对空目录**不产生任何 File**（目录不是条目）⇒ 用户点完按钮
+//     毫无反应。必须显式提示，否则看起来就是坏的。
+//  ② keepRelativePath=true：目录信息只在 File.webkitRelativePath 上，队列在
+//     选文件的这一刻取下来存进任务（之后再从 file.name 推就永远拿不到了）。
+const onFolderPicked = (e: Event) => {
+  const input = e.target as HTMLInputElement
+  const picked = input.files ? Array.from(input.files) : []
+  input.value = '' // 允许连续选同一个文件夹（不重置则 change 不再触发）
+  if (picked.length === 0) {
+    ElMessage.warning(t('upload.emptyFolder'))
+    return
+  }
+  addFiles(picked, { keepRelativePath: true })
+}
 
 // 单请求体上限：后端 Hertz max body = upload_size（未知时保守取 8MB），留 1MB 表单开销余量
 const queue = useUploadQueue({
@@ -384,6 +427,26 @@ onBeforeUnmount(() => dispose())
 .upload-dragger :deep(.el-upload) {
   flex: 1;
   display: flex;
+}
+
+/* 上传文件夹入口：贴在拖拽区下方一行，不抢主按钮的视觉权重
+   （主路径仍是「拖/点多选」，目录上传是进阶用法） */
+.folder-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -12px 0 20px;
+}
+
+.folder-hint {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+/* 隐藏原生 input：它只作为「文件系统选择器」的触发器，界面由按钮表现 */
+.folder-input {
+  display: none;
 }
 
 /* 手机端拖拽区收紧:降低留白,避免空拖拽区占满首屏 */

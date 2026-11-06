@@ -12,7 +12,11 @@
       <el-icon size="32"><Document /></el-icon>
     </div>
     <div class="file-info">
-      <div class="file-name">{{ task.file.name }}</div>
+      <!-- 目录上传（5.3.0）：名字前面带相对目录，否则一个文件夹里 20 个同名
+           index.html 在列表里完全无法区分（用户会以为重复添加了） -->
+      <div class="file-name" :title="task.relDir ? `${task.relDir}/${task.file.name}` : task.file.name">
+        <span v-if="task.relDir" class="file-dir">{{ task.relDir }}/</span>{{ task.file.name }}
+      </div>
       <div class="file-meta">
         <span>{{ formatFileSize(task.file.size) }}</span>
         <span class="file-type">{{ getFileType(task.file.name) }}</span>
@@ -269,6 +273,12 @@ const getFileType = (filename: string): string => {
   font-size: 14px;
   word-break: break-all;
   margin-bottom: 4px;
+}
+
+/* 相对目录：与文件名同色但更浅，读起来是「路径 + 名字」而不是两个并列标题 */
+.file-dir {
+  font-weight: 400;
+  color: var(--color-text-secondary);
 }
 
 .file-meta {

@@ -58,6 +58,15 @@ export interface UploadTask {
    * 其余通道（direct / presign / multi-chunk）本就是逐文件粒度 ⇒ 保持可信。
    */
   percentValid?: boolean
+  /**
+   * 分享内相对目录（5.3.0 目录上传；空/缺省 = 根）。
+   *
+   * 从 File.webkitRelativePath 的**父路径**得来——注意不能从 file.name 推：
+   * 浏览器给 upload 的 name 恒为裸文件名，目录信息只在 webkitRelativePath 上，
+   * 而它会随「重新构造的 File」（E2E 密文、加密后 rename）一起丢失 ⇒ 必须在
+   * 选文件的那一刻取下来存在任务上。
+   */
+  relDir?: string
 }
 
 /**
@@ -211,7 +220,24 @@ export function useUploadQueue(opts: {
     })
   }
 
-  const addFiles = (files: File[] | FileList) => {
+  /**
+   * relDirOf 从 webkitRelativePath 取分享内相对目录（去掉最后一段文件名）。
+   *
+   * 只在「上传文件夹」入口传 keepRelativePath=true 时使用：普通多选/拖拽得到的
+   * File 上 webkitRelativePath 为空串，行为与 5.3.0 之前完全一致。
+   *
+   * 第一段是用户选中的那个文件夹名（浏览器语义，如 "photos/2024/a.jpg"）——
+   * 保留它：用户在取件页看到的树因此与自己磁盘上选的那棵树同名。
+   */
+  const relDirOf = (f: File): string => {
+    const rel = (f as File & { webkitRelativePath?: string }).webkitRelativePath ?? ''
+    if (!rel) return ''
+    const normalized = rel.replace(/\\/g, '/')
+    const idx = normalized.lastIndexOf('/')
+    return idx > 0 ? normalized.slice(0, idx) : ''
+  }
+
+  const addFiles = (files: File[] | FileList, options?: { keepRelativePath?: boolean }) => {
     const limit = maxFileSizeLimit()
     for (const f of Array.from(files)) {
       // 超限/禁传扩展名直接落 blocked 终态：选完文件即刻可见，且不计入 canStart
@@ -230,6 +256,7 @@ export function useUploadQueue(opts: {
             ? t('upload.blockedExt', { ext: bext })
             : '',
         percentValid: true,
+        relDir: options?.keepRelativePath ? relDirOf(f) : '',
       })
     }
     if (limit > 0) {
@@ -487,6 +514,15 @@ export function useUploadQueue(opts: {
       presignAllowed,
     })
 
+    // 目录上传（5.3.0）：单文件通道**没有**「分享内相对目录」这个位
+    // （direct/presign 是逐文件成享，服务端只认一个文件名）⇒ 若本批带目录，
+    // 必须改走 multi 通道，否则目录结构在落库前就被静默丢掉（用户只会看到
+    // 「文件都在，但全部平铺在根目录」）。
+    // 只有 1 个文件时 pickUploadPlan 会给 direct/presign ⇒ 这里兜回来。
+    if ((plan === 'direct' || plan === 'presign') && pending.some((t) => t.relDir)) {
+      plan = maxFileBytes <= (opts.bodyCap?.() ?? DEFAULT_BODY_CAP) ? 'multi-direct' : 'multi-chunk'
+    }
+
     try {
       if (plan === 'direct') {
         const task = pending[0]!
@@ -633,9 +669,11 @@ export function useUploadQueue(opts: {
         // 聚合字节数 ⇒ 按文件顺序均摊会让第一个文件先冲到 100%、其余长期 0%
         // （那是误导，不是估算）⇒ 关掉行内百分比，改由批次总进度条呈现真聚合值。
         for (const task of pending) task.percentValid = false
+        // 目录上传：dirs 与 payloads 同序（payload 可能是 E2E 密文 File ⇒ 目录
+        // 只能取任务上存的 relDir，不能从 payload 的 webkitRelativePath 读）
         const result = await multiDirect(
           payloads,
-          multiOptions(wrappedKey),
+          { ...multiOptions(wrappedKey), dirs: pending.map((t) => t.relDir ?? '') },
           (loaded, total) => {
             batchProgress.value = {
               active: true,
@@ -672,7 +710,9 @@ export function useUploadQueue(opts: {
       // 断点续传（2026-11-03 Phase 2）：每文件先查任务记录拿续传坐标，服务端会话
       // 位图为准（getChunkStatus），缺片补传；坐标经任务 store 写穿 localStorage。
       multiAbort = new AbortController()
-      const entries: Array<{ upload_id: string }> = []
+      // rel_dir：目录上传的相对路径（5.3.0）。绑定阶段与 upload_id 同序上报；
+      // 空串表示平铺文件，不发该字段（服务端 optional）。
+      const entries: Array<{ upload_id: string; rel_dir?: string }> = []
       const store = opts.uploadTasks
       const recOf = new Map<string, string>()
       // 秒传早命中的直出结果（单文件路径；命中即免绑定）
@@ -843,7 +883,7 @@ export function useUploadQueue(opts: {
           task.status = 'binding'
           task.progress = 100
           task.statusText = t('upload.prepare')
-          entries.push({ upload_id: sessionId })
+          entries.push({ upload_id: sessionId, rel_dir: task.relDir || undefined })
         } catch (e) {
           // 暂停（Phase 3）：片间边界抛 'Paused' ⇒ 保留续传坐标、任务落 paused，
           // 不走错误路径。恢复走 resumeTask → startRun(true) 补缺片。
