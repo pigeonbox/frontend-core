@@ -47,6 +47,35 @@ export type AdminConfigUpdate = Partial<BasicConfigUpdate & SecurityConfigUpdate
   [key: string]: unknown
 }
 
+// 备份包条目（/admin/backups 的 items）。
+export interface BackupItem {
+  name: string
+  size: number
+  // 生成时间取自**文件名**（不是 mtime），RFC3339；空串表示解析不出（不该发生）
+  created_at: string
+  download_url: string
+}
+
+// 备份状态 + 列表（一次请求取齐）。
+//
+// 为什么合成一个响应而不是两次请求：分两次会让卡片短暂出现「有 3 份包但显示
+// 从未备份」这种自相矛盾的中间态——运维看到这种图只会怀疑功能坏了。
+export interface BackupOverview {
+  enabled: boolean
+  dir: string
+  keep: number
+  at: string
+  count: number
+  total_bytes: number
+  last_file: string
+  last_size: number
+  // 最新一份包的生成时间（RFC3339；空串 = 从未备份）
+  last_backup_at: string
+  running: boolean
+  last_error: string
+  items: BackupItem[]
+}
+
 export const adminApi = {
   // 管理员登录(契约镜像 P1:core 返回 AdminLoginData{token,token_type,expires_in}——
   // 旧手抄内联 {token,user{...}} 是照抄 /user/login 形态的幻影字段,wire 从不下发
@@ -436,6 +465,33 @@ export const adminApi = {
     }>>({
       url: '/admin/diagnostics',
       method: 'GET'
+    })
+  },
+
+  // ===== 备份（5.1.0 定时自动备份）=====
+  getBackups: () => {
+    return request<ApiResponse<BackupOverview>>({
+      url: '/admin/backups',
+      method: 'GET'
+    })
+  },
+
+  // 立即备份：服务端**立刻返回**（真正的导出在后台跑，几十 GB 不能挂在 HTTP
+  // 请求上）⇒ 返回的是「有没有开始」，进度看 getBackups().running。
+  runBackup: () => {
+    return request<ApiResponse<{ started: boolean; running: boolean }>>({
+      url: '/admin/backups/run',
+      method: 'POST'
+    })
+  },
+
+  // 下载备份包。必须走 blob 而不是 <a href>：该端点要鉴权头，浏览器直连会
+  // 401；且拦截器对二进制载荷不做信封归一化（见 utils/request.ts）。
+  downloadBackup: (name: string) => {
+    return request<Blob>({
+      url: `/admin/backups/${encodeURIComponent(name)}`,
+      method: 'GET',
+      responseType: 'blob'
     })
   },
 
