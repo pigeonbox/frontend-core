@@ -327,6 +327,7 @@ export default {
     largeFileHint: '大文件将走对象存储直传通道，更快更稳',
     presignFallback: '匿名直传未开放，已切换为普通上传通道',
     unfinishedHint: '有 {count} 个未完成的上传，可从断点续传',
+    discardUnfinished: '忽略',
     resumePick: '选择文件续传',
     resumeMismatch: '所选文件与未完成任务不匹配（名称/大小/修改时间需一致）',
     resume: '续传',
@@ -386,6 +387,8 @@ export default {
     dedupedSuccess: '秒传成功（内容已存在，未重复占用存储）',
     failed: '上传失败',
     retry: '重试',
+    // 批量态下行内重试/续传只复位（多文件分享需整批成享），必须说清下一步
+    batchRetryHint: '已复位为待上传，请点「安全寄送」整批重发（多文件分享需整批成享）',
     cancel: '取消',
     paste_image: '检测到剪贴板图片，是否上传？',
     scan_qr: '扫码分享',
@@ -595,6 +598,8 @@ export default {
       batchDeleteSuccess: '已删除 {n} 个分享',
       batchRestoreConfirm: '确定要恢复选中的 {n} 个分享吗？',
       batchRestoreSuccess: '已恢复 {n} 个分享',
+      batchRestoreFailed: '恢复失败',
+      batchRestorePartial: '已恢复 {ok} 个，{failed} 个失败',
       restoreConfirm: '确定要恢复这个分享吗？',
       restoreSuccess: '已恢复',
       hardDeleteConfirm: '此操作不可恢复，确定要永久删除这个分享吗？',
@@ -778,6 +783,9 @@ export default {
       saved: '配置保存成功',
       saveFailed: '保存失败',
       fetchFailed: '获取配置失败',
+      // 加载失败仍可保存 = 用出厂默认覆盖真实配置（多数段整段提交）⇒ 硬禁用
+      loadFailedBlockSave: '配置未能加载，保存会覆盖现有配置，已暂时禁用',
+      retryLoad: '重新加载',
       nav: {
         site: '站点与外观',
         share: '上传与分享',
@@ -1101,6 +1109,7 @@ export default {
       restored: '已恢复',
       purgeConfirmBody: '彻底删除「{code}」？DB 记录与存储对象将被永久删除，不可恢复！',
       purged: '已彻底删除',
+      purgeFailed: '彻底删除失败',
       blockConfirmTitle: '确认禁用',
       restoreShareConfirmTitle: '确认恢复',
       blockConfirmBody: '确定要禁用分享 {name} 吗？禁用后任何人无法取件，记录保留可恢复。',

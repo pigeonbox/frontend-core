@@ -87,6 +87,10 @@
       <el-button size="small" type="primary" @click="pickResumeFile">
         {{ t('upload.resumePick') }}
       </el-button>
+      <!-- 清除入口（2026-11-06）：此前横幅只增不减，不想续传时无法关掉 -->
+      <el-button size="small" text @click="discardUnfinished">
+        {{ t('upload.discardUnfinished') }}
+      </el-button>
     </div>
     <input ref="resumeInput" type="file" style="display: none" @change="onResumeFilePicked" />
 
@@ -291,6 +295,8 @@ const handlePause = (id: string) => pause(id)
 // 未完成上传横幅（2026-11-03 Phase 2）：刷新/中断的任务在 localStorage 里留有
 // 续传坐标；File 不跨刷新存活 ⇒ 引导用户重选同指纹文件接管会话
 const unfinishedTasks = computed(() => uploadTasksStore.unfinished)
+// 丢弃未完成记录（横幅「忽略」）：续传坐标一并作废，服务端分片会话按 TTL 回收
+const discardUnfinished = () => uploadTasksStore.discardUnfinished()
 const resumeInput = ref<HTMLInputElement | null>(null)
 const pickResumeFile = () => resumeInput.value?.click()
 const onResumeFilePicked = async (e: Event) => {

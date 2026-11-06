@@ -74,7 +74,16 @@
 
           <!-- 卡内页脚：回取件 -->
           <div class="card-footer">
-            <a class="footer-link" @click="router.push('/')">
+            <!-- 无 href 的可点击 <a> 键盘不可达（Tab 到不了、回车不触发）⇒
+                 显式 role+tabindex 并补 Enter/Space 处理（2026-11-06 a11y）。 -->
+            <a
+              class="footer-link"
+              role="button"
+              tabindex="0"
+              @click="router.push('/')"
+              @keydown.enter.prevent="router.push('/')"
+              @keydown.space.prevent="router.push('/')"
+            >
               <el-icon><Download /></el-icon>
               {{ t('home.needRetrieve') }}
             </a>
@@ -89,7 +98,14 @@
           <a href="https://github.com/pigeonbox/pigeonbox" target="_blank">GitHub</a>
           <span class="meta-dot">·</span>
           <!-- API 文档/管理入口按配置展示（/api-docs 与 /admin 路由始终可达,仅控制入口展示） -->
-          <a v-if="configStore.config?.apiDocsEnabled !== false" @click="router.push('/api-docs')">{{ t('home.apiDocs') }}</a>
+          <a
+            v-if="configStore.config?.apiDocsEnabled !== false"
+            role="button"
+            tabindex="0"
+            @click="router.push('/api-docs')"
+            @keydown.enter.prevent="router.push('/api-docs')"
+            @keydown.space.prevent="router.push('/api-docs')"
+          >{{ t('home.apiDocs') }}</a>
           <template v-if="configStore.config?.apiDocsEnabled !== false"><span class="meta-dot">·</span></template>
           <a v-if="configStore.config?.showAdminAddr" :href="'#' + adminBasePath(configStore.config?.adminPath) + '/login'">{{ t('admin.title') }}</a>
           <template v-if="configStore.config?.showAdminAddr"><span class="meta-dot">·</span></template>

@@ -35,7 +35,14 @@
             <el-icon><Lock /></el-icon>
           </template>
         </el-input>
-        <a class="pw-cancel" @click="onCancelPassword">{{ t('common.cancel') }}</a>
+        <a
+          class="pw-cancel"
+          role="button"
+          tabindex="0"
+          @click="onCancelPassword"
+          @keydown.enter.prevent="onCancelPassword"
+          @keydown.space.prevent="onCancelPassword"
+        >{{ t('common.cancel') }}</a>
       </div>
 
       <el-button

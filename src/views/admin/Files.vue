@@ -600,6 +600,10 @@ const restoreDeleted = async (row: any) => {
     if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.restored'))
       reload()
+    } else {
+      // 非 200 分支曾被静默吞掉：管理员点了「确认」，没有任何成功也没有任何
+      // 失败提示 ⇒ 无法判断是否生效（2026-11-06）。业务码/文案一律上屏。
+      ElMessage.error(res.message || t('admin.filesPage.restoreFailed'))
     }
   } catch (e) {
     if (e !== 'cancel') handleError(e as Error)
@@ -617,6 +621,10 @@ const purgeDeleted = async (row: any) => {
     if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.purged'))
       reload()
+    } else {
+      // 同 restoreDeleted：非 200 不得静默（彻底删除失败却无提示最危险——
+      // 管理员以为数据已清除，实际还在）
+      ElMessage.error(res.message || t('admin.filesPage.purgeFailed'))
     }
   } catch (e) {
     if (e !== 'cancel') handleError(e as Error)
@@ -727,6 +735,10 @@ const batchDelete = async () => {
     const res = await adminApi.batchDeleteFilesByIds(selectedIds.value)
     if (res.code === 200) {
       ElMessage.success(t('admin.filesPage.batchDeleteDone', { n: res.data?.deleted ?? selectedIds.value.length }))
+      // 2026-11-06 修：删除后必须清选择集——被删行已不在列表里，若 selectedRows
+      // 留着旧 id，后续「批量屏蔽/延期/彻底删除」会拿**已删除的 id** 提交 ⇒
+      // 后端返回「0 条受影响」但前端照旧弹成功提示，管理员以为生效。
+      selectedRows.value = []
       await fetchFiles()
     } else {
       handleError(new Error(res.message || t('admin.filesPage.batchDeleteFailed')))

@@ -115,8 +115,19 @@ export const useUploadTasksStore = defineStore('uploadTasks', () => {
     persist()
   }
 
+  /** 清掉**已完成**的记录（名字与实际相反，历史包袱；未完成的保留） */
   function clearFinished() {
     tasks.value = tasks.value.filter((t) => UNFINISHED_STATUSES.has(t.status))
+    persist()
+  }
+
+  /**
+   * 丢弃全部**未完成**记录（2026-11-06）：横幅一直挂着"有 N 个未完成的上传"
+   * 却没有任何清除入口——用户不想续传时只能清 localStorage。丢弃即作废续传
+   * 坐标（服务端分片会话由 janitor 按 TTL 回收），语义明确故不设确认框。
+   */
+  function discardUnfinished() {
+    tasks.value = tasks.value.filter((t) => !UNFINISHED_STATUSES.has(t.status))
     persist()
   }
 
@@ -125,5 +136,5 @@ export const useUploadTasksStore = defineStore('uploadTasks', () => {
     return tasks.value.find((t) => t.fingerprint === fingerprint && UNFINISHED_STATUSES.has(t.status))
   }
 
-  return { tasks, unfinished, create, update, remove, clearFinished, findByFingerprint }
+  return { tasks, unfinished, create, update, remove, clearFinished, discardUnfinished, findByFingerprint }
 })

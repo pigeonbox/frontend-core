@@ -374,7 +374,7 @@ const tipStyle = computed(() => {
 
 /* 入场画线动画:pathLength=1 归一化后 dashoffset 1→0 */
 .line-upload {
-  stroke: #5e6ad2;
+  stroke: #1677ff;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: trend-draw 0.9s ease-out forwards;
@@ -410,11 +410,14 @@ const tipStyle = computed(() => {
 }
 
 /* 图表系列色 = 固定对比色对,不跟运行时 accent——accent 有 6 种预设
-   (青竹/靛蓝/清新蓝/墨黑/暖沙/绛红)。上传线若跟 accent,青竹(默认主色)会
+   (科技蓝/青竹/靛蓝/清新蓝/墨黑/暖沙/绛红)。上传线若跟 accent,青竹会
    与绿色系下载线融成一片;固定色对保证任意主题下两条线都分辨得清。
-   上传=靛蓝(带面积渐变),下载=青绿;暗色下各提亮一档。 */
+   上传=品牌科技蓝 #1677ff(带面积渐变),下载=青绿 #0d9488;暗色下各提亮一档。
+   ⚠️ 2026-11-06：上传线原为**退役的靛蓝 #5e6ad2**（品牌主色 2026-11-03 已改
+   科技蓝,靛蓝降为主题预设之一）——图表是固定色对,不会跟随主题,所以它与
+   「管理台其余部分」的颜色已经不同源,这里对齐回品牌蓝。 */
 .dot-upload {
-  fill: #5e6ad2;
+  fill: #1677ff;
 }
 
 .dot-download {
@@ -422,7 +425,7 @@ const tipStyle = computed(() => {
 }
 
 .area-stop {
-  stop-color: #5e6ad2;
+  stop-color: #1677ff;
 }
 
 .chart-legend {
@@ -447,7 +450,7 @@ const tipStyle = computed(() => {
 }
 
 .legend-dot.upload {
-  background: #5e6ad2;
+  background: #1677ff;
 }
 
 .legend-dot.download {
@@ -501,7 +504,7 @@ const tipStyle = computed(() => {
 }
 
 .tip-dot.upload {
-  background: #5e6ad2;
+  background: #1677ff;
 }
 
 .tip-dot.download {
@@ -525,15 +528,15 @@ const tipStyle = computed(() => {
 
 /* 暗色:系列色各提亮一档 */
 html.dark .line-upload {
-  stroke: #8e97e0;
+  stroke: #69b1ff;
 }
 
 html.dark .dot-upload {
-  fill: #8e97e0;
+  fill: #69b1ff;
 }
 
 html.dark .area-stop {
-  stop-color: #8e97e0;
+  stop-color: #69b1ff;
 }
 
 html.dark .line-download {
@@ -546,7 +549,7 @@ html.dark .dot-download {
 
 html.dark .legend-dot.upload,
 html.dark .tip-dot.upload {
-  background: #8e97e0;
+  background: #69b1ff;
 }
 
 html.dark .legend-dot.download,

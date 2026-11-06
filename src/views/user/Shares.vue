@@ -32,7 +32,7 @@
         <el-button
           v-if="activeStatus !== 'deleted' && selectedCodes.length > 0"
           type="warning"
-          @click="showBatchExtend = true"
+          @click="openBatchExtend"
         >
           <el-icon><Clock /></el-icon>
           {{ t('user.shares.batchExtend') }}
@@ -344,9 +344,8 @@ const search = ref('')
 const selectedRows = ref<UserShareItem[]>([])
 const selectedCodes = computed(() => selectedRows.value.map(r => r.code))
 
-// 延期对话框
+// 延期对话框（单条与批量共用一个对话框；批量态 extendTarget 为空）
 const showExtendDialog = ref(false)
-const showBatchExtend = ref(false)
 const extendTarget = ref<UserShareItem | null>(null)
 const extendHours = ref(24)
 const extendForever = ref(false)
@@ -480,15 +479,36 @@ const confirmBatchRestore = async () => {
   } catch {
     return // 用户取消
   }
-  try {
-    for (const code of selectedCodes.value) {
+  // 2026-11-06 修：批量恢复是「逐条串行调用」——旧实现在 for 里第一条失败就
+  // 直接跳出到 catch ⇒ 前面几条**已经恢复成功**，但列表一次都不刷新 ⇒ 界面还
+  // 显示「回收站」里的行，用户重试又撞「已恢复」。⇒ 每条单独兜住、统计成败，
+  // 最后**无论成败都刷新**；部分失败要如实上屏（不能只报一个失败让人以为全完）。
+  const codes = selectedCodes.value
+  const failed: string[] = []
+  let firstError: unknown = null
+  for (const code of codes) {
+    try {
       await userSharesApi.restore(code)
+    } catch (e) {
+      // 首条失败必须走本页统一的 handleError（请求层文案只有它知道）——否则
+      // 「批量恢复失败」就成了静默计数，用户看不到失败原因。
+      // 其余条目只计数：N 条失败弹 N 个 toast 会把屏幕糊住，末尾汇总一次即可。
+      if (firstError === null) {
+        firstError = e
+        handleError(e as Error)
+      }
+      failed.push(code)
     }
-    ElMessage.success(t('user.shares.batchRestoreSuccess', { n: selectedCodes.value.length }))
-    selectedRows.value = []
-    await loadList()
-  } catch (e) {
-    handleError(e)
+  }
+  selectedRows.value = []
+  await loadList()
+  const ok = codes.length - failed.length
+  if (failed.length === 0) {
+    ElMessage.success(t('user.shares.batchRestoreSuccess', { n: ok }))
+  } else if (ok === 0) {
+    ElMessage.error(t('user.shares.batchRestoreFailed'))
+  } else {
+    ElMessage.warning(t('user.shares.batchRestorePartial', { ok, failed: failed.length }))
   }
 }
 
@@ -518,16 +538,20 @@ const openExtendDialog = (row: UserShareItem) => {
   showExtendDialog.value = true
 }
 
-// 监听 showBatchExtend 打开
-import { watch } from 'vue'
-watch(showBatchExtend, (v) => {
-  if (v) {
-    extendTarget.value = null
-    extendHours.value = 24
-    extendForever.value = false
-    showExtendDialog.value = true
-  }
-})
+/**
+ * 批量延期入口（2026-11-06 修「第二次点不动」）。
+ *
+ * 旧实现是「按钮写 showBatchExtend=true + watch 里再开对话框」：取消对话框只关
+ * showExtendDialog，**showBatchExtend 仍留在 true** ⇒ 第二次点按钮赋的还是 true
+ * ⇒ watch 不触发 ⇒ 对话框再也打不开（按钮变死的，直到刷新页面）。直接开对话框
+ * 即可，不需要那个中转布尔量。
+ */
+const openBatchExtend = () => {
+  extendTarget.value = null
+  extendHours.value = 24
+  extendForever.value = false
+  showExtendDialog.value = true
+}
 
 const doExtend = async () => {
   if (extendHours.value <= 0 && !extendForever.value) {
@@ -547,7 +571,6 @@ const doExtend = async () => {
     })
     ElMessage.success(t('user.shares.extendSuccess', { n: codes.length }))
     showExtendDialog.value = false
-    showBatchExtend.value = false
     await loadList()
   } catch (e) {
     handleError(e)

@@ -39,7 +39,15 @@
               <el-icon><Promotion /></el-icon>
               {{ t('home.ctaSend') }}
             </el-button>
-            <a class="footer-link" @click="getShareRef?.openHistory()">{{ t('home.getShare.history') }}</a>
+            <!-- 无 href 的可点击 <a> 键盘不可达 ⇒ 显式 role+tabindex（2026-11-06 a11y） -->
+            <a
+              class="footer-link"
+              role="button"
+              tabindex="0"
+              @click="getShareRef?.openHistory()"
+              @keydown.enter.prevent="getShareRef?.openHistory()"
+              @keydown.space.prevent="getShareRef?.openHistory()"
+            >{{ t('home.getShare.history') }}</a>
           </div>
         </div>
       </main>
@@ -52,11 +60,24 @@
           <span class="meta-dot">·</span>
           <!-- 宿主入口:跳宿主应用设置页(授权目录/端口/密码面板);无宿主隐藏 -->
           <template v-if="hostAppSettings">
-            <a @click="host.openAppSettings()">{{ t('home.hostAppSettings') }}</a>
+            <a
+              role="button"
+              tabindex="0"
+              @click="host.openAppSettings()"
+              @keydown.enter.prevent="host.openAppSettings()"
+              @keydown.space.prevent="host.openAppSettings()"
+            >{{ t('home.hostAppSettings') }}</a>
             <span class="meta-dot">·</span>
           </template>
           <!-- API 文档/管理入口按配置展示（/api-docs 与 /admin 路由始终可达,仅控制入口展示） -->
-          <a v-if="configStore.config?.apiDocsEnabled !== false" @click="$router.push('/api-docs')">{{ t('home.apiDocs') }}</a>
+          <a
+            v-if="configStore.config?.apiDocsEnabled !== false"
+            role="button"
+            tabindex="0"
+            @click="$router.push('/api-docs')"
+            @keydown.enter.prevent="$router.push('/api-docs')"
+            @keydown.space.prevent="$router.push('/api-docs')"
+          >{{ t('home.apiDocs') }}</a>
           <template v-if="configStore.config?.apiDocsEnabled !== false"><span class="meta-dot">·</span></template>
           <a v-if="configStore.config?.showAdminAddr" :href="'#' + adminBasePath(configStore.config?.adminPath) + '/login'">{{ t('admin.title') }}</a>
           <template v-if="configStore.config?.showAdminAddr"><span class="meta-dot">·</span></template>

@@ -466,8 +466,27 @@
           </el-form>
 
           <div class="config-save-bar">
-            <el-button type="primary" :loading="saving" @click="saveCurrent">
+            <!-- 加载失败 ⇒ 表单里是出厂默认值，保存会把真实配置整段覆盖掉
+                 （2026-11-06）：此前只在 toast 里报「获取失败」，保存按钮照常
+                 可点 ⇒ 一次误点就把线上配置重置成默认。 -->
+            <el-alert
+              v-if="configLoadFailed"
+              type="error"
+              :closable="false"
+              show-icon
+              :title="t('admin.configPage.loadFailedBlockSave')"
+              style="margin-bottom: 12px"
+            />
+            <el-button
+              type="primary"
+              :loading="saving"
+              :disabled="configLoadFailed"
+              @click="saveCurrent"
+            >
               {{ t('admin.configPage.save') }}
+            </el-button>
+            <el-button v-if="configLoadFailed" @click="reloadAll">
+              {{ t('admin.configPage.retryLoad') }}
             </el-button>
           </div>
         </div>
@@ -534,6 +553,14 @@ watch(
 )
 
 const loading = ref(false)
+/**
+ * 配置加载失败标记（2026-11-06）。
+ *
+ * 失败时 configForm 仍是**出厂默认值**，而保存是按段**整段提交**（site 段提交
+ * base+ui、share 段提交 upload_ex+transfer+local_import…）⇒ 一次保存就把真实
+ * 配置覆盖成默认。⇒ 失败即禁用保存，只留「重新加载」。
+ */
+const configLoadFailed = ref(false)
 const saving = ref(false)
 const configStore = useConfigStore()
 
@@ -566,6 +593,7 @@ const fetchConfig = async () => {
   try {
     const res = await adminApi.getConfig()
     if (res.code === 200 && res.data) {
+      configLoadFailed.value = false
       // 映射配置数据
       if (res.data.base) {
         Object.assign(configForm.value.base, res.data.base)
@@ -579,8 +607,12 @@ const fetchConfig = async () => {
       fetchExSections(res.data as Record<string, unknown>)
       // 用户配置走独立端点（此前随通用配置保存会被后端丢弃——假开关）
       await fetchUserSettings()
+    } else {
+      // 非 200：没有可用的服务端值 ⇒ 表单仍是默认值，禁止保存（同上）
+      configLoadFailed.value = true
     }
   } catch (error) {
+    configLoadFailed.value = true
     console.error('fetch config failed:', error)
     ElMessage.error(t('admin.configPage.fetchFailed'))
   } finally {
@@ -833,7 +865,18 @@ const putRateLimit = async () => {
   }
 }
 
+// 重新加载全部配置段（加载失败后的恢复入口）
+const reloadAll = async () => {
+  await fetchConfig()
+  await fetchRateLimit()
+}
+
 const saveCurrent = async () => {
+  // 兜底：加载失败时按钮已禁用，这里再拦一道（快捷键/自动化也不得覆盖真实配置）
+  if (configLoadFailed.value) {
+    ElMessage.error(t('admin.configPage.loadFailedBlockSave'))
+    return
+  }
   saving.value = true
   try {
     switch (activeSection.value) {

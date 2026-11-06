@@ -303,7 +303,13 @@ export function useUploadQueue(opts: {
     task.error = ''
     task.statusText = ''
     task.progress = 0
-    if (tasks.value.length > 1) return null
+    // 批量语义保留（多文件分享要整批同时成享，单文件重发会把它拆成另一条分享），
+    // 但**必须给反馈**（2026-11-06）：此前队列 >1 时静默 return null ⇒ 行内「重试」
+    // 按下去毫无反应（任务行无声回到 pending、进度条不动），用户只会以为按钮坏了。
+    if (tasks.value.length > 1) {
+      ElMessage.info(t('upload.batchRetryHint'))
+      return null
+    }
     return await start()
   }
 
@@ -320,7 +326,11 @@ export function useUploadQueue(opts: {
     task.error = ''
     task.statusText = ''
     task.progress = 0
-    if (tasks.value.length > 1) return null
+    // 与 retry 同口径（2026-11-06）：批量态下只复位 + 明确提示，不做静默死按钮。
+    if (tasks.value.length > 1) {
+      ElMessage.info(t('upload.batchRetryHint'))
+      return null
+    }
     return await start()
   }
 

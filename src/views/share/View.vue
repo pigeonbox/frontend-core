@@ -143,12 +143,18 @@
                   <el-icon class="icon-secondary"><Document /></el-icon>
                   <span class="m-name" :title="f.name">{{ f.name }}</span>
                   <span class="m-size">{{ formatFileSize(f.size) }}</span>
+                  <!-- E2E 分享的多文件逐个下载**同样必须解密**（2026-11-06）：
+                       此前这里漏了 :transform，单文件卡片（下方）有、多文件列表没有
+                       ⇒ 加密分享的多文件下载下来是**密文**（文件名对、内容打不开）。
+                       打包 zip 按钮对 E2E 已隐藏（服务端无法打包密文），所以这条
+                       路径就是 E2E 多文件唯一的下载口。 -->
                   <DownloadButton
                     v-if="!downloadBlocked"
                     size="small"
                     :url="downloadUrlFor(f.id)"
                     :filename="downloadNameFor(f.name)"
                     :label="t('common.download')"
+                    :transform="isEncrypted ? e2eTransform : undefined"
                     :guard="downloadGuard"
                     @error="onDownloadError"
                   />
@@ -324,7 +330,7 @@ const fetchShare = async (pwd?: string) => {
       // E2E 文本解密（密文 base64 存于 text 字段）：URL-hash key 当场解；
       // 口令型待输口令后由 submitE2ePassword 解
       if (res.data?.encrypted && res.data?.text && e2eKey.value) {
-        await decryptShareText(e2eKey.value)
+        await decryptShareText(e2eKey.value, mySeq)
       }
     } else if (res.code === 403 || res.code === 10003 || res.data?.has_password) {
       needPassword.value = true
@@ -438,13 +444,31 @@ const t2ePendingText = () =>
 
 const isEncrypted = computed(() => !!shareData.value?.encrypted)
 
-/** E2E 文本解密（密文 base64 存于 text 字段；key = URL-hash 或口令解包所得） */
-const decryptShareText = async (key: string) => {
+/**
+ * E2E 文本解密（密文 base64 存于 text 字段；key = URL-hash 或口令解包所得）。
+ *
+ * 竞态守卫（2026-11-06）：解密走 WebCrypto，是**真异步**；期间可能已切到另一个
+ * 分享或重新取数。此前结果直接赋值 ⇒ 旧分享的明文会落到新分享页面上（正是本仓
+ * 反复出现的「内容挂在别的地址下」）。两道判据：
+ *   ① seq——由 fetchShare 传入，期间有新请求发出即作废；
+ *   ② 源分享未变——口令解包路径没有 seq，用**分享码比对**兜住。
+ * 注意判据在 await 之后、赋值之前，抛错分支同样要判（否则旧分享的解密失败
+ * 提示会盖在新分享上）。
+ */
+const decryptShareText = async (key: string, seq?: number) => {
+  const srcCode = (shareData.value?.code as string | undefined) || ''
+  const srcText = (shareData.value?.text as string | undefined) || ''
   decryptedText.value = ''
+  e2eError.value = ''
+  const stale = () =>
+    (seq !== undefined && latest.isStale(seq)) ||
+    (((shareData.value?.code as string | undefined) || '') !== srcCode)
   try {
-    decryptedText.value = await decryptText(key, shareData.value?.text || '')
-    e2eError.value = ''
+    const text = await decryptText(key, srcText)
+    if (stale()) return
+    decryptedText.value = text
   } catch {
+    if (stale()) return
     e2eError.value = t('share.decryptFailed')
   }
 }
