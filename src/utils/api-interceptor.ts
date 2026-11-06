@@ -69,6 +69,11 @@ const ERRCODE_KEY_MAP: Record<number, string> = {
   40009: 'errcode.40009',
   40010: 'errcode.40010',
   40011: 'errcode.40011',
+  // 账号与信任（5.2.0）：不逐码登记就会落到 4xxxx 段位兜底「用户不存在」——
+  // 那不只是没翻译，是**说错了原因**（密码错的用户会被告知账号不存在）。
+  40012: 'errcode.40012',
+  40013: 'errcode.40013',
+  40014: 'errcode.40014',
   50001: 'errcode.50001',
   50002: 'errcode.50002',
   50003: 'errcode.50003',
