@@ -1,7 +1,7 @@
 import { request } from '@/utils/request'
 import type { ApiResponse } from '@/types/common'
 import type { UserInfo, UserStats } from '@/types/user'
-import type { common as commonContract } from '@pigeonbox/contracts'
+import type { common as commonContract, user as userContract } from '@pigeonbox/contracts'
 
 export const userApi = {
   // 用户注册
@@ -19,7 +19,9 @@ export const userApi = {
   },
 
   // 用户登录
-  login: (data: { username: string; password: string }) => {
+  // totp_code：账号开启二验后**必填**。未带时服务端回 40012（「需要验证码」，
+  // 此时口令已正确、**不计入失败锁定**）⇒ 前端据此弹第二个输入框再提交一次。
+  login: (data: { username: string; password: string; totp_code?: string }) => {
     return request<ApiResponse<{ token: string; user: UserInfo }>>({
       url: '/user/login',
       method: 'POST',
@@ -102,6 +104,79 @@ export const userApi = {
   revokeAllApiKeys: () => {
     return request<ApiResponse<commonContract.UserAPIKeysRevokeAllData>>({
       url: '/user/api-keys/revoke-all',
+      method: 'POST',
+    })
+  },
+
+  // ===== 账号与信任（5.2.0）=====
+
+  // ---- 二次验证（TOTP）----
+  // setup 只是**生成**密钥（totp_enabled 仍为 false）：必须再调 totpEnable
+  // 送一次有效码才算绑定成功——否则「扫了码但没验过」会把自己锁在门外。
+  totpSetup: () => {
+    return request<ApiResponse<userContract.TotpSetupData>>({
+      url: '/user/totp/setup',
+      method: 'POST',
+    })
+  },
+
+  // 启用并**一次性**返回恢复码（库内只存 bcrypt 哈希，页面关掉就再也拿不到）
+  totpEnable: (code: string) => {
+    return request<ApiResponse<userContract.TotpEnableData>>({
+      url: '/user/totp/enable',
+      method: 'POST',
+      data: { code },
+    })
+  },
+
+  // 关闭二验必须双因子（口令 + 当前码）：防「令牌被盗后顺手把二验关掉」
+  totpDisable: (data: { password: string; code: string }) => {
+    return request<ApiResponse<void>>({
+      url: '/user/totp/disable',
+      method: 'POST',
+      data,
+    })
+  },
+
+  // ---- 邮箱自助找回密码 ----
+  // ⚠️ forgot **恒返回成功**（防账号枚举）：不要按响应判断邮箱是否存在。
+  forgotPassword: (email: string) => {
+    return request<ApiResponse<void>>({
+      url: '/user/password/forgot',
+      method: 'POST',
+      data: { email },
+    })
+  },
+
+  // 重置链接里的 token 由服务端签发的邮件带入（前端只透传）
+  resetPassword: (data: { token: string; new_password: string }) => {
+    return request<ApiResponse<void>>({
+      url: '/user/password/reset',
+      method: 'POST',
+      data,
+    })
+  },
+
+  // ---- 登录设备管理 ----
+  listSessions: () => {
+    return request<ApiResponse<userContract.UserSessionsData>>({
+      url: '/user/sessions',
+      method: 'GET',
+    })
+  },
+
+  // 踢掉指定会话（current: true 的那条由界面禁掉，避免踢掉自己）
+  revokeSession: (id: number) => {
+    return request<ApiResponse<void>>({
+      url: `/user/sessions/${id}`,
+      method: 'DELETE',
+    })
+  },
+
+  // 退出所有设备：撤全部会话 + 会话纪元 +1（API Key 不受影响）
+  revokeAllSessions: () => {
+    return request<ApiResponse<void>>({
+      url: '/user/sessions/revoke-all',
       method: 'POST',
     })
   },

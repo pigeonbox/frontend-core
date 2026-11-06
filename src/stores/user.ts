@@ -35,8 +35,9 @@ export const useUserStore = defineStore('user', () => {
     loggingOut = false
   }
 
-  const login = async (username: string, password: string) => {
-    const res = await userApi.login({ username, password })
+  // totpCode：账号开启二验后由第二次提交带入（首次不带 ⇒ 服务端回 40012）
+  const login = async (username: string, password: string, totpCode?: string) => {
+    const res = await userApi.login({ username, password, totp_code: totpCode })
     if (res.code === 200) {
       userInfo.value = res.data.user
       markSessionActive()

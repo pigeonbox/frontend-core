@@ -1,5 +1,5 @@
 import type { Component } from 'vue'
-import { Bell, Document, Key, Monitor, Postcard, Share } from '@element-plus/icons-vue'
+import { Bell, Document, Key, Lock, Monitor, Postcard, Share } from '@element-plus/icons-vue'
 
 export interface MenuItem {
   path: string
@@ -18,5 +18,6 @@ export const userNavItems: MenuItem[] = [
   { path: '/user/history', icon: Document, labelKey: 'user.nav_history' },
   { path: '/user/notifications', icon: Bell, labelKey: 'user.nav_notifications' },
   { path: '/user/tokens', icon: Key, labelKey: 'user.nav_tokens' },
+  { path: '/user/security', icon: Lock, labelKey: 'user.nav_security' },
   { path: '/user/requests', icon: Postcard, labelKey: 'user.nav_requests' },
 ]

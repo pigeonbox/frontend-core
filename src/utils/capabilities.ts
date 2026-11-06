@@ -152,3 +152,20 @@ export function federationDeliveryAvailable(
 ): boolean {
   return readCapabilities(cfg).federation_delivery !== false
 }
+
+/**
+ * 邮箱自助找回密码是否可用（5.2.0）。
+ *
+ * ⚠️ 与上面几个位**判据方向相反**：这里只认服务端**明确**说 true。
+ *
+ * 为什么可以反过来：缺字段在这里的含义不是「未知」而是「一定不支持」——
+ * 老后端连 /user/password/forgot 端点都没有（5.2.0 才引入），给出入口只会
+ * 让用户填完邮箱后收一条 404。而已配 SMTP 的新后端会显式下发 true。
+ *
+ * ⇒ 宁可少给入口，也不给一个必然失败的入口。
+ */
+export function emailPasswordResetAvailable(
+  cfg: CapabilitiesCarrier | null | undefined,
+): boolean {
+  return readCapabilities(cfg).email_password_reset === true
+}

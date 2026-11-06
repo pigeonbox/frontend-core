@@ -29,6 +29,15 @@ export interface ServerCapabilities {
    * ⚠️ 缺字段 = **未知**（老后端不下发）⇒ 不得据此隐藏功能。
    */
   federation_delivery?: boolean
+  /**
+   * 邮箱自助找回密码是否可用（5.2.0）——判据是**站级 SMTP 是否配置**，
+   * 不是「这个用户有没有登记邮箱」：没配 SMTP 时 forgot 端点仍恒返回成功
+   * 但**不发信**，前端若给入口，用户会永远等一封不来的邮件。
+   *
+   * ⚠️ 缺字段 = **老后端（根本没有该端点）** ⇒ 与上面几条不同，这里**隐藏**入口：
+   * 「未知」在这里不是「可能支持」，而是「一定不支持」（端点不存在）。
+   */
+  email_password_reset?: boolean
 }
 
 export interface PublicConfig {
