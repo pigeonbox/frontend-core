@@ -157,12 +157,112 @@
         </el-card>
       </el-col>
     </el-row>
+    <!-- 备份（5.1.0 定时自动备份）：状态 + 包列表 + 立即备份 / 下载。
+         未启用时仍然展示这一块——「我这台机器有没有备份、备份在哪」是运维
+         最先问的问题，藏起来只会让人以为功能不存在。 -->
+    <el-row :gutter="20" class="backup-row">
+      <el-col :span="24">
+        <el-card class="tool-card">
+          <template #header>
+            <div class="card-header">
+              <el-icon><FolderOpened /></el-icon>
+              <span>{{ t('admin.maintenancePage.backupTitle') }}</span>
+              <el-tag
+                :type="backup.enabled ? 'success' : 'info'"
+                size="small"
+                class="backup-tag"
+              >
+                {{ backup.enabled ? t('admin.maintenancePage.backupEnabled', { at: backup.at }) : t('admin.maintenancePage.backupDisabled') }}
+              </el-tag>
+              <div class="backup-actions">
+                <el-button size="small" :loading="backupLoading" @click="fetchBackups()">
+                  {{ t('admin.maintenancePage.backupRefresh') }}
+                </el-button>
+                <el-button
+                  size="small"
+                  type="primary"
+                  :loading="backup.running"
+                  :disabled="backup.running"
+                  @click="runBackupNow"
+                >
+                  {{ backup.running ? t('admin.maintenancePage.backupRunning') : t('admin.maintenancePage.backupRunNow') }}
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <el-alert
+            v-if="!backup.enabled"
+            type="info"
+            :closable="false"
+            show-icon
+            :title="t('admin.maintenancePage.backupDisabledHint')"
+            class="backup-alert"
+          />
+          <el-alert
+            v-if="backup.last_error"
+            type="error"
+            :closable="false"
+            show-icon
+            :title="t('admin.maintenancePage.backupError', { error: backup.last_error })"
+            class="backup-alert"
+          />
+
+          <el-descriptions :column="2" border size="small">
+            <el-descriptions-item :label="t('admin.maintenancePage.backupDir')">
+              {{ backup.dir || '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('admin.maintenancePage.backupAt')">
+              {{ backup.at || '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('admin.maintenancePage.backupKeep')">
+              {{ backup.keep > 0 ? backup.keep : t('admin.maintenancePage.backupKeepUnlimited') }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('admin.maintenancePage.backupCount')">
+              {{ t('admin.maintenancePage.backupCountValue', { n: backup.count, size: formatFileSize(backup.total_bytes) }) }}
+            </el-descriptions-item>
+            <el-descriptions-item :label="t('admin.maintenancePage.backupLast')">
+              {{ backup.last_backup_at ? formatDateTime(backup.last_backup_at) : t('admin.maintenancePage.backupNever') }}
+            </el-descriptions-item>
+          </el-descriptions>
+
+          <el-table
+            :data="backup.items"
+            size="small"
+            class="backup-table"
+            :empty-text="t('admin.maintenancePage.backupListEmpty')"
+          >
+            <el-table-column
+              prop="name"
+              :label="t('admin.maintenancePage.backupFile')"
+              min-width="300"
+              show-overflow-tooltip
+            />
+            <el-table-column :label="t('admin.maintenancePage.backupSize')" width="120">
+              <template #default="{ row }">{{ formatFileSize(row.size) }}</template>
+            </el-table-column>
+            <el-table-column :label="t('admin.maintenancePage.backupTime')" width="200">
+              <template #default="{ row }">
+                {{ row.created_at ? formatDateTime(row.created_at) : '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column width="110">
+              <template #default="{ row }">
+                <el-button size="small" text type="primary" @click="downloadBackup(row.name)">
+                  {{ t('admin.maintenancePage.backupDownload') }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
 <script setup lang="ts">
-import { formatFileSize } from '@/utils/format'
-import { ref, reactive, computed, onMounted } from 'vue'
+import { formatFileSize, formatDateTime } from '@/utils/format'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
@@ -171,9 +271,11 @@ import {
   Files,
   Folder,
   Delete,
-  DocumentChecked
+  DocumentChecked,
+  FolderOpened
 } from '@element-plus/icons-vue'
 import { adminApi } from '@/api/admin'
+import type { BackupOverview } from '@/api/admin'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
 const { t } = useI18n()
@@ -206,6 +308,105 @@ const systemInfo = reactive({
 })
 
 
+// ===== 备份（5.1.0 定时自动备份）=====
+//
+// 默认值按「未启用 + 空列表」：这是**没配置过**的机器的真实状态，也是唯一
+// 不会在首屏闪出错误结论的初值（同 update 段的教训）。
+const backup = reactive<BackupOverview>({
+  enabled: false,
+  dir: '',
+  keep: 0,
+  at: '',
+  count: 0,
+  total_bytes: 0,
+  last_file: '',
+  last_size: 0,
+  last_backup_at: '',
+  running: false,
+  last_error: '',
+  items: []
+})
+const backupLoading = ref(false)
+// 轮询句柄：备份在后台跑，页面要知道它什么时候结束。
+let backupPollTimer: ReturnType<typeof setTimeout> | undefined
+
+const stopBackupPoll = () => {
+  if (backupPollTimer) {
+    clearTimeout(backupPollTimer)
+    backupPollTimer = undefined
+  }
+}
+
+// 取备份状态与列表。静默失败：备份卡片是附加信息，取不到不该让整页报错。
+const fetchBackups = async (quiet = false) => {
+  if (!quiet) backupLoading.value = true
+  try {
+    const res = await adminApi.getBackups()
+    if (res.code === 200 && res.data) {
+      Object.assign(backup, {
+        enabled: Boolean(res.data.enabled),
+        dir: res.data.dir || '',
+        keep: res.data.keep || 0,
+        at: res.data.at || '',
+        count: res.data.count || 0,
+        total_bytes: res.data.total_bytes || 0,
+        last_file: res.data.last_file || '',
+        last_size: res.data.last_size || 0,
+        last_backup_at: res.data.last_backup_at || '',
+        running: Boolean(res.data.running),
+        last_error: res.data.last_error || '',
+        items: res.data.items || []
+      })
+      // 还在跑 ⇒ 5s 后再看一次；跑完即停（不常驻轮询）。
+      stopBackupPoll()
+      if (backup.running) {
+        backupPollTimer = setTimeout(async () => {
+          await fetchBackups(true)
+        }, 5000)
+      }
+    }
+  } catch {
+    // 保持上一次的状态，页面照常可用
+  } finally {
+    if (!quiet) backupLoading.value = false
+  }
+}
+
+// 立即备份：服务端立刻返回（导出在后台跑）⇒ 这里只负责把状态刷成「正在备份」。
+const runBackupNow = async () => {
+  try {
+    const res = await adminApi.runBackup()
+    if (res.code === 200) {
+      if (res.data?.started) {
+        ElMessage.success(t('admin.maintenancePage.backupStarted'))
+      } else {
+        ElMessage.info(t('admin.maintenancePage.backupAlreadyRunning'))
+      }
+      await fetchBackups(true)
+    } else {
+      handleError(new Error(res.message || t('admin.maintenancePage.backupRunFailed', { error: res.message || '' })))
+    }
+  } catch (error: any) {
+    handleError(new Error(error?.message || t('admin.maintenancePage.backupRunFailed', { error: String(error?.message || '') })))
+  }
+}
+
+// 下载：走 blob + 临时 object URL。直接用 <a href> 会 401（端点要鉴权头）。
+const downloadBackup = async (name: string) => {
+  try {
+    const blob = await adminApi.downloadBackup(name)
+    const url = URL.createObjectURL(blob as unknown as Blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch {
+    ElMessage.error(t('admin.maintenancePage.backupDownloadFailed'))
+  }
+}
 const cleanExpiredFiles = async () => {
   try {
     await ElMessageBox.confirm(
@@ -309,6 +510,12 @@ const fetchSystemInfo = async () => {
 onMounted(() => {
   fetchSystemInfo()
   fetchUpdate()
+  fetchBackups()
+})
+
+// 卸载时停掉轮询，避免离开页面后还在打接口。
+onUnmounted(() => {
+  stopBackupPoll()
 })
 </script>
 
@@ -412,5 +619,27 @@ onMounted(() => {
   margin: 0;
   font-size: 14px;
   color: var(--color-text-secondary);
+}
+
+.backup-row {
+  margin-top: 20px;
+}
+
+.backup-tag {
+  margin-left: 10px;
+}
+
+.backup-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.backup-alert {
+  margin-bottom: 12px;
+}
+
+.backup-table {
+  margin-top: 12px;
 }
 </style>
