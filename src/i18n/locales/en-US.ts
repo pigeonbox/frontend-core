@@ -1324,6 +1324,12 @@ export default {
       optimizeDone: 'Database optimized',
       optimizeFailed: 'Optimization failed',
       fetchInfoFailed: 'Failed to load system info',
+      updateAvailable: 'Version {latest} is available (current {current})',
+      updateLatest: 'Latest Version',
+      updateUnknown: 'Unavailable',
+      updateDisabled: 'Check disabled',
+      updateStale: '(cached result; this check did not succeed)',
+      updateViewRelease: 'View release notes',
     },
     moderation: {
       subtitle: 'Review shares pending moderation (queued when a moderation rule hits and the policy is pending)',
