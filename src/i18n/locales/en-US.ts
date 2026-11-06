@@ -307,6 +307,9 @@ export default {
   upload: {
     title: 'Upload Files',
     dragHint: 'Drag files here, or click to choose',
+    selectFolder: 'Upload folder',
+    folderHint: 'Directory structure is kept: the pickup page groups by folder, the zip keeps the hierarchy',
+    emptyFolder: 'The selected folder contains no files (empty folders produce no files)',
     clickHint: 'Multiple files supported, {clause}',
     maxFileLimited: 'up to {size} per file',
     maxFileUnlimited: 'no per-file size limit',

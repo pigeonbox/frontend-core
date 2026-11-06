@@ -30,9 +30,14 @@ import { useI18n } from 'vue-i18n'
 const localeStore = useLocaleStore()
 const { locale } = useI18n()
 
+// 语言名用**该语言本身**书写（各语言用户都能认出自己那一行），
+// 不用 "Japanese / 日本語" 这类「母语+英语」双写——五个选项时那列会撑成两倍宽。
 const options: { value: AppLocale; label: string }[] = [
   { value: 'zh-CN', label: '中文' },
   { value: 'en-US', label: 'English' },
+  { value: 'ja-JP', label: '日本語' },
+  { value: 'de-DE', label: 'Deutsch' },
+  { value: 'ru-RU', label: 'Русский' },
 ]
 
 const currentLabel = computed(

@@ -35,6 +35,13 @@ export type MultiShareOptions = publicapiContract.MultiShareDirectReq & {
    * 免于在每个调用点各写一遍 `?? false` 兜底。
    */
   require_auth: boolean
+  /**
+   * 目录上传（5.3.0）：与 files **同序**的分享内相对目录（空串 = 根）。
+   *
+   * 必须与 files 等长：服务端按索引对齐，长度不一致会整单 400（不猜、不错位）。
+   * 扁平上传不传该字段（服务端 nil ⇒ 全部落根目录，与 5.3.0 之前一致）。
+   */
+  dirs?: string[]
 }
 
 /** 多文件分享结果（契约 MultiShareData：code/url/share_url/file_count/pickup_code?） */
@@ -53,6 +60,14 @@ export type MultiShareResult = publicapiContract.MultiShareData
  */
 export type MultiShareBindEntryInput = Omit<publicapiContract.MultiShareBindEntry, 'file_name'> & {
   file_name?: string
+  /**
+   * 分享内相对目录（5.3.0 目录上传）："a/b"，空/缺省 = 根。
+   *
+   * 不在契约里：multi-bind 的条目不来自 IDL（服务端手写 JSON 解析，
+   * 见 core/transport/http/handler/share_multi.go 的 multiBindEntry）。
+   * 客户端可控 ⇒ 服务端同样过 pathx.SanitizeRelStrict 严格档。
+   */
+  rel_dir?: string
 }
 
 /** multi-bind 请求体（契约 MultiShareBindReq 的 entries 用上面的放宽版） */
@@ -188,6 +203,12 @@ export async function multiDirect(
 ): Promise<MultiShareResult> {
   const formData = new FormData()
   for (const f of files) formData.append('files', f)
+  // 目录上传（5.3.0）：dirs 逐项与 files 同序（multipart 的 filename 由浏览器
+  // 剥成裸名，目录信息只能靠这条平行数组带过去）。长度必须一致，否则服务端整单
+  // 拒绝——错位一格会把每个文件塞进隔壁目录，而结果看起来完全正常。
+  if (opts.dirs && opts.dirs.length === files.length) {
+    for (const d of opts.dirs) formData.append('dirs', d)
+  }
   formData.append('expire_value', String(opts.expire_value))
   formData.append('expire_style', opts.expire_style)
   // require_auth 为契约必填: false 也必须显式发送

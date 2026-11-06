@@ -312,7 +312,7 @@ const greeting = computed(() => {
 
 
 const formatDate = (dateStr?: string): string =>
-  toLocaleDateTime(dateStr, { locale: locale.value === 'zh-CN' ? 'zh-CN' : 'en-US', fallback: '' })
+  toLocaleDateTime(dateStr, { locale: locale.value, fallback: '' })
 
 const fetchUserInfo = async () => {
   try {

@@ -437,7 +437,7 @@ const greeting = computed(() => {
 
 
 const formatDate = (dateStr?: string): string =>
-  toLocaleDateTime(dateStr, { locale: locale.value === 'zh-CN' ? 'zh-CN' : 'en-US' })
+  toLocaleDateTime(dateStr, { locale: locale.value })
 
 // 数字动画
 const animateNumber = (key: 'userCount' | 'fileCount' | 'todayUploads', target: number) => {
