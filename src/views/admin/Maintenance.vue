@@ -1,5 +1,34 @@
 <template>
   <div class="maintenance-tools">
+    <!-- 新版本提示：只有**确实有更新**时才出现。
+         查不到 / 已关闭 / 已是最新都不打扰——更新检查是锦上添花，
+         不是让用户每次打开后台都看到一个「可能有问题」的横幅。 -->
+    <el-alert
+      v-if="update.available"
+      type="success"
+      :closable="false"
+      show-icon
+      class="update-alert"
+    >
+      <template #title>
+        {{ t('admin.maintenancePage.updateAvailable', { latest: update.latest, current: update.current }) }}
+      </template>
+      <div class="update-body">
+        <span v-if="update.stale" class="update-stale">
+          {{ t('admin.maintenancePage.updateStale') }}
+        </span>
+        <el-link
+          v-if="update.url"
+          type="primary"
+          :href="update.url"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ t('admin.maintenancePage.updateViewRelease') }}
+        </el-link>
+      </div>
+    </el-alert>
+
     <!-- 系统状态卡片 -->
     <el-row :gutter="20" class="status-row">
       <el-col :span="6">
@@ -115,6 +144,9 @@
             <el-descriptions-item label="Git Commit">
               {{ systemInfo.gitCommit }}
             </el-descriptions-item>
+            <el-descriptions-item :label="t('admin.maintenancePage.updateLatest')">
+              {{ latestVersionText }}
+            </el-descriptions-item>
             <el-descriptions-item :label="t('admin.maintenancePage.osInfo')">
               {{ systemInfo.osInfo }}
             </el-descriptions-item>
@@ -130,7 +162,7 @@
 
 <script setup lang="ts">
 import { formatFileSize } from '@/utils/format'
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
@@ -149,6 +181,18 @@ const { handleError } = useErrorHandler()
 
 const cleaningExpired = ref(false)
 const optimizing = ref(false)
+
+// 更新状态。默认 source='unknown'：**先假设查不到**，拿到结果才升级为 github。
+// 反过来的话（默认 github + 空 latest）会让模板先闪一下「无法检查」再变——
+// 而查不到本来就是常态（离线部署、内网、关闭检查）。
+const update = reactive({
+  current: '',
+  latest: '',
+  available: false,
+  source: 'unknown' as 'github' | 'disabled' | 'unknown',
+  stale: false,
+  url: ''
+})
 
 const systemInfo = reactive({
   version: '-',
@@ -210,6 +254,34 @@ const optimizeDatabase = async () => {
   }
 }
 
+// 「最新版本」一行的显示文本。
+// 三种非「有版本号」的情形各给一句人话，而不是留空或显示 undefined：
+// 空白会让人以为字段坏了，而这里是**可预期的状态**，不是故障。
+const latestVersionText = computed(() => {
+  if (update.source === 'disabled') return t('admin.maintenancePage.updateDisabled')
+  if (update.source === 'unknown' || !update.latest) return t('admin.maintenancePage.updateUnknown')
+  return update.latest
+})
+
+// 取更新状态。失败**静默**：这是维护页的附加信息，
+// 不能因为 GitHub 连不上就让整页报错（同 server#88 的教训：缺一路数据 ≠ 服务故障）。
+const fetchUpdate = async () => {
+  try {
+    const res = await adminApi.getDiagnostics()
+    if (res.code === 200 && res.data?.update) {
+      const u = res.data.update
+      update.current = u.current || ''
+      update.latest = u.latest || ''
+      update.available = Boolean(u.available)
+      update.source = u.source || 'unknown'
+      update.stale = Boolean(u.stale)
+      update.url = u.url || ''
+    }
+  } catch {
+    // 保持 source='unknown'，页面照常可用
+  }
+}
+
 const fetchSystemInfo = async () => {
   try {
     // 获取系统信息
@@ -236,6 +308,7 @@ const fetchSystemInfo = async () => {
 
 onMounted(() => {
   fetchSystemInfo()
+  fetchUpdate()
 })
 </script>
 
@@ -301,6 +374,21 @@ onMounted(() => {
   gap: 10px;
   font-size: 16px;
   font-weight: 600;
+}
+
+.update-alert {
+  margin-bottom: 20px;
+}
+
+.update-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.update-stale {
+  opacity: 0.75;
 }
 
 .tool-list {

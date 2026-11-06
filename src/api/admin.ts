@@ -416,6 +416,29 @@ export const adminApi = {
     })
   },
 
+  // 部署自检快照（含更新状态）。
+  //
+  // 只取「更新」这一段：其余检查项（DB / 存储 / Redis / 首启）由 pb doctor 消费，
+  // 前端维护页不重复呈现——同一事实两个界面 = 两份要维护的文案。
+  getDiagnostics: () => {
+    return request<ApiResponse<{
+      version: string
+      update?: {
+        current: string
+        latest?: string
+        available: boolean
+        source: 'github' | 'disabled' | 'unknown'
+        checked_at?: string
+        stale?: boolean
+        url?: string
+        error?: string
+      }
+    }>>({
+      url: '/admin/diagnostics',
+      method: 'GET'
+    })
+  },
+
   // 测试邮件（后端未实现，待后端实现后启用）
   testEmail: () => {
     return request<ApiResponse<void>>({

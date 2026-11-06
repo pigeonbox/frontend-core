@@ -1314,6 +1314,13 @@ export default {
       optimizeDone: '数据库优化完成',
       optimizeFailed: '优化失败',
       fetchInfoFailed: '获取系统信息失败',
+      // 更新检查：只有「确实有新版本」才在前端露面，其余状态只在系统信息里显示一行。
+      updateAvailable: '有新版本 {latest} 可用（当前 {current}）',
+      updateLatest: '最新版本',
+      updateUnknown: '无法检查',
+      updateDisabled: '已关闭检查',
+      updateStale: '（该结果来自缓存，本次检查未成功）',
+      updateViewRelease: '查看发布说明',
     },
     moderation: {
       subtitle: '处理待审核的分享（moderation 命中且策略为 pending 时进入此队列）',
