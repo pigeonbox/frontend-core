@@ -826,6 +826,7 @@ export default {
         telegram: 'Telegram',
         bark: 'Bark',
         smtp: 'Почта SMTP',
+        expiryReminder: 'Напоминание о сроке',
         federation: 'Реестр федерации'
 
       },
@@ -951,6 +952,10 @@ export default {
         barkDeviceKey: 'Ключ устройства',
         barkDeviceKeyPlaceholder: 'Ключ устройства Bark',
         barkHint: 'Работает только когда заданы и URL сервера, и ключ устройства; оставьте пустым, чтобы отключить отправку в Bark',
+        expiryReminderEnabled: 'Напоминание об истечении срока',
+        expiryReminderAdvance: 'Заблаговременно (часов)',
+        expiryReminderInterval: 'Интервал проверки (минут)',
+        expiryReminderHint: 'Если включено, отправитель один раз получит уведомление на сайте до истечения срока (также через настроенные Webhook / e-mail / Telegram / Bark). Анонимные ссылки и ссылки со сроком жизни меньше заблаговременного интервала не учитываются.',
         smtpHost: 'SMTP-хост',
         username: 'Имя пользователя',
         password: 'Пароль',

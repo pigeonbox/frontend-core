@@ -34,11 +34,21 @@ export interface BarkNotifyUpdate {
   [key: string]: unknown
 }
 
+// 分享到期提醒（5.5.0 core）：注意它**不是渠道**，而是「什么时候产生消息」。
+// 所以是 notify 段的平级子段，关掉它不影响各渠道自己的配置。
+export interface ExpiryReminderNotifyUpdate {
+  enabled?: boolean
+  advance_hours?: number
+  interval_minutes?: number
+  [key: string]: unknown
+}
+
 export interface NotifyConfigUpdate {
   webhook_url?: string
   smtp?: Record<string, unknown>
   telegram?: TelegramNotifyUpdate
   bark?: BarkNotifyUpdate
+  expiry_reminder?: ExpiryReminderNotifyUpdate
   [key: string]: unknown
 }
 

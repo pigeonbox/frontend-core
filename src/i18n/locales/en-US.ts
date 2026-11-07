@@ -826,6 +826,7 @@ export default {
         telegram: 'Telegram',
         bark: 'Bark',
         smtp: 'SMTP Email',
+        expiryReminder: 'Expiry reminder',
         federation: 'Federation Registry'
 
       },
@@ -951,6 +952,10 @@ export default {
         barkDeviceKey: 'Device Key',
         barkDeviceKeyPlaceholder: 'Bark device key',
         barkHint: 'Enabled only when both Server URL and Device Key are set; leave empty to disable Bark push',
+        expiryReminderEnabled: 'Share expiry reminder',
+        expiryReminderAdvance: 'Lead time (hours)',
+        expiryReminderInterval: 'Check interval (minutes)',
+        expiryReminderHint: 'When enabled, senders get a single in-site notice before their share expires (also pushed through the configured Webhook / email / Telegram / Bark channels). Anonymous shares and shares shorter-lived than the lead time are excluded.',
         smtpHost: 'SMTP Host',
         username: 'Username',
         password: 'Password',
