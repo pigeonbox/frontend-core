@@ -826,6 +826,7 @@ export default {
         telegram: 'Telegram',
         bark: 'Bark',
         smtp: 'SMTPメール',
+        expiryReminder: '期限の事前通知',
         federation: '連携レジストリ'
 
       },
@@ -951,6 +952,10 @@ export default {
         barkDeviceKey: 'デバイスキー',
         barkDeviceKeyPlaceholder: 'Barkのデバイスキー',
         barkHint: 'サーバーURLとデバイスキーの両方が設定されている場合のみ有効です。空欄にするとBark通知は無効になります',
+        expiryReminderEnabled: '共有期限の事前通知',
+        expiryReminderAdvance: 'リードタイム（時間）',
+        expiryReminderInterval: 'チェック間隔（分）',
+        expiryReminderHint: '有効にすると、共有の期限が近づいた時点で投稿者へ一度だけ通知します（設定済みの Webhook / メール / Telegram / Bark でも同時に送信）。匿名の共有と、寿命がリード時間より短い共有は対象外です。',
         smtpHost: 'SMTPホスト',
         username: 'ユーザー名',
         password: 'パスワード',

@@ -385,6 +385,18 @@
               <span class="field-hint">{{ t('admin.configPage.notify.barkHint') }}</span>
             </el-form-item>
 
+            <el-divider content-position="left">{{ t('admin.configPage.sections.expiryReminder') }}</el-divider>
+            <el-form-item :label="t('admin.configPage.notify.expiryReminderEnabled')">
+              <el-switch v-model="exForm.notify.expiry_reminder.enabled" />
+              <span class="field-hint">{{ t('admin.configPage.notify.expiryReminderHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.expiryReminderAdvance')">
+              <el-input-number v-model="exForm.notify.expiry_reminder.advance_hours" :min="1" :max="720" :step="1" />
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.expiryReminderInterval')">
+              <el-input-number v-model="exForm.notify.expiry_reminder.interval_minutes" :min="1" :max="1440" :step="1" />
+            </el-form-item>
+
             <el-divider content-position="left">{{ t('admin.configPage.sections.smtp') }}</el-divider>
             <el-form-item :label="t('admin.configPage.notify.smtpHost')">
               <el-input v-model="exForm.notify.smtp.host" placeholder="smtp.example.com:465" />
@@ -670,6 +682,9 @@ const exForm = ref({
     // Telegram / Bark 推送渠道（2026-11-01 外部推送渠道扩展）：缺省空 = 禁用该渠道
     telegram: { bot_token: '', chat_id: '' },
     bark: { server_url: '', device_key: '' },
+    // 分享到期提醒（5.5.0）：不是渠道，而是「什么时候产生消息」——默认关
+    // （主动打扰要显式开启，与「更新检查」那种被动查询不同）
+    expiry_reminder: { enabled: false, advance_hours: 24, interval_minutes: 60 },
   },
   oidc: { enabled: false, issuer: '', client_id: '', client_secret: '', scopes: 'openid profile email', frontend_callback: '' },
   local_import: { enabled: false, roots: [] as string[] },
@@ -786,6 +801,13 @@ const fetchExSections = (data: Record<string, unknown>) => {
     // 后端/旧库下发 null 归一为空对象（v-model 需要稳定的嵌套对象，null 会渲染异常）
     if (!exForm.value.notify.telegram) exForm.value.notify.telegram = { bot_token: '', chat_id: '' }
     if (!exForm.value.notify.bark) exForm.value.notify.bark = { server_url: '', device_key: '' }
+    // 旧库无 expiry_reminder 键 → 后端下发 null：归一为默认值（关 / 24h / 60min）
+    if (sec.notify.expiry_reminder) {
+      Object.assign(exForm.value.notify.expiry_reminder, sec.notify.expiry_reminder)
+    }
+    if (!exForm.value.notify.expiry_reminder) {
+      exForm.value.notify.expiry_reminder = { enabled: false, advance_hours: 24, interval_minutes: 60 }
+    }
   }
   if (sec.oidc) Object.assign(exForm.value.oidc, sec.oidc)
   if (sec.local_import) Object.assign(exForm.value.local_import, sec.local_import)
@@ -910,6 +932,7 @@ const saveCurrent = async () => {
             smtp: { ...exForm.value.notify.smtp },
             telegram: { ...exForm.value.notify.telegram },
             bark: { ...exForm.value.notify.bark },
+            expiry_reminder: { ...exForm.value.notify.expiry_reminder },
           },
         })
         break

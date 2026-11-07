@@ -824,6 +824,7 @@ export default {
         telegram: 'Telegram',
         bark: 'Bark',
         smtp: 'SMTP 邮件',
+        expiryReminder: '分享到期提醒',
         federation: '联邦注册'
 
       },
@@ -949,6 +950,10 @@ export default {
         barkDeviceKey: 'Device Key',
         barkDeviceKeyPlaceholder: 'Bark 设备密钥',
         barkHint: '服务地址与 Device Key 均填写才启用；留空即禁用 Bark 推送',
+        expiryReminderEnabled: '分享到期提醒',
+        expiryReminderAdvance: '提前量（小时）',
+        expiryReminderInterval: '巡检间隔（分钟）',
+        expiryReminderHint: '开启后，寄件人在分享到期前会收到一次站内信（同时经已配置的 Webhook / 邮件 / Telegram / Bark 外推）。匿名分享与寿命短于提前量的分享不在范围内。',
         smtpHost: 'SMTP 主机',
         username: '用户名',
         password: '密码',

@@ -826,6 +826,7 @@ export default {
         telegram: 'Telegram',
         bark: 'Bark',
         smtp: 'SMTP-E-Mail',
+        expiryReminder: 'Ablauf-Erinnerung',
         federation: 'Verbund-Registry'
 
       },
@@ -951,6 +952,10 @@ export default {
         barkDeviceKey: 'Geräteschlüssel',
         barkDeviceKeyPlaceholder: 'Bark-Geräteschlüssel',
         barkHint: 'Nur aktiv, wenn Server-URL und Geräteschlüssel beide gesetzt sind; leer lassen, um Bark-Push zu deaktivieren',
+        expiryReminderEnabled: 'Ablauf-Erinnerung für Freigaben',
+        expiryReminderAdvance: 'Vorlaufzeit (Stunden)',
+        expiryReminderInterval: 'Prüfintervall (Minuten)',
+        expiryReminderHint: 'Wenn aktiviert, erhalten Absender einmalig einen Hinweis, bevor ihre Freigabe abläuft (zusätzlich über die konfigurierten Kanäle Webhook / E-Mail / Telegram / Bark). Anonyme Freigaben und Freigaben mit kürzerer Laufzeit als die Vorlaufzeit sind ausgenommen.',
         smtpHost: 'SMTP-Host',
         username: 'Benutzername',
         password: 'Passwort',
