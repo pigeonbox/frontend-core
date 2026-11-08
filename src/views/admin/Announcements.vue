@@ -33,10 +33,10 @@
         </el-table-column>
         <el-table-column :label="t('admin.announcementsPage.colActions')" width="260" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
-            <el-button size="small" @click="openEdit(row)">{{ t('admin.announcementsPage.edit') }}</el-button>
-            <el-button v-if="row.status === 1" size="small" type="warning" plain @click="setStatus(row, 2)">{{ t('admin.announcementsPage.offline') }}</el-button>
-            <el-button v-else size="small" type="success" plain @click="setStatus(row, 1)">{{ t('admin.announcementsPage.publish') }}</el-button>
-            <el-button size="small" type="danger" plain @click="onDelete(row)">{{ t('admin.announcementsPage.delete') }}</el-button>
+            <el-button size="small" @click="openEdit((row as NotifyRow))">{{ t('admin.announcementsPage.edit') }}</el-button>
+            <el-button v-if="row.status === 1" size="small" type="warning" plain @click="setStatus((row as NotifyRow), 2)">{{ t('admin.announcementsPage.offline') }}</el-button>
+            <el-button v-else size="small" type="success" plain @click="setStatus((row as NotifyRow), 1)">{{ t('admin.announcementsPage.publish') }}</el-button>
+            <el-button size="small" type="danger" plain @click="onDelete((row as NotifyRow))">{{ t('admin.announcementsPage.delete') }}</el-button>
           </template>
         </el-table-column>
         <template #empty>{{ t('admin.announcementsPage.empty') }}</template>

@@ -98,8 +98,8 @@
         </el-table-column>
         <el-table-column :label="t('admin.storagePage.colActions')" width="220">
           <template #default="{ row }">
-            <el-button size="small" type="primary" plain @click="applyAsDataPath(row)">{{ t('admin.storagePage.useAsDataPath') }}</el-button>
-            <el-button size="small" @click="openDir(row)">{{ t('admin.storagePage.openDir') }}</el-button>
+            <el-button size="small" type="primary" plain @click="applyAsDataPath((row as HostDirItem))">{{ t('admin.storagePage.useAsDataPath') }}</el-button>
+            <el-button size="small" @click="openDir((row as HostDirItem))">{{ t('admin.storagePage.openDir') }}</el-button>
           </template>
         </el-table-column>
       </el-table>

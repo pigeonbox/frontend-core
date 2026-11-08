@@ -56,7 +56,7 @@
         </el-table-column>
         <el-table-column :label="t('request.statusCol')" width="100">
           <template #default="{ row }">
-            <el-tag v-if="isExpired(row)" type="danger" size="small">{{ t('request.expired') }}</el-tag>
+            <el-tag v-if="isExpired((row as FileRequestItem))" type="danger" size="small">{{ t('request.expired') }}</el-tag>
             <el-tag v-else type="success" size="small">{{ t('request.active') }}</el-tag>
           </template>
         </el-table-column>
