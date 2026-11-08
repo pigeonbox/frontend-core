@@ -67,15 +67,15 @@
         <el-table-column :label="t('admin.localFilesPage.colActions')" :width="hostAvailable ? 360 : 240" fixed="right" class-name="nowrap-actions">
           <template #default="{ row }">
             <template v-if="!row.is_dir">
-              <el-button size="small" type="primary" @click="openImport(row)">{{ t('admin.localFilesPage.genCode') }}</el-button>
-              <el-button size="small" type="danger" plain @click="onDelete(row)">{{ t('admin.localFilesPage.delete') }}</el-button>
+              <el-button size="small" type="primary" @click="openImport((row as LocalFileEntry))">{{ t('admin.localFilesPage.genCode') }}</el-button>
+              <el-button size="small" type="danger" plain @click="onDelete((row as LocalFileEntry))">{{ t('admin.localFilesPage.delete') }}</el-button>
               <!-- 宿主联动:用宿主应用打开/查看详情 -->
               <template v-if="hostAvailable">
-                <el-button size="small" @click="openInHost(row)">{{ t('admin.localFilesPage.open') }}</el-button>
-                <el-button size="small" @click="detailsInHost(row)">{{ t('admin.localFilesPage.details') }}</el-button>
+                <el-button size="small" @click="openInHost((row as LocalFileEntry))">{{ t('admin.localFilesPage.open') }}</el-button>
+                <el-button size="small" @click="detailsInHost((row as LocalFileEntry))">{{ t('admin.localFilesPage.details') }}</el-button>
               </template>
             </template>
-            <el-button v-else-if="hostAvailable" size="small" @click="openDirInHost(row)">{{ t('admin.localFilesPage.openDir') }}</el-button>
+            <el-button v-else-if="hostAvailable" size="small" @click="openDirInHost((row as LocalFileEntry))">{{ t('admin.localFilesPage.openDir') }}</el-button>
           </template>
         </el-table-column>
         <template #empty>{{ t('admin.localFilesPage.emptyDir') }}</template>

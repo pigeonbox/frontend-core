@@ -112,14 +112,14 @@
       </el-table-column>
       <el-table-column :label="t('user.shares.usedCount')" width="120">
         <template #default="{ row }">
-          <span v-if="shareQuotaDisplay(row).kind === 'unlimited'">
-            {{ shareQuotaDisplay(row).used }} / {{ t('user.shares.unlimited') }}
+          <span v-if="shareQuotaDisplay((row as UserShareItem)).kind === 'unlimited'">
+            {{ shareQuotaDisplay((row as UserShareItem)).used }} / {{ t('user.shares.unlimited') }}
           </span>
-          <span v-else-if="shareQuotaDisplay(row).kind === 'exhausted'">
-            {{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}
+          <span v-else-if="shareQuotaDisplay((row as UserShareItem)).kind === 'exhausted'">
+            {{ shareQuotaDisplay((row as UserShareItem)).used }} / {{ shareQuotaDisplay((row as UserShareItem)).total }}
             · {{ t('user.shares.countExhausted') }}
           </span>
-          <span v-else>{{ shareQuotaDisplay(row).used }} / {{ shareQuotaDisplay(row).total }}</span>
+          <span v-else>{{ shareQuotaDisplay((row as UserShareItem)).used }} / {{ shareQuotaDisplay((row as UserShareItem)).total }}</span>
           <el-tooltip
             v-if="row.viewer_count > 0 && activeStatus !== 'deleted'"
             :content="`${t('user.shares.lastViewerIP')}: ${row.viewer_ip || '-'} | ${t('user.shares.lastViewerAt')}: ${formatDate(row.viewer_at)}`"
@@ -151,24 +151,24 @@
       <el-table-column :label="t('common.actions')" width="380" fixed="right" class-name="nowrap-actions">
         <template #default="{ row }">
           <template v-if="row.deleted_at">
-            <el-button size="small" type="success" link @click="confirmRestore(row)">
+            <el-button size="small" type="success" link @click="confirmRestore((row as UserShareItem))">
               <el-icon><RefreshLeft /></el-icon> {{ t('user.shares.restore') }}
             </el-button>
-            <el-button size="small" type="danger" link @click="confirmHardDelete(row)">
+            <el-button size="small" type="danger" link @click="confirmHardDelete((row as UserShareItem))">
               <el-icon><Delete /></el-icon> {{ t('user.shares.hardDelete') }}
             </el-button>
           </template>
           <template v-else>
-            <el-button size="small" link @click="copyLink(row)">
+            <el-button size="small" link @click="copyLink((row as UserShareItem))">
               <el-icon><Link /></el-icon> {{ t('user.shares.copyLink') }}
             </el-button>
-            <el-button size="small" link @click="copyCode(row)">
+            <el-button size="small" link @click="copyCode((row as UserShareItem))">
               <el-icon><Postcard /></el-icon> {{ t('user.shares.copyCode') }}
             </el-button>
-            <el-button size="small" type="warning" link @click="openExtendDialog(row)">
+            <el-button size="small" type="warning" link @click="openExtendDialog((row as UserShareItem))">
               <el-icon><Clock /></el-icon> {{ t('user.shares.extend') }}
             </el-button>
-            <el-button size="small" type="danger" link @click="confirmDelete(row)">
+            <el-button size="small" type="danger" link @click="confirmDelete((row as UserShareItem))">
               <el-icon><Delete /></el-icon> {{ t('common.delete') }}
             </el-button>
           </template>

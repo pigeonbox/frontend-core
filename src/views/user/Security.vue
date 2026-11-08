@@ -104,7 +104,7 @@
             <el-tag v-if="row.current" type="success" size="small" effect="plain">
               {{ t('security.sessions.current') }}
             </el-tag>
-            <el-button v-else type="danger" link size="small" @click="revokeOne(row)">
+            <el-button v-else type="danger" link size="small" @click="revokeOne((row as SessionRow))">
               {{ t('security.sessions.revoke') }}
             </el-button>
           </template>

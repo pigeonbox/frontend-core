@@ -38,12 +38,12 @@
       <el-table-column :label="t('user.tokens.status')" width="180">
         <template #default="{ row }">
           <el-tag v-if="row.revoked" size="small" type="danger">{{ t('user.tokens.revoked') }}</el-tag>
-          <el-tag v-else-if="isExpired(row)" size="small" type="warning">{{ t('user.tokens.expired') }}</el-tag>
+          <el-tag v-else-if="isExpired((row as ApiKeyItem))" size="small" type="warning">{{ t('user.tokens.expired') }}</el-tag>
           <el-tag v-else size="small" type="success">{{ t('user.tokens.active') }}</el-tag>
           <!-- 权限范围（contracts v0.20.5）：贴在状态列旁，不另开一列
                （本表 8 列已 ~1210px，窄屏卡片形态才是主战场） -->
           <el-tag
-            v-for="(tag, i) in scopeTagsOf(row)"
+            v-for="(tag, i) in scopeTagsOf((row as ApiKeyItem))"
             :key="`scope-${i}`"
             size="small"
             type="info"
@@ -87,7 +87,7 @@
             size="small"
             type="danger"
             plain
-            @click="revoke(row)"
+            @click="revoke((row as ApiKeyItem))"
           >
             {{ t('user.tokens.revoke') }}
           </el-button>
