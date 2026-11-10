@@ -393,8 +393,10 @@ const toggleUserStatus = async (user: any) => {
       handleError(new Error(res.message || t('admin.usersPage.actionFailed')))
     }
   } catch (error: any) {
+    // A6 批建议（core#114 尾巴）：失败走 handleError 透传后端可操作错误
+    // （全站信封的 message/trace_id 都能上屏），不再用固定 actionFailed 文案顶掉。
     if (error !== 'cancel') {
-      ElMessage.error(t('admin.usersPage.actionFailed'))
+      handleError(error)
     }
   }
 }
