@@ -821,7 +821,12 @@ export default {
         testHint: 'Сохраните настройки перед проверкой; тест использует действующие настройки',
         testSent: 'Тестовое письмо отправлено',
         fillTo: 'Введите адрес получателя',
-        sendFailed: 'Не удалось отправить'
+        sendFailed: 'Не удалось отправить',
+        // 推送渠道测试发送（core#122）
+        channelTest: 'Тест канала',
+        channelTestSend: 'Отправить тест',
+        channelTestOk: 'Успешно отправлено ({ms} мс)',
+        channelTestFailed: 'Ошибка отправки: {error}'
       },
       oidc: {
         enabled: 'Включить OIDC',

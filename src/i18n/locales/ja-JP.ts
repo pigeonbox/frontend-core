@@ -821,7 +821,12 @@ export default {
         testHint: 'テスト前に保存してください。テストは現在有効な設定を使用します',
         testSent: 'テストメールを送信しました',
         fillTo: '宛先メールアドレスを入力してください',
-        sendFailed: '送信に失敗しました'
+        sendFailed: '送信に失敗しました',
+        // 推送渠道测试发送（core#122）
+        channelTest: 'チャンネルテスト',
+        channelTestSend: 'テスト送信',
+        channelTestOk: '送信成功（所要 {ms} ms）',
+        channelTestFailed: '送信失敗：{error}'
       },
       oidc: {
         enabled: 'OIDCを有効化',

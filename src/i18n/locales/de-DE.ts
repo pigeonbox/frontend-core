@@ -821,7 +821,12 @@ export default {
         testHint: 'Vor dem Test speichern; der Test verwendet die aktuell aktiven Einstellungen',
         testSent: 'Test-E-Mail gesendet',
         fillTo: 'Bitte geben Sie die E-Mail des Empfängers ein',
-        sendFailed: 'Senden fehlgeschlagen'
+        sendFailed: 'Senden fehlgeschlagen',
+        // 推送渠道测试发送（core#122）
+        channelTest: 'Kanal-Test',
+        channelTestSend: 'Test senden',
+        channelTestOk: 'Erfolgreich gesendet ({ms} ms)',
+        channelTestFailed: 'Senden fehlgeschlagen: {error}'
       },
       oidc: {
         enabled: 'OIDC aktivieren',

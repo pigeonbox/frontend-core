@@ -819,7 +819,12 @@ export default {
         testHint: '先保存再测试；测的是当前生效配置',
         testSent: '测试邮件已发送',
         fillTo: '请填收件邮箱',
-        sendFailed: '发送失败'
+        sendFailed: '发送失败',
+        // 推送渠道测试发送（core#122）
+        channelTest: '渠道测试',
+        channelTestSend: '发送测试',
+        channelTestOk: '发送成功（耗时 {ms} ms）',
+        channelTestFailed: '发送失败：{error}'
       },
       oidc: {
         enabled: '启用 OIDC',

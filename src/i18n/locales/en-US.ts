@@ -821,7 +821,12 @@ export default {
         testHint: 'Save before testing; the test uses the currently active settings',
         testSent: 'Test email sent',
         fillTo: 'Please enter a recipient email',
-        sendFailed: 'Send failed'
+        sendFailed: 'Send failed',
+        // 推送渠道测试发送（core#122）
+        channelTest: 'Channel test',
+        channelTestSend: 'Send test',
+        channelTestOk: 'Sent successfully (took {ms} ms)',
+        channelTestFailed: 'Send failed: {error}'
       },
       oidc: {
         enabled: 'Enable OIDC',
