@@ -1212,6 +1212,14 @@ export default {
       backupError: '上次备份失败：{error}',
       updateStale: '（该结果来自缓存，本次检查未成功）',
       updateViewRelease: '查看发布说明',
+      // ===== ClamAV 扫描器存活（core#121 尾巴）=====
+      clamavTitle: '病毒扫描（ClamAV）',
+      clamavDisabled: '未启用',
+      clamavHealthy: '正常（探活 {ms} ms）',
+      clamavDegraded: '不可用（当前放行）',
+      clamavDegradedTitle: '病毒扫描器不可用（当前放行）',
+      clamavPingError: '最近探活失败：{error}',
+      clamavFailOpen: '近 {total} 次扫描有 {n} 次未经扫描直接放行',
     },
     moderation: {
       subtitle: '处理待审核的分享（moderation 命中且策略为 pending 时进入此队列）',

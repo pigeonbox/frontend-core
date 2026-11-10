@@ -29,6 +29,29 @@
       </div>
     </el-alert>
 
+    <!-- ClamAV 扫描器存活（core#121 尾巴）：ClamAV 是 fail-open——扫描器挂掉时
+         文件照常放行、业务不阻断，但「没在扫描」必须可见（WARN 而非阻断红：
+         放行是既定策略，不是本站故障）。仅在服务端上报了该段且启用、探活失败时出现。 -->
+    <el-alert
+      v-if="clamav.present && clamav.enabled && clamav.degraded"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="update-alert"
+    >
+      <template #title>
+        {{ t('admin.maintenancePage.clamavDegradedTitle') }}
+      </template>
+      <div class="update-body">
+        <span v-if="clamav.last_error" class="update-stale">
+          {{ t('admin.maintenancePage.clamavPingError', { error: clamav.last_error }) }}
+        </span>
+        <span v-if="clamav.degraded_count > 0" class="update-stale">
+          {{ t('admin.maintenancePage.clamavFailOpen', { total: clamav.scans_in_window, n: clamav.degraded_count }) }}
+        </span>
+      </div>
+    </el-alert>
+
     <!-- 系统状态卡片 -->
     <el-row :gutter="20" class="status-row">
       <el-col :span="6">
@@ -152,6 +175,11 @@
             </el-descriptions-item>
             <el-descriptions-item :label="t('admin.maintenancePage.cpuCores')">
               {{ systemInfo.cpuCores }}
+            </el-descriptions-item>
+            <!-- ClamAV 存活一行：旧版服务端不带 moderation 段时整行不渲染
+                 （「未取到 ≠ 未启用」，与 pb doctor 同口径） -->
+            <el-descriptions-item v-if="clamav.present" :label="t('admin.maintenancePage.clamavTitle')">
+              <span :class="clamav.enabled && clamav.degraded ? 'clamav-warn' : ''">{{ clamavStatusText }}</span>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -455,6 +483,27 @@ const optimizeDatabase = async () => {
   }
 }
 
+// ===== ClamAV 扫描器存活（core#121 尾巴）=====
+// 初值按「未取到」：旧版服务端不带 moderation 段 ⇒ 该行/告警都不出现，
+// 而不是误报「未启用」（「未取到 ≠ 未启用」，与 pb doctor 同口径）。
+const clamav = reactive({
+  present: false,
+  enabled: false,
+  degraded: false,
+  degraded_count: 0,
+  scans_in_window: 0,
+  last_ok: false,
+  last_error: '',
+  last_latency_ms: 0
+})
+
+// 「病毒扫描」一行的显示文本：未启用 / 不可用（当前放行）/ 正常（带探活耗时）。
+const clamavStatusText = computed(() => {
+  if (!clamav.enabled) return t('admin.maintenancePage.clamavDisabled')
+  if (clamav.degraded) return t('admin.maintenancePage.clamavDegraded')
+  return t('admin.maintenancePage.clamavHealthy', { ms: clamav.last_latency_ms })
+})
+
 // 「最新版本」一行的显示文本。
 // 三种非「有版本号」的情形各给一句人话，而不是留空或显示 undefined：
 // 空白会让人以为字段坏了，而这里是**可预期的状态**，不是故障。
@@ -469,14 +518,33 @@ const latestVersionText = computed(() => {
 const fetchUpdate = async () => {
   try {
     const res = await adminApi.getDiagnostics()
-    if (res.code === 200 && res.data?.update) {
-      const u = res.data.update
-      update.current = u.current || ''
-      update.latest = u.latest || ''
-      update.available = Boolean(u.available)
-      update.source = u.source || 'unknown'
-      update.stale = Boolean(u.stale)
-      update.url = u.url || ''
+    if (res.code === 200 && res.data) {
+      if (res.data.update) {
+        const u = res.data.update
+        update.current = u.current || ''
+        update.latest = u.latest || ''
+        update.available = Boolean(u.available)
+        update.source = u.source || 'unknown'
+        update.stale = Boolean(u.stale)
+        update.url = u.url || ''
+      }
+      // ===== ClamAV 存活（core#121 尾巴）=====
+      // 只在服务端确实上报了 moderation 段时才亮这一块（旧版缺段 = 不渲染，
+      // 不是「未启用」）；clamav 子段同理。
+      const m = res.data.moderation
+      if (m) {
+        clamav.present = true
+        const c = m.clamav
+        if (c) {
+          clamav.enabled = Boolean(c.enabled)
+          clamav.degraded = Boolean(c.degraded)
+          clamav.degraded_count = c.degraded_count || 0
+          clamav.scans_in_window = c.scans_in_window || 0
+          clamav.last_ok = Boolean(c.last_ping?.ok)
+          clamav.last_error = c.last_ping?.error || ''
+          clamav.last_latency_ms = c.last_ping?.duration_ms || 0
+        }
+      }
     }
   } catch {
     // 保持 source='unknown'，页面照常可用
@@ -641,5 +709,9 @@ onUnmounted(() => {
 
 .backup-table {
   margin-top: 12px;
+}
+
+.clamav-warn {
+  color: var(--color-warning);
 }
 </style>

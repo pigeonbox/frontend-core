@@ -488,6 +488,27 @@ export const adminApi = {
         url?: string
         error?: string
       }
+      // moderation.clamav 段（core#121）：ClamAV 扫描器存活可观测（fail-open 放行可见化）。
+      // 旧版本服务端不带该段 ⇒ 全部 optional（「未取到 ≠ 未启用」，与 pb doctor 同口径）。
+      moderation?: {
+        enabled: boolean
+        clamav?: {
+          enabled: boolean
+          addr?: string
+          last_ping?: {
+            ok: boolean
+            at: string
+            duration_ms: number
+            error?: string
+          }
+          degraded: boolean
+          degraded_count: number
+          window_size: number
+          scans_in_window: number
+          hits_in_window: number
+          skipped_in_window: number
+        }
+      }
     }>>({
       url: '/admin/diagnostics',
       method: 'GET'

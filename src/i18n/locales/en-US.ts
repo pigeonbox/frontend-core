@@ -1221,6 +1221,14 @@ export default {
       backupError: 'Last backup failed: {error}',
       updateStale: '(cached result; this check did not succeed)',
       updateViewRelease: 'View release notes',
+      // ===== ClamAV 扫描器存活（core#121 尾巴）=====
+      clamavTitle: 'Virus scan (ClamAV)',
+      clamavDisabled: 'Not enabled',
+      clamavHealthy: 'Healthy (probe {ms} ms)',
+      clamavDegraded: 'Unavailable (passing unscanned)',
+      clamavDegradedTitle: 'Virus scanner unavailable (files are passing unscanned)',
+      clamavPingError: 'Last probe failed: {error}',
+      clamavFailOpen: '{n} of the last {total} scans passed unscanned',
     },
     moderation: {
       subtitle: 'Review shares pending moderation (queued when a moderation rule hits and the policy is pending)',

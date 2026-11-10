@@ -1221,6 +1221,14 @@ export default {
       backupError: '前回のバックアップに失敗しました：{error}',
       updateStale: '（キャッシュされた結果です。今回のチェックは成功していません）',
       updateViewRelease: 'リリースノートを見る',
+      // ===== ClamAV 扫描器存活（core#121 尾巴）=====
+      clamavTitle: 'ウイルススキャン（ClamAV）',
+      clamavDisabled: '無効',
+      clamavHealthy: '正常（疎通確認 {ms} ms）',
+      clamavDegraded: '利用不可（現在はスキャンせず通過）',
+      clamavDegradedTitle: 'ウイルススキャナーが利用できません（現在はスキャンせず通過）',
+      clamavPingError: '直近の疎通確認に失敗：{error}',
+      clamavFailOpen: '直近 {total} 回のスキャンのうち {n} 回はスキャンせず通過しました',
     },
     moderation: {
       subtitle: 'モデレーション待ちの共有を確認します（モデレーションルールに該当し、ポリシーが保留の場合にキューに入ります）',

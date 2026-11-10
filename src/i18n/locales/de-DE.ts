@@ -1221,6 +1221,14 @@ export default {
       backupError: 'Letzte Sicherung fehlgeschlagen: {error}',
       updateStale: '(zwischengespeichertes Ergebnis; diese Prüfung war nicht erfolgreich)',
       updateViewRelease: 'Release-Notes ansehen',
+      // ===== ClamAV 扫描器存活（core#121 尾巴）=====
+      clamavTitle: 'Virenscan (ClamAV)',
+      clamavDisabled: 'Nicht aktiviert',
+      clamavHealthy: 'Normal (Ping {ms} ms)',
+      clamavDegraded: 'Nicht verfügbar (Dateien werden ungeprüft durchgelassen)',
+      clamavDegradedTitle: 'Virenscanner nicht verfügbar (Dateien werden ungeprüft durchgelassen)',
+      clamavPingError: 'Letzter Ping fehlgeschlagen: {error}',
+      clamavFailOpen: '{n} der letzten {total} Scans wurden ungeprüft durchgelassen',
     },
     moderation: {
       subtitle: 'Freigaben prüfen, die auf Moderation warten (eingereiht, wenn eine Moderationsregel greift und die Richtlinie „ausstehend“ ist)',
