@@ -821,7 +821,12 @@ export default {
         testHint: 'Vor dem Test speichern; der Test verwendet die aktuell aktiven Einstellungen',
         testSent: 'Test-E-Mail gesendet',
         fillTo: 'Bitte geben Sie die E-Mail des Empfängers ein',
-        sendFailed: 'Senden fehlgeschlagen'
+        sendFailed: 'Senden fehlgeschlagen',
+        // 推送渠道测试发送（core#122）
+        channelTest: 'Kanal-Test',
+        channelTestSend: 'Test senden',
+        channelTestOk: 'Erfolgreich gesendet ({ms} ms)',
+        channelTestFailed: 'Senden fehlgeschlagen: {error}'
       },
       oidc: {
         enabled: 'OIDC aktivieren',
@@ -1216,6 +1221,14 @@ export default {
       backupError: 'Letzte Sicherung fehlgeschlagen: {error}',
       updateStale: '(zwischengespeichertes Ergebnis; diese Prüfung war nicht erfolgreich)',
       updateViewRelease: 'Release-Notes ansehen',
+      // ===== ClamAV 扫描器存活（core#121 尾巴）=====
+      clamavTitle: 'Virenscan (ClamAV)',
+      clamavDisabled: 'Nicht aktiviert',
+      clamavHealthy: 'Normal (Ping {ms} ms)',
+      clamavDegraded: 'Nicht verfügbar (Dateien werden ungeprüft durchgelassen)',
+      clamavDegradedTitle: 'Virenscanner nicht verfügbar (Dateien werden ungeprüft durchgelassen)',
+      clamavPingError: 'Letzter Ping fehlgeschlagen: {error}',
+      clamavFailOpen: '{n} der letzten {total} Scans wurden ungeprüft durchgelassen',
     },
     moderation: {
       subtitle: 'Freigaben prüfen, die auf Moderation warten (eingereiht, wenn eine Moderationsregel greift und die Richtlinie „ausstehend“ ist)',

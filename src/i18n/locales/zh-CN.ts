@@ -819,7 +819,12 @@ export default {
         testHint: '先保存再测试；测的是当前生效配置',
         testSent: '测试邮件已发送',
         fillTo: '请填收件邮箱',
-        sendFailed: '发送失败'
+        sendFailed: '发送失败',
+        // 推送渠道测试发送（core#122）
+        channelTest: '渠道测试',
+        channelTestSend: '发送测试',
+        channelTestOk: '发送成功（耗时 {ms} ms）',
+        channelTestFailed: '发送失败：{error}'
       },
       oidc: {
         enabled: '启用 OIDC',
@@ -1207,6 +1212,14 @@ export default {
       backupError: '上次备份失败：{error}',
       updateStale: '（该结果来自缓存，本次检查未成功）',
       updateViewRelease: '查看发布说明',
+      // ===== ClamAV 扫描器存活（core#121 尾巴）=====
+      clamavTitle: '病毒扫描（ClamAV）',
+      clamavDisabled: '未启用',
+      clamavHealthy: '正常（探活 {ms} ms）',
+      clamavDegraded: '不可用（当前放行）',
+      clamavDegradedTitle: '病毒扫描器不可用（当前放行）',
+      clamavPingError: '最近探活失败：{error}',
+      clamavFailOpen: '近 {total} 次扫描有 {n} 次未经扫描直接放行',
     },
     moderation: {
       subtitle: '处理待审核的分享（moderation 命中且策略为 pending 时进入此队列）',

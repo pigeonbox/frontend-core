@@ -365,6 +365,17 @@
             <el-form-item :label="t('admin.configPage.notify.webhook')">
               <el-input v-model="exForm.notify.webhook_url" :placeholder="t('admin.configPage.notify.webhookPlaceholder')" clearable />
             </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.channelTest')">
+              <el-button :loading="channelTests.webhook.testing" @click="doChannelTest('webhook')">{{ t('admin.configPage.notify.channelTestSend') }}</el-button>
+              <span class="field-hint">{{ t('admin.configPage.notify.testHint') }}</span>
+              <span
+                v-if="channelTests.webhook.done"
+                class="test-result"
+                :class="channelTests.webhook.ok ? 'test-ok' : 'test-fail'"
+              >
+                {{ channelTests.webhook.ok ? t('admin.configPage.notify.channelTestOk', { ms: channelTests.webhook.latency_ms }) : t('admin.configPage.notify.channelTestFailed', { error: channelTests.webhook.error_summary }) }}
+              </span>
+            </el-form-item>
 
             <!-- Telegram / Bark：与 webhook 同属外部推送 fan-out（缺省空 = 禁用该渠道） -->
             <el-divider content-position="left">{{ t('admin.configPage.sections.telegram') }}</el-divider>
@@ -375,6 +386,17 @@
               <el-input v-model="exForm.notify.telegram.chat_id" :placeholder="t('admin.configPage.notify.telegramChatIdPlaceholder')" clearable />
               <span class="field-hint">{{ t('admin.configPage.notify.telegramHint') }}</span>
             </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.channelTest')">
+              <el-button :loading="channelTests.telegram.testing" @click="doChannelTest('telegram')">{{ t('admin.configPage.notify.channelTestSend') }}</el-button>
+              <span class="field-hint">{{ t('admin.configPage.notify.testHint') }}</span>
+              <span
+                v-if="channelTests.telegram.done"
+                class="test-result"
+                :class="channelTests.telegram.ok ? 'test-ok' : 'test-fail'"
+              >
+                {{ channelTests.telegram.ok ? t('admin.configPage.notify.channelTestOk', { ms: channelTests.telegram.latency_ms }) : t('admin.configPage.notify.channelTestFailed', { error: channelTests.telegram.error_summary }) }}
+              </span>
+            </el-form-item>
 
             <el-divider content-position="left">{{ t('admin.configPage.sections.bark') }}</el-divider>
             <el-form-item :label="t('admin.configPage.notify.barkServerUrl')">
@@ -383,6 +405,17 @@
             <el-form-item :label="t('admin.configPage.notify.barkDeviceKey')">
               <el-input v-model="exForm.notify.bark.device_key" :placeholder="t('admin.configPage.notify.barkDeviceKeyPlaceholder')" clearable />
               <span class="field-hint">{{ t('admin.configPage.notify.barkHint') }}</span>
+            </el-form-item>
+            <el-form-item :label="t('admin.configPage.notify.channelTest')">
+              <el-button :loading="channelTests.bark.testing" @click="doChannelTest('bark')">{{ t('admin.configPage.notify.channelTestSend') }}</el-button>
+              <span class="field-hint">{{ t('admin.configPage.notify.testHint') }}</span>
+              <span
+                v-if="channelTests.bark.done"
+                class="test-result"
+                :class="channelTests.bark.ok ? 'test-ok' : 'test-fail'"
+              >
+                {{ channelTests.bark.ok ? t('admin.configPage.notify.channelTestOk', { ms: channelTests.bark.latency_ms }) : t('admin.configPage.notify.channelTestFailed', { error: channelTests.bark.error_summary }) }}
+              </span>
             </el-form-item>
 
             <el-divider content-position="left">{{ t('admin.configPage.sections.expiryReminder') }}</el-divider>
@@ -515,7 +548,7 @@ import { Picture, Upload, Download, User, Lock, Message, Connection } from '@ele
 import { useI18n } from 'vue-i18n'
 import { THEMES, matchThemePreset, type ThemePreset } from '@/config/themes'
 import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS } from '@/config/expireStyles'
-import { adminApi } from '@/api/admin'
+import { adminApi, type NotifyTestChannel } from '@/api/admin'
 import { useConfigStore } from '@/stores/config'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { uploadCapMismatch, alignedUploadCap } from '@/utils/uploadCap'
@@ -1011,6 +1044,55 @@ const doSMTPTest = async () => {
   }
 }
 
+// ==================== 推送渠道测试发送（core#122）====================
+// 每渠道独立状态：三个卡片各自的「发送测试」互不干扰（共用一个 loading 会让
+// 点了 webhook 的测试把 telegram 的按钮也转起来）。
+interface ChannelTestState {
+  testing: boolean
+  done: boolean
+  ok: boolean
+  latency_ms: number
+  error_summary: string
+}
+const newChannelTestState = (): ChannelTestState => ({
+  testing: false,
+  done: false,
+  ok: false,
+  latency_ms: 0,
+  error_summary: '',
+})
+// ⚠️ 用 ref 而非 reactive：vue-tsc 3.3.14 对 reactive() 绑定的**嵌套成员**访问
+// 会误生成 .value（TS2339，ci.yml typecheck-latest 注释记载的已知缺陷）；
+// ref 的嵌套访问（同 exForm.notify.xxx）无此问题，模板自动解包照常。
+const channelTests = ref<Record<NotifyTestChannel, ChannelTestState>>({
+  webhook: newChannelTestState(),
+  telegram: newChannelTestState(),
+  bark: newChannelTestState(),
+})
+
+// 渠道发送失败是**测试的结论**（200 + data.ok=false + 脱敏摘要），不是 API 错误
+// ⇒ 结论内联展示在按钮旁，不用错误 toast；只有请求本身失败（网络/鉴权/400）
+// 才走 handleError。与 doSMTPTest 同口径：测的是**当前生效配置**（先保存再测试）。
+const doChannelTest = async (channel: NotifyTestChannel) => {
+  const st = channelTests.value[channel]
+  st.testing = true
+  try {
+    const res = await adminApi.testNotifyChannel(channel)
+    if (res.code === 200 && res.data) {
+      st.done = true
+      st.ok = Boolean(res.data.ok)
+      st.latency_ms = res.data.latency_ms ?? 0
+      st.error_summary = res.data.error_summary || ''
+    } else {
+      handleError(new Error(res.message || t('admin.configPage.notify.sendFailed')))
+    }
+  } catch (e) {
+    handleError(e)
+  } finally {
+    st.testing = false
+  }
+}
+
 const oidcTesting = ref(false)
 const doOIDCTest = async () => {
   oidcTesting.value = true
@@ -1032,6 +1114,20 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 推送渠道测试结论（core#122）：结果内联在按钮旁，成功绿 / 失败红 */
+.test-result {
+  margin-left: 12px;
+  font-size: 13px;
+}
+
+.test-ok {
+  color: var(--color-success);
+}
+
+.test-fail {
+  color: var(--color-danger);
+}
+
 /* P2P 分区：两功能白话导航卡（设备直传=推荐 / 跨站联邦=进阶折叠），2026-10-15 重设计 */
 .p2p-intro {
   display: grid;

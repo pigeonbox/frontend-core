@@ -821,7 +821,12 @@ export default {
         testHint: 'テスト前に保存してください。テストは現在有効な設定を使用します',
         testSent: 'テストメールを送信しました',
         fillTo: '宛先メールアドレスを入力してください',
-        sendFailed: '送信に失敗しました'
+        sendFailed: '送信に失敗しました',
+        // 推送渠道测试发送（core#122）
+        channelTest: 'チャンネルテスト',
+        channelTestSend: 'テスト送信',
+        channelTestOk: '送信成功（所要 {ms} ms）',
+        channelTestFailed: '送信失敗：{error}'
       },
       oidc: {
         enabled: 'OIDCを有効化',
@@ -1216,6 +1221,14 @@ export default {
       backupError: '前回のバックアップに失敗しました：{error}',
       updateStale: '（キャッシュされた結果です。今回のチェックは成功していません）',
       updateViewRelease: 'リリースノートを見る',
+      // ===== ClamAV 扫描器存活（core#121 尾巴）=====
+      clamavTitle: 'ウイルススキャン（ClamAV）',
+      clamavDisabled: '無効',
+      clamavHealthy: '正常（疎通確認 {ms} ms）',
+      clamavDegraded: '利用不可（現在はスキャンせず通過）',
+      clamavDegradedTitle: 'ウイルススキャナーが利用できません（現在はスキャンせず通過）',
+      clamavPingError: '直近の疎通確認に失敗：{error}',
+      clamavFailOpen: '直近 {total} 回のスキャンのうち {n} 回はスキャンせず通過しました',
     },
     moderation: {
       subtitle: 'モデレーション待ちの共有を確認します（モデレーションルールに該当し、ポリシーが保留の場合にキューに入ります）',

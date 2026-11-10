@@ -43,6 +43,22 @@ export interface ExpiryReminderNotifyUpdate {
   [key: string]: unknown
 }
 
+// 推送渠道测试发送（core#122）wire 类型——**手写副本**。
+// core#122 待 IDL 化后替换为 contracts 生成类型：该路由（POST /admin/notify/channels/test）
+// 暂以手写注册进 core 的 routes_custom.go，未进 contracts IDL ⇒ 无生成类型可用；
+// 待下趟库线列车收敛进 admin.thrift 并发 contracts tag 后，本段整体换成
+// adminContract 生成类型（同 contractTypeDrift.spec 已登记路由的口径）。
+export type NotifyTestChannel = 'webhook' | 'telegram' | 'bark'
+
+// 测试结论（HTTP 200 + 全站信封的 data）：ok=false 表示**发送失败但 API 正常**
+// （error_summary 为脱敏摘要，不含 token/key/目标 URL 凭据片段）；
+// 仅请求非法（缺 channel / 未知 channel）才是 400 + 10001。
+export interface NotifyChannelTestResult {
+  ok: boolean
+  latency_ms: number
+  error_summary: string
+}
+
 export interface NotifyConfigUpdate {
   webhook_url?: string
   smtp?: Record<string, unknown>
@@ -472,6 +488,27 @@ export const adminApi = {
         url?: string
         error?: string
       }
+      // moderation.clamav 段（core#121）：ClamAV 扫描器存活可观测（fail-open 放行可见化）。
+      // 旧版本服务端不带该段 ⇒ 全部 optional（「未取到 ≠ 未启用」，与 pb doctor 同口径）。
+      moderation?: {
+        enabled: boolean
+        clamav?: {
+          enabled: boolean
+          addr?: string
+          last_ping?: {
+            ok: boolean
+            at: string
+            duration_ms: number
+            error?: string
+          }
+          degraded: boolean
+          degraded_count: number
+          window_size: number
+          scans_in_window: number
+          hits_in_window: number
+          skipped_in_window: number
+        }
+      }
     }>>({
       url: '/admin/diagnostics',
       method: 'GET'
@@ -693,6 +730,16 @@ export const adminApi = {
     return request<ApiResponse<null>>({
       url: '/admin/oidc/test',
       method: 'POST',
+    })
+  },
+
+  // 推送渠道测试发送（core#122）：真实发一条固定文案测试消息到所选渠道。
+  // 渠道发送失败是**测试的结论**（200 + data.ok=false），不是 API 错误。
+  testNotifyChannel: (channel: NotifyTestChannel) => {
+    return request<ApiResponse<NotifyChannelTestResult>>({
+      url: '/admin/notify/channels/test',
+      method: 'POST',
+      data: { channel },
     })
   },
 
