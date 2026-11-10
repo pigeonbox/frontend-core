@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -91,6 +92,40 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  # 变异自证（pigeonbox#331）：判据有没有牙齿要**自证**——把被测行为故意改坏，
+  # 对应 E2E 必须转红；变异后仍绿 = 判据是恒绿摆设。脚本自己做三件事：
+  #   ① 锚点预检（漂移即红，点名「元测试需要更新」，不许静默放过）；
+  #   ② 基线绿前置（未变异的 spec 本来就红 ⇒「变异转红」是假信号 ⇒ 判红中止）；
+  #   ③ 每条变异：改坏 → 重建产物（vite build，产物陈旧 = 变异打不到浏览器）→
+  #      跑对应 spec 必须转红 → 还原并逐字节校验。
+  # ⚠️ 判据独立于 e2e job（不设 needs）：e2e 绿 ≠ 判据有牙齿，两条结论互不背书。
+  # 取舍：当前 5 条变异全量跑（基线 4 spec + 每条变异一次构建 + 单 spec），
+  #   本机实测 1m28s（CI runner 预计 5 分钟内），在 CI 预算内 ⇒ 不做采样；
+  #   若日后变异点涨到跑不完，用 --only 采样（每条 spec 至少保留一个变异点）
+  #   或挪定时/手动 workflow_dispatch。
+  e2e-mutation:
+    name: E2E 变异自证（判据牙齿复核）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - run: npm ci
+      - name: 安装 Playwright 浏览器
+        run: npx playwright install --with-deps chromium
+      - name: 变异自证（基线绿 + 每条变异必须转红）
+        run: python3 scripts/check-e2e-mutation.py
+      - name: 上传失败现场（trace + 截图）
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-mutation-report
           path: |
             playwright-report/
             test-results/

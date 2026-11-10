@@ -29,5 +29,6 @@ E2E 的后端**一律 mock**（`e2e/support/mock-api.ts`）：验的是前端自
 
 判据是否真能抓住回归，用变异自证脚本验：
 `python3 scripts/check-e2e-mutation.py`（故意改坏被测行为，判据必须转红）。
+脚本以自身位置定位仓库根，任意目录可执行；CI 的 `e2e-mutation` job 每次 PR/push 复核（pigeonbox#331）。
 
 License: Apache-2.0 · Copyright 2026 PigeonBox
