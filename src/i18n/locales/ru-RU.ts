@@ -1486,12 +1486,13 @@ export default {
     forgotPassword: 'Забыли пароль?',
     // Distinguishable OIDC callback failures (2026-10-26, core-side audit P2):
     // core redirects back with oidc_code (state_invalid / account_disabled /
-    // login_failed / missing_code) ⇒ the UI picks the wording by code instead
+    // email_invalid / login_failed / missing_code) ⇒ the UI picks the wording by code instead
     // of one generic "login failed".
     // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
     oidcError: {
       stateInvalid: 'Запрос на вход истёк или недействителен. Начните заново.',
       accountDisabled: 'Эта учётная запись отключена. Обратитесь к администратору сайта.',
+      emailInvalid: 'Провайдер идентификации вернул недействительный адрес электронной почты. Обратитесь к администратору сайта.',
       loginFailed: 'Единый вход не удался. Попробуйте снова.',
       missingCode: 'Авторизация не удалась: отсутствует код авторизации. Начните заново.',
     },

@@ -1486,12 +1486,13 @@ export default {
     forgotPassword: 'パスワードをお忘れですか？',
     // Distinguishable OIDC callback failures (2026-10-26, core-side audit P2):
     // core redirects back with oidc_code (state_invalid / account_disabled /
-    // login_failed / missing_code) ⇒ the UI picks the wording by code instead
+    // email_invalid / login_failed / missing_code) ⇒ the UI picks the wording by code instead
     // of one generic "login failed".
     // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
     oidcError: {
       stateInvalid: 'サインイン要求の有効期限が切れているか、無効です。最初からやり直してください。',
       accountDisabled: 'このアカウントは無効化されています。サイト管理者にお問い合わせください。',
+      emailInvalid: 'IDプロバイダーが返したメールアドレスの形式が無効です。サイト管理者にお問い合わせください。',
       loginFailed: 'シングルサインオンに失敗しました。もう一度お試しください。',
       missingCode: '認可に失敗しました。認可コードがありません。最初からやり直してください。',
     },
