@@ -1475,12 +1475,13 @@ export default {
     totpRequired: '该账号已开启二次验证，请补充验证码',
     forgotPassword: '忘记密码？',
     // OIDC 回调失败的**可区分**提示（2026-10-26 core 侧审计 P2 的后半段）：
-    // core 按 oidc_code 回跳（state_invalid / account_disabled / login_failed /
-    // missing_code）⇒ 前端按码选文案，不再笼统弹「登录失败」。
+    // core 按 oidc_code 回跳（state_invalid / account_disabled / email_invalid /
+    // login_failed / missing_code）⇒ 前端按码选文案，不再笼统弹「登录失败」。
     // ⚠️ 不展示 core 下发的 msg（那是 core 的措辞、且只有中文）⇒ 只按码映射。
     oidcError: {
       stateInvalid: '登录请求已过期或无效，请重新发起登录',
       accountDisabled: '账号已被禁用，请联系站点管理员',
+      emailInvalid: '身份提供方返回的邮箱格式无效，请联系站点管理员',
       loginFailed: '单点登录失败，请重试',
       missingCode: '授权失败：缺少授权码，请重新发起登录',
     },

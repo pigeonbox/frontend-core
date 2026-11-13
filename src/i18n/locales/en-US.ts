@@ -1486,12 +1486,13 @@ export default {
     forgotPassword: 'Forgot your password?',
     // Distinguishable OIDC callback failures (2026-10-26, core-side audit P2):
     // core redirects back with oidc_code (state_invalid / account_disabled /
-    // login_failed / missing_code) ⇒ the UI picks the wording by code instead
+    // email_invalid / login_failed / missing_code) ⇒ the UI picks the wording by code instead
     // of one generic "login failed".
     // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
     oidcError: {
       stateInvalid: 'The sign-in request expired or is invalid. Please start again.',
       accountDisabled: 'This account is disabled. Contact the site administrator.',
+      emailInvalid: 'The identity provider returned an invalid email address. Contact the site administrator.',
       loginFailed: 'Single sign-on failed. Please try again.',
       missingCode: 'Authorization failed: missing authorization code. Please start again.',
     },
