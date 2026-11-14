@@ -181,7 +181,7 @@ const create = async () => {
       const last = list.value[0]
       if (last) await copyLink(last.token)
     } else {
-      throw new Error(res.message || '创建失败')
+      throw new Error(res.message || t('request.createFailed'))
     }
   } catch (e: unknown) {
     handleError(e)
@@ -211,7 +211,7 @@ const remove = async (token: string) => {
       ElMessage.success(t('request.revoked'))
       await load()
     } else {
-      handleError(new Error(res.message || '撤销失败'))
+      handleError(new Error(res.message || t('request.revokeFailed')))
     }
   } catch (e) {
     handleError(e)

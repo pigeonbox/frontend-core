@@ -2,15 +2,15 @@
   <div class="oidc-callback-container">
     <div class="callback-card">
       <template v-if="error">
-        <el-result icon="error" title="OIDC 登录失败" :sub-title="error">
+        <el-result icon="error" :title="t('login.oidcCallback.failTitle')" :sub-title="error">
           <template #extra>
-            <el-button type="primary" @click="$router.push('/user/login')">返回登录</el-button>
+            <el-button type="primary" @click="$router.push('/user/login')">{{ t('login.oidcCallback.backLogin') }}</el-button>
           </template>
         </el-result>
       </template>
       <template v-else>
         <el-icon class="loading-icon" :size="48"><Loading /></el-icon>
-        <p>登录成功，正在跳转...</p>
+        <p>{{ t('login.oidcCallback.redirecting') }}</p>
       </template>
     </div>
   </div>
@@ -22,12 +22,14 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { userApi } from '@/api/user'
+import { useUserStore } from '@/stores/user'
 import { isOidcErrorRedirect, oidcErrorI18nKey } from '@/utils/oidcError'
 import { Loading } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
+const userStore = useUserStore()
 const error = ref('')
 
 /** 去掉 hash query 里的 OIDC 错误参数（保留路由段本身） */
@@ -62,14 +64,17 @@ onMounted(async () => {
   try {
     const res = await userApi.getUserInfo()
     if (res.code === 200) {
-      localStorage.setItem('fcb_session', '1')
-      ElMessage.success('登录成功')
+      // 会话必须进 store（frontend-core#95）：直写 localStorage 不翻转 sessionActive
+      // ref ⇒ isLoggedIn 恒 false ⇒ Dashboard onMounted 把刚登录的用户弹回登录页。
+      // applyExternalSession = userInfo + userRole + markSessionActive 一体灌入。
+      userStore.applyExternalSession(res.data)
+      ElMessage.success(t('login.success'))
       router.push('/user/dashboard')
       return
     }
-    error.value = '登录态获取失败，请重新登录'
+    error.value = t('login.oidcCallback.sessionFailed')
   } catch {
-    error.value = '登录态获取失败，请重新登录'
+    error.value = t('login.oidcCallback.sessionFailed')
   }
 })
 </script>

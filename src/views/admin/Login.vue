@@ -179,8 +179,13 @@ onMounted(async () => {
 const handleElevate = () => {
   elevating.value = true
   try {
-    userStore.markSessionActive()
-    localStorage.setItem('userRole', 'admin')
+    // 会话标记 + userRole 统一走 applyExternalSession（frontend-core#98 写点收口）：
+    // elevate 卡片仅在 userInfo.role==='admin' 经服务端确认后渲染 ⇒ userInfo 必在场
+    if (userStore.userInfo) {
+      userStore.applyExternalSession(userStore.userInfo)
+    } else {
+      userStore.markSessionActive()
+    }
     ElMessage.success(t('admin.adminLogin.success'))
     router.push(getAdminBase())
   } finally {
@@ -237,7 +242,9 @@ const handleLogin = async () => {
           userStore.logout()
           return
         }
-        localStorage.setItem('userRole', 'admin')
+        // userRole 写点收口（frontend-core#98）：角色已由服务端确认（上面 !== 'admin'
+        // 已挡），不再硬编码 'admin' 字面量
+        userStore.applyExternalSession(userStore.userInfo)
 
         ElMessage.success(t('admin.adminLogin.success'))
         router.push(getAdminBase())

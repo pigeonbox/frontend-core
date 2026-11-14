@@ -18,6 +18,7 @@ export default {
     username: 'ユーザー名',
     email: 'メールアドレス',
     traceId: 'トレースID',
+    defaultSiteDescription: '安全で便利なファイル共有システム',
     minutes: '分',
     hours: '時間',
     days: '日',
@@ -1496,6 +1497,12 @@ export default {
     // email_invalid / login_failed / missing_code / admin_mfa_required) ⇒ the UI picks the wording by code instead
     // of one generic "login failed".
     // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
+    oidcCallback: {
+      failTitle: 'OIDCログインに失敗しました',
+      backLogin: 'ログインに戻る',
+      redirecting: 'ログイン成功、リダイレクト中…',
+      sessionFailed: 'ログイン状態を取得できませんでした。再度ログインしてください。',
+    },
     oidcError: {
       stateInvalid: 'サインイン要求の有効期限が切れているか、無効です。最初からやり直してください。',
       accountDisabled: 'このアカウントは無効化されています。サイト管理者にお問い合わせください。',
@@ -1583,6 +1590,8 @@ export default {
     revoke: '無効化',
     revoked: '無効化しました',
     revokeConfirm: '無効化すると、訪問者はファイルを投函できなくなります。続行しますか？',
+    createFailed: '作成に失敗しました',
+    revokeFailed: '無効化に失敗しました',
     created: 'リンクを作成しました',
     pickupTitle: 'ファイルの投函',
     pickupNotice: 'アップロードされたファイルはリンクの所有者に直接届き、所有者だけが閲覧できます',

@@ -18,6 +18,7 @@ export default {
     username: 'Username',
     email: 'Email',
     traceId: 'Trace ID',
+    defaultSiteDescription: 'Secure and convenient file sharing',
     minutes: 'minutes',
     hours: 'hours',
     days: 'days',
@@ -1496,6 +1497,12 @@ export default {
     // email_invalid / login_failed / missing_code / admin_mfa_required) ⇒ the UI picks the wording by code instead
     // of one generic "login failed".
     // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
+    oidcCallback: {
+      failTitle: 'OIDC sign-in failed',
+      backLogin: 'Back to sign-in',
+      redirecting: 'Signed in, redirecting…',
+      sessionFailed: 'Failed to restore the sign-in session. Please sign in again.',
+    },
     oidcError: {
       stateInvalid: 'The sign-in request expired or is invalid. Please start again.',
       accountDisabled: 'This account is disabled. Contact the site administrator.',
@@ -1584,6 +1591,8 @@ export default {
     revoke: 'Revoke',
     revoked: 'Revoked',
     revokeConfirm: 'Once revoked, visitors can no longer deliver files. Continue?',
+    createFailed: 'Create failed',
+    revokeFailed: 'Revoke failed',
     created: 'Link created',
     pickupTitle: 'File Delivery',
     pickupNotice: 'Uploaded files go straight to the link owner and are visible only to them',

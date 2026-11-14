@@ -18,6 +18,7 @@ export default {
     username: '用户名',
     email: '邮箱',
     traceId: '追踪 ID',
+    defaultSiteDescription: '安全、便捷的文件分享系统',
     minutes: '分钟',
     hours: '小时',
     days: '天',
@@ -1485,6 +1486,12 @@ export default {
     // core 按 oidc_code 回跳（state_invalid / account_disabled / email_invalid /
     // login_failed / missing_code / admin_mfa_required）⇒ 前端按码选文案，不再笼统弹「登录失败」。
     // ⚠️ 不展示 core 下发的 msg（那是 core 的措辞、且只有中文）⇒ 只按码映射。
+    oidcCallback: {
+      failTitle: 'OIDC 登录失败',
+      backLogin: '返回登录',
+      redirecting: '登录成功，正在跳转...',
+      sessionFailed: '登录态获取失败，请重新登录',
+    },
     oidcError: {
       stateInvalid: '登录请求已过期或无效，请重新发起登录',
       accountDisabled: '账号已被禁用，请联系站点管理员',
@@ -1572,6 +1579,8 @@ export default {
     revoke: '撤销',
     revoked: '已撤销',
     revokeConfirm: '撤销后访客将无法再投递，确认？',
+    createFailed: '创建失败',
+    revokeFailed: '撤销失败',
     created: '链接已创建',
     pickupTitle: '文件投递',
     pickupNotice: '上传的文件将直接投递给链接主人，仅其可见',

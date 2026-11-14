@@ -18,6 +18,7 @@ export default {
     username: 'Имя пользователя',
     email: 'Эл. почта',
     traceId: 'Trace ID',
+    defaultSiteDescription: 'Безопасный и удобный обмен файлами',
     minutes: 'минут',
     hours: 'часов',
     days: 'дней',
@@ -1496,6 +1497,12 @@ export default {
     // email_invalid / login_failed / missing_code / admin_mfa_required) ⇒ the UI picks the wording by code instead
     // of one generic "login failed".
     // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
+    oidcCallback: {
+      failTitle: 'Не удалось войти через OIDC',
+      backLogin: 'Вернуться ко входу',
+      redirecting: 'Вход выполнен, переход…',
+      sessionFailed: 'Не удалось получить сеанс входа. Войдите снова.',
+    },
     oidcError: {
       stateInvalid: 'Запрос на вход истёк или недействителен. Начните заново.',
       accountDisabled: 'Эта учётная запись отключена. Обратитесь к администратору сайта.',
@@ -1584,6 +1591,8 @@ export default {
     revoke: 'Отозвать',
     revoked: 'Отозвана',
     revokeConfirm: 'После отзыва посетители больше не смогут доставлять файлы. Продолжить?',
+    createFailed: 'Не удалось создать',
+    revokeFailed: 'Не удалось отозвать',
     created: 'Ссылка создана',
     pickupTitle: 'Доставка файла',
     pickupNotice: 'Загруженные файлы попадают сразу владельцу ссылки и видны только ему',

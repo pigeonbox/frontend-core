@@ -9,7 +9,7 @@
       :value="chars[i] || ''"
       :disabled="disabled"
       autocomplete="off"
-      :aria-label="`${ariaLabel} ${i + 1}`"
+      :aria-label="`${ariaLabelResolved} ${i + 1}`"
       @input="(e) => onInput(i, e as InputEvent)"
       @keydown="onKeydown(i, $event)"
       @paste.prevent="onPaste"
@@ -20,6 +20,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { splitTyping } from '@/utils/codeInput'
 
 /**
@@ -33,15 +34,18 @@ import { splitTyping } from '@/utils/codeInput'
  * autocomplete 不得用 one-time-code：浏览器会把短信验证码自动灌进 6 格并触发
  * 700ms 自动提交（2026-10-22 修正）。
  */
+const { t } = useI18n()
 const props = withDefaults(
   defineProps<{
     modelValue: string
     length?: number
     disabled?: boolean
+    /** 逐格 aria-label 前缀；缺省取 share.pickupCodeLabel（frontend-core#101：不许硬编码中文） */
     ariaLabel?: string
   }>(),
-  { length: 6, disabled: false, ariaLabel: '取件码' },
+  { length: 6, disabled: false },
 )
+const ariaLabelResolved = computed(() => props.ariaLabel ?? t('share.pickupCodeLabel'))
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]

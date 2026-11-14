@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { publicApi, type PublicConfig } from '@/api/public'
+import { i18n } from '@/i18n'
 // ⚠️ 别名：store 里对外暴露的 computed 与工具函数同名，直接 import 会**自引用**
 // （const setupTokenRequired = computed(() => setupTokenRequired(...)) ⇒ TDZ 报错）。
 import {
@@ -53,7 +54,8 @@ export const useConfigStore = defineStore('config', () => {
 
   // 获取站点描述
   const siteDescription = () => {
-    return config.value?.description || '安全、便捷的文件分享系统'
+    // 缺省描述随界面语言（frontend-core#101：硬编码中文会让非中文站渲染中文 meta）
+    return config.value?.description || i18n.global.t('common.defaultSiteDescription')
   }
 
   // 站点公网地址（base.public_url）：管理台配置的对外可达地址；

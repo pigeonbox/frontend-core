@@ -103,6 +103,13 @@ const loadSpec = async () => {
       docExpansion: 'list',
       filter: true,
       tryItOutEnabled: true,
+      // frontend-core#100：Cookie 会话的写请求必须带 X-Requested-With——后端 CSRF
+      // 中间件对「Cookie 认证 + 非安全方法 + 缺该头」回 403。应用内两条通道都全局
+      // 补头（utils/request.ts / api/_xhr.ts），唯独 Swagger 原生请求要在这里补。
+      requestInterceptor: (req: { headers?: Record<string, string> }) => {
+        req.headers = { ...req.headers, 'X-Requested-With': 'XMLHttpRequest' }
+        return req
+      },
     })
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
