@@ -10,8 +10,8 @@
  * 细节：issuer / 端点 URL / token 响应片段 / 账号标识），失败时 302 回
  * `/#/user/login?oidc_error=1&oidc_code=<短码>&msg=<urlencode 后的可公开文案>`。
  *
- * ⚠️ **码集合是跨仓契约**（core 侧 `oidcPublicError` 的四个返回分支（含 `email_invalid`，core#119） +
- *   `missing_code` 分支）⇒ 前端**不得自造新码**；core 增码时前端补一条映射
+ * ⚠️ **码集合是跨仓契约**（core 侧 `oidcPublicError` 的五个返回分支（含 `email_invalid`，core#119、
+ *   `admin_mfa_required`，core#187） + `missing_code` 分支）⇒ 前端**不得自造新码**；core 增码时前端补一条映射
  *   即可（守卫 `src/views/user/__tests__/oidcErrorHandling.spec.ts` 会核对两侧
  *   的集合一致——core 仓在场时自动核对）。
  *
@@ -26,6 +26,7 @@ export const OIDC_ERROR_CODES = [
   'email_invalid',
   'login_failed',
   'missing_code',
+  'admin_mfa_required',
 ] as const
 
 export type OidcErrorCode = (typeof OIDC_ERROR_CODES)[number]
@@ -37,6 +38,7 @@ export const OIDC_ERROR_I18N_KEYS: Record<OidcErrorCode, string> = {
   email_invalid: 'login.oidcError.emailInvalid',
   login_failed: 'login.oidcError.loginFailed',
   missing_code: 'login.oidcError.missingCode',
+  admin_mfa_required: 'login.oidcError.adminMfaRequired',
 }
 
 /** 规范化 core 下发的短码；未知/缺失 ⇒ null（不裸奔标识） */
