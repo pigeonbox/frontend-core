@@ -1,7 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import { host } from '@/host'
 import { adminBasePath } from '@/utils/adminPath'
-import { i18n } from '@/i18n'
+import { applyDocumentTitle } from '@/utils/documentTitle'
 import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
@@ -314,11 +313,9 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  // 设置页面标题（meta.title 存 i18n key，此处按当前 locale 解析；无 title 落品牌名）
-  const title = to.meta.title ? i18n.global.t(to.meta.title as string) : 'PigeonBox'
-  document.title = title
-  // 宿主窗口标题同步(经统一网关内嵌宿主时窗口标题由应用管理;无宿主 no-op)
-  host.setTitle(title).catch(() => {})
+  // 设置页面标题（meta.title 存 i18n key，按当前 locale 解析；无 title 落品牌名）。
+  // 与语言切换共用同一入口（frontend-core#99：切语言不导航也要刷新标签）。
+  applyDocumentTitle(to.meta.title as string | undefined)
 
   // 检查是否需要登录
   if (to.meta.requiresAuth) {

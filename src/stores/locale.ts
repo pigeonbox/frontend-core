@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { i18n, supportedLocales, type AppLocale } from '@/i18n'
+import { refreshDocumentTitle } from '@/utils/documentTitle'
 
 export type { AppLocale }
 
@@ -46,6 +47,8 @@ export const useLocaleStore = defineStore('locale', () => {
     if (typeof document !== 'undefined') {
       document.documentElement.lang = next
     }
+    // frontend-core#99：标签标题随语言重算（不导航也刷新；与守卫共用同一入口）
+    refreshDocumentTitle()
   }
 
   function toggle() {
@@ -62,6 +65,8 @@ export const useLocaleStore = defineStore('locale', () => {
     if (typeof document !== 'undefined') {
       document.documentElement.lang = next
     }
+    // 宿主语言切换同样改了界面语言 ⇒ 标题同口径重算（frontend-core#99）
+    refreshDocumentTitle()
   }
 
   return {

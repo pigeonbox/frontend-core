@@ -18,6 +18,7 @@ export default {
     username: 'Benutzername',
     email: 'E-Mail',
     traceId: 'Trace-ID',
+    defaultSiteDescription: 'Sichere und bequeme Dateifreigabe',
     minutes: 'Minuten',
     hours: 'Stunden',
     days: 'Tage',
@@ -1496,6 +1497,12 @@ export default {
     // email_invalid / login_failed / missing_code / admin_mfa_required) ⇒ the UI picks the wording by code instead
     // of one generic "login failed".
     // ⚠️ core's `msg` is NOT shown (it is core's wording and Chinese-only).
+    oidcCallback: {
+      failTitle: 'OIDC-Anmeldung fehlgeschlagen',
+      backLogin: 'Zurück zur Anmeldung',
+      redirecting: 'Anmeldung erfolgreich, Weiterleitung…',
+      sessionFailed: 'Anmeldekonnte nicht abgerufen werden. Bitte erneut anmelden.',
+    },
     oidcError: {
       stateInvalid: 'Die Anmeldeanfrage ist abgelaufen oder ungültig. Bitte starten Sie erneut.',
       accountDisabled: 'Dieses Konto ist deaktiviert. Wenden Sie sich an den Site-Administrator.',
@@ -1584,6 +1591,8 @@ export default {
     revoke: 'Widerrufen',
     revoked: 'Widerrufen',
     revokeConfirm: 'Nach dem Widerruf können Besucher keine Dateien mehr zustellen. Fortfahren?',
+    createFailed: 'Erstellen fehlgeschlagen',
+    revokeFailed: 'Widerrufen fehlgeschlagen',
     created: 'Link erstellt',
     pickupTitle: 'Dateizustellung',
     pickupNotice: 'Hochgeladene Dateien gehen direkt an den Inhaber des Links und sind nur für ihn sichtbar',

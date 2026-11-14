@@ -3,7 +3,7 @@
     <!-- 空态 -->
     <div v-if="points.length === 0" class="chart-empty">
       <el-icon :size="36"><TrendCharts /></el-icon>
-      <p>{{ emptyText }}</p>
+      <p>{{ emptyTextResolved }}</p>
     </div>
 
     <template v-else>
@@ -127,6 +127,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { TrendCharts } from '@element-plus/icons-vue'
 
 export interface TrendPoint {
@@ -140,15 +141,19 @@ interface Props {
   height?: number
   uploadLabel?: string
   downloadLabel?: string
+  /** 空态文案；缺省按当前语言取 admin.noData（frontend-core#101：不许硬编码中文） */
   emptyText?: string
 }
 
+const { t } = useI18n()
 const props = withDefaults(defineProps<Props>(), {
   height: 240,
   uploadLabel: 'Uploads',
   downloadLabel: 'Downloads',
-  emptyText: '暂无数据',
 })
+// 现役唯一调用方是管理台（admin/Dashboard）⇒ 缺省落 admin.noData；
+// 调用方显式传入时以传入值为准。
+const emptyTextResolved = computed(() => props.emptyText ?? t('admin.noData'))
 
 const containerRef = ref<HTMLElement | null>(null)
 const width = ref(600)

@@ -39,8 +39,9 @@ export const useUserStore = defineStore('user', () => {
   const login = async (username: string, password: string, totpCode?: string) => {
     const res = await userApi.login({ username, password, totp_code: totpCode })
     if (res.code === 200) {
-      userInfo.value = res.data.user
-      markSessionActive()
+      // 会话 + userRole 统一走 applyExternalSession（frontend-core#98 写点收口）：
+      // login 不再绕开 userRole 写点，与 OIDC 回调 / 宿主 SSO 同一口径。
+      applyExternalSession(res.data.user)
       return true
     }
     // 保留错误码：抛普通 Error 会丢掉 code，导致前端的 errcode→i18n 映射
@@ -99,10 +100,13 @@ export const useUserStore = defineStore('user', () => {
   }
 
   // applyExternalSession 外部身份源(宿主 SSO/OIDC 回调等)直接灌入登录态:
-  // 服务端已下发会话 Cookie,这里只补齐客户端状态(与 login() 成功分支同语义)
+  // 服务端已下发会话 Cookie,这里只补齐客户端状态(与 login() 成功分支同语义)。
+  // userRole 写点收口(frontend-core#98):role 在场写入、缺席清残留——
+  // 换号登录后旧 admin 标记不得留存(客户端 UX 标记,安全仍由后端强制)。
   const applyExternalSession = (user: UserInfo) => {
     userInfo.value = user
     if (user?.role) localStorage.setItem('userRole', user.role)
+    else localStorage.removeItem('userRole')
     markSessionActive()
   }
 
