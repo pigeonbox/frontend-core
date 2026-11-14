@@ -59,6 +59,23 @@
           />
         </el-form-item>
 
+        <!-- 二次验证码（评审 S01 管理员登录统一 MFA）：账号开了 TOTP 后，服务端
+             对「口令正确但缺码」回 40012（不计失败锁定）⇒ 据此增量显示第二个
+             输入框，不重置已填的用户名口令（与 user Login 同构）。-->
+        <el-form-item v-if="needTotp" prop="totpCode" :label="t('admin.adminLogin.totpCode')">
+          <el-input
+            ref="totpInputRef"
+            v-model="loginForm.totpCode"
+            :placeholder="t('admin.adminLogin.totpCodePlaceholder')"
+            size="large"
+            :prefix-icon="Key"
+            maxlength="20"
+            clearable
+            @keyup.enter="handleLogin"
+          />
+          <div class="totp-hint">{{ t('admin.adminLogin.totpHint') }}</div>
+        </el-form-item>
+
         <!-- 认证失败就地提示（登录表单的标准形态），不再弹带追踪 ID 的全局大 toast -->
         <el-alert
           v-if="loginError"
@@ -105,7 +122,7 @@ import { getAdminBase } from '@/router'
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Back } from '@element-plus/icons-vue'
+import { User, Lock, Back, Key } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
 
@@ -119,13 +136,25 @@ const { handleError } = useErrorHandler()
 const router = useRouter()
 const userStore = useUserStore()
 const loginFormRef = ref()
+const totpInputRef = ref<{ focus?: () => void }>()
 const loading = ref(false)
 // 认证失败就地展示（401/业务失败）；非认证类异常仍走全局 handleError
 const loginError = ref('')
 
+/**
+ * 是否进入「第二阶段」登录（账号已开二验）。
+ *
+ * 判据只有一个：服务端回 40012（口令已对、只缺码——**不是**失败提示，
+ * 也不计入失败锁定）。⚠️ 不要用「先查账号是否开二验」预告这一步——那是
+ * 一个账号枚举面，服务端也不提供该查询（与 user Login 同口径）。
+ */
+const needTotp = ref(false)
+
 const loginForm = reactive({
   username: '',
-  password: ''
+  password: '',
+  // 仅第二阶段使用；服务端契约字段是 totp_code（snake_case），提交时转换
+  totpCode: ''
 })
 
 // 一键提权：已登录会话经 /user/info 服务端确认 admin 角色后，补写客户端
@@ -167,6 +196,12 @@ const loginRules = computed(() => ({
   ],
   password: [
     { required: true, message: t('admin.adminLogin.passwordRule'), trigger: 'blur' }
+  ],
+  // 只在第二阶段（v-if=needTotp）注册字段才参与校验；恢复码 10 位（含连字符
+  // 14 位）⇒ 上限放到 20，下限放到 6（6 位 TOTP / 归一化后的恢复码都可能更短）
+  totpCode: [
+    { required: true, message: () => t('admin.adminLogin.totpCodePlaceholder'), trigger: 'blur' },
+    { min: 6, max: 20, message: t('admin.adminLogin.totpRule'), trigger: 'blur' }
   ]
 }))
 
@@ -179,7 +214,14 @@ const handleLogin = async () => {
     loading.value = true
     loginError.value = ''
     try {
-      const res = await adminApi.login(loginForm)
+      // 载荷显式构造：不得整体透传 loginForm（它带 camelCase 的 totpCode，
+      // thrift 绑定会静默丢弃；契约字段是 totp_code，仅第二阶段带值——
+      // 首次不带 ⇒ 服务端回 40012 才切第二阶段）
+      const res = await adminApi.login({
+        username: loginForm.username,
+        password: loginForm.password,
+        totp_code: needTotp.value ? loginForm.totpCode.trim() : undefined
+      })
       if (res.code === 200) {
         // 会话 Cookie 由服务端下发（HttpOnly），前端不再持久化令牌。
         // 会话标记统一入口（ref 响应式 + localStorage 双写）：admin 登录不走
@@ -203,7 +245,19 @@ const handleLogin = async () => {
         loginError.value = res.message || t('login.failed')
       }
     } catch (error: any) {
+      // 40012 = 口令已对、只缺二次验证码（服务端刻意不算失败、也不锁账号）
+      // ⇒ 切到第二阶段，保留已填的用户名口令，只多要一个码。
+      // ⚠️ 请求层包装成 {code, message, response}：body 的 code 才是业务码
+      // （40012 走 HTTP 400 ⇒ status 是 400，判据必须先于 401/400 兜底）。
+      if (error?.code === 40012) {
+        needTotp.value = true
+        ElMessage.warning(t('admin.adminLogin.totpRequired'))
+        // 下一帧再聚焦：此时输入框刚由 v-if 挂上
+        setTimeout(() => totpInputRef.value?.focus?.(), 0)
+        return
+      }
       // 请求层把 HTTP 错误包装成 {code, message, response}；401 = 凭证错误
+      // （40013 错码、密码错等其余失败 → 既有 loginError 就地展示）
       const status = error?.response?.status ?? error?.code
       if (status === 401 || status === 400) {
         loginError.value = error?.message || t('login.failed')
@@ -282,6 +336,14 @@ const handleLogin = async () => {
 .login-error {
   margin: 0 0 var(--spacing-md);
   border-radius: var(--radius-md);
+}
+
+/* 二验输入框下方的说明（「也支持恢复码」）——与 user Login 同构 */
+.totp-hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-top: var(--spacing-xs);
 }
 
 .login-button {

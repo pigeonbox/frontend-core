@@ -617,6 +617,13 @@ export default {
       password: 'Password',
       passwordPlaceholder: 'Enter your password',
       passwordRule: 'Password is required',
+      // Two-factor sign-in (S01 admin MFA): server answers 40012 → second field.
+      // Values mirror this locale's login.totp* translations.
+      totpCode: 'Verification code',
+      totpCodePlaceholder: 'Enter a code or recovery code',
+      totpRequired: 'Two-factor authentication is enabled for this account. Please enter your code.',
+      totpHint: 'The 6-digit code comes from your authenticator app; use a recovery code if you lost your phone.',
+      totpRule: 'Enter the 6-digit code or one recovery code',
       submit: 'Sign In',
       submitting: 'Signing in…',
       success: 'Signed in',
