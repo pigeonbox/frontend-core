@@ -617,6 +617,13 @@ export default {
       password: 'Passwort',
       passwordPlaceholder: 'Geben Sie Ihr Passwort ein',
       passwordRule: 'Passwort ist erforderlich',
+      // Zwei-Faktor-Anmeldung (S01: einheitliche MFA für den Admin-Login) — 40012.
+      // Werte spiegeln login.totp* dieser Sprache (gleiche Übersetzung, ein Ort).
+      totpCode: 'Bestätigungscode',
+      totpCodePlaceholder: 'Code oder Wiederherstellungscode eingeben',
+      totpRequired: 'Für dieses Konto ist die Zwei-Faktor-Authentifizierung aktiviert. Bitte geben Sie Ihren Code ein.',
+      totpHint: 'Der 6-stellige Code kommt aus Ihrer Authenticator-App; verwenden Sie einen Wiederherstellungscode, wenn Sie Ihr Telefon verloren haben.',
+      totpRule: 'Geben Sie den 6-stelligen Code oder einen Wiederherstellungscode ein',
       submit: 'Anmelden',
       submitting: 'Anmeldung läuft…',
       success: 'Angemeldet',

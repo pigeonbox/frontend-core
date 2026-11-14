@@ -614,6 +614,13 @@ export default {
       password: '密码',
       passwordPlaceholder: '请输入密码',
       passwordRule: '请输入密码',
+      // 二次验证（评审 S01 管理员登录统一 MFA）：40012 切第二阶段的表单文案
+      // ——值镜像本语种 login.totp*（同一语义同一译文，避免两处措辞漂移）
+      totpCode: '二次验证码',
+      totpCodePlaceholder: '请输入验证码或恢复码',
+      totpRequired: '该账号已开启二次验证，请补充验证码',
+      totpHint: '6 位数字来自认证器 App；手机丢了就填一个恢复码。',
+      totpRule: '请输入 6 位验证码或一个恢复码',
       submit: '立即登录',
       submitting: '登录中…',
       success: '登录成功',

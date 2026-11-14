@@ -617,6 +617,13 @@ export default {
       password: 'パスワード',
       passwordPlaceholder: 'パスワードを入力',
       passwordRule: 'パスワードは必須です',
+      // 二要素認証（S01 管理者ログイン統一 MFA）：40012 で第二段階に移行。
+      // 値は本言語の login.totp* と同一（同じ訳文を二箇所で維持しない）。
+      totpCode: '確認コード',
+      totpCodePlaceholder: 'コードまたはリカバリーコードを入力',
+      totpRequired: 'このアカウントは二要素認証が有効です。コードを入力してください。',
+      totpHint: '6桁のコードは認証アプリに表示されます。スマートフォンを紛失した場合はリカバリーコードを使用してください。',
+      totpRule: '6桁のコード、またはリカバリーコードを1つ入力してください',
       submit: 'サインイン',
       submitting: 'サインイン中…',
       success: 'サインインしました',
