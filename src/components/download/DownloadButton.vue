@@ -24,6 +24,14 @@
         <span v-if="error" class="dl-error">{{ error }}</span>
         <span v-else-if="handedOff" class="dl-handoff">{{ t('download.handedOff') }}</span>
         <span v-else class="dl-status">{{ statusText }}</span>
+        <el-button
+          v-if="canResume"
+          size="small"
+          link
+          type="primary"
+          class="dl-resume"
+          @click="onResume"
+        >{{ t('download.resume') }}</el-button>
         <span v-if="!error && !handedOff && bytesPerSecond > 0" class="dl-speed">
           {{ t('download.speed', { speed: formatSpeed(bytesPerSecond) }) }}
         </span>
@@ -79,6 +87,7 @@ const error = dl.error
 const handedOff = dl.handedOff
 const bytesPerSecond = dl.bytesPerSecond
 const etaSeconds = dl.etaSeconds
+const canResume = dl.canResume
 
 /** 进度条只在「进行中 / 出错 / 已移交」时出现——空闲时不占版面 */
 const visible = computed(() => dl.phase.value !== 'idle' || !!dl.error.value)
@@ -87,6 +96,8 @@ const statusText = computed(() => {
   switch (dl.phase.value) {
     case 'preparing':
       return t('download.preparing')
+    case 'retrying':
+      return t('download.retrying', { attempt: String(dl.retryAttempt.value || 1) })
     case 'transforming':
       return t('download.decrypting')
     case 'saving':
@@ -125,6 +136,18 @@ const onClick = async () => {
     transform: props.transform,
   })
   const out = await p
+  if (out) emit('done', out)
+  else if (dl.error.value) emit('error', dl.error.value, dl.lastError.value)
+}
+
+/** 断点续传（frontend-core#94）：中断时保留的进度/句柄回传，从断点接着下 */
+const onResume = async () => {
+  const out = await dl.resumeDownload({
+    url: props.url,
+    filename: props.filename,
+    headers: props.headers,
+    transform: props.transform,
+  })
   if (out) emit('done', out)
   else if (dl.error.value) emit('error', dl.error.value, dl.lastError.value)
 }

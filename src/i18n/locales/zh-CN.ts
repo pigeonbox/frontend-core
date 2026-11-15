@@ -343,6 +343,14 @@ export default {
     failed: '下载失败',
     speed: '{speed}/s',
     eta: '剩余 {time}',
+    retrying: '网络中断，正在重试（第 {attempt} 次）…',
+    interrupted: '下载已中断（已保存 {percent}%），点「继续下载」从断点续传',
+    interruptedUnknown: '下载已中断，点「继续下载」重试',
+    resume: '继续下载',
+  },
+  network: {
+    offline: '网络已断开——传输会失败，恢复后可继续',
+    restored: '网络已恢复，可继续传输',
   },
   share: {
     passwordDownloadHint: '该分享受密码保护，请通过取件页获取下载凭证',
