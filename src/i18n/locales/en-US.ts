@@ -471,6 +471,8 @@ export default {
       extend: 'Extend',
       restore: 'Restore',
       hardDelete: 'Delete Permanently',
+      trashQuotaHint: 'Shares in the trash still occupy your storage quota',
+      trashQuotaHintDesc: 'Moving to the trash does not free quota immediately; permanently delete shares in the trash to free it.',
       batchDelete: 'Delete Selected',
       batchExtend: 'Extend Selected',
       batchRestore: 'Restore Selected',

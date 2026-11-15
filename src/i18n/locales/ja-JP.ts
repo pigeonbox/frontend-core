@@ -471,6 +471,8 @@ export default {
       extend: '延長',
       restore: '復元',
       hardDelete: '完全に削除',
+      trashQuotaHint: 'ゴミ箱の共有はまだストレージクォータを占有しています',
+      trashQuotaHintDesc: 'ゴミ箱に移してもクォータはすぐに解放されません。解放するにはゴミ箱の共有を完全に削除してください。',
       batchDelete: '選択した項目を削除',
       batchExtend: '選択した項目を延長',
       batchRestore: '選択した項目を復元',
