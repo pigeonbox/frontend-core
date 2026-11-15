@@ -14,6 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # action pin 门禁（frontend-core#90）：判据脚本为 hub pigeonbox/pigeonbox
+      # scripts/check-action-pins.sh 的本仓副本（scripts/ 下，头部有同步注记）。
+      # 断言挂在 pull_request 路径上（放别处 = 漏网 pin 已进 main 才报）。
+      # --remote 用 GitHub API 验每个 pin 真是合法 commit（抓「全仓一致地打错」）；
+      # --selfcheck 注入坏 pin（tag/矛盾 SHA/零 pin）必须判红，证明门禁有牙齿。
+      - name: action pin 必须全是合法 commit（格式+一致性+远端校验）
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/check-action-pins.sh --remote
+      - name: action pin 门禁自证（注入坏 pin 必须判红）
+        run: bash scripts/check-action-pins.sh --selfcheck
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
@@ -89,7 +100,7 @@ jobs:
         run: npx playwright test
       - name: 上传失败现场（trace + 截图）
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report
           path: |
@@ -123,7 +134,7 @@ jobs:
         run: python3 scripts/check-e2e-mutation.py
       - name: 上传失败现场（trace + 截图）
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: e2e-mutation-report
           path: |
