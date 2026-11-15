@@ -29,6 +29,17 @@ export const userApi = {
     })
   },
 
+  // OIDC 管理员二验换发（core#180 / frontend-core#108）：半会话 → 正式会话。
+  // 半会话是 HttpOnly Cookie，本请求只要带 code；服务端成功即轮换下发正式会话。
+  // 分流：缺码 40012（不是失败，保留输入框）/ 错码 40013 / 半会话失效 401。
+  oidcMfaComplete: (data: { code: string }) => {
+    return request<ApiResponse<null>>({
+      url: '/api/v1/user/oidc/mfa',
+      method: 'POST',
+      data,
+    })
+  },
+
   // 获取用户信息
   getUserInfo: () => {
     return request<ApiResponse<UserInfo>>({
