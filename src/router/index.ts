@@ -236,6 +236,14 @@ function adminRoutes(base: string): RouteRecordRaw[] {
         meta: { title: 'route.adminActivities' },
       },
       {
+        // 运营解读（frontend-core#91）：既有 transfer/审计数据的前端聚合视图，
+        // 零新 wire——数据源与口径见 views/admin/Insights.vue 头注。
+        path: 'insights',
+        name: 'AdminInsights',
+        component: () => import('@/views/admin/Insights.vue'),
+        meta: { title: 'route.adminInsights' },
+      },
+      {
         path: 'maintenance',
         name: 'AdminMaintenance',
         component: () => import('@/views/admin/Maintenance.vue'),
