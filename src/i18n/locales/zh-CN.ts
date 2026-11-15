@@ -692,7 +692,8 @@ export default {
         account: '用户与登录',
         security: '安全与限流',
         notify: '通知与邮件',
-        p2p: '联邦'
+        p2p: '联邦',
+        policy: '策略模板'
       },
       navDesc: {
         site: '站点的基础信息与对外形象',
@@ -701,7 +702,32 @@ export default {
         account: '注册开放策略、用户默认配额与登录方式',
         security: '接口限流规则与 API Key 准入',
         notify: '分享创建等事件的站外通知与邮件',
-        p2p: '跨站联邦：与其他 PigeonBox 实例互递取件口令（口令直达，流量不过服务器）'
+        p2p: '跨站联邦：与其他 PigeonBox 实例互递取件口令（口令直达，流量不过服务器）',
+        policy: '把分散的匿名/注册/存储/有效期旋钮收敛为命名模板，一次下发、应用前预览差异'
+      },
+      policy: {
+        intro: '策略模板是一组预设配置（不改变任何单旋钮语义）：选择模板后先预览将发生的差异，确认应用；服务端会在保存时校验跨配置不变量（如单次发送总量 ≥ 单文件上限），非法组合直接拒绝。',
+        emptyList: '未获取到策略模板清单（后端未下发 policy_templates）',
+        selectLabel: '选择模板',
+        selectPlaceholder: '请选择要应用的策略模板',
+        diffTitle: '差异预览',
+        noChanges: '当前配置与该模板一致，无需变更',
+        onlyChanged: '仅列出将发生变化的字段；未列出的字段保持不变。',
+        colField: '配置项',
+        colFrom: '当前值',
+        colTo: '应用后',
+        applyBtn: '应用模板',
+        confirmTitle: '应用策略模板',
+        confirmMsg: '将按「{name}」一次下发多项配置，应用前请确认上方差异。是否继续？',
+        applySuccess: '模板已应用，配置已生效',
+        applyFailed: '模板应用失败',
+        on: '开',
+        off: '关',
+        templates: {
+          intranet: { name: '纯内网', desc: '可信内网部署：放开访客上传与日配额、关闭自助注册、下载不需登录、默认 7 天/100 次' },
+          publicNoAnonymous: { name: '公开但禁匿名', desc: '对公网开放的柜子：访客不可上传（须登录）、开放自助注册、下载不需登录、默认 3 天/50 次' },
+          enterprise: { name: '企业默认', desc: '受控部署：访客禁传、禁自助注册、存储配额 10GB、单次发送总量与单文件上限对齐 2GB、会话 12 小时、默认 7 天/20 次' },
+        },
       },
       sections: {
         site: '站点信息',

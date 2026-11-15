@@ -693,7 +693,8 @@ export default {
         account: 'Benutzer & Anmeldung',
         security: 'Sicherheit & Ratenbegrenzung',
         notify: 'Benachrichtigungen & E-Mail',
-        p2p: 'Verbund'
+        p2p: 'Verbund',
+        policy: 'Richtlinienvorlagen'
       },
       navDesc: {
         site: 'Identität der Site und öffentliches Erscheinungsbild',
@@ -702,7 +703,32 @@ export default {
         account: 'Registrierungsrichtlinie, Vorgaben pro Benutzer und Anmeldemethoden',
         security: 'Regeln zur Ratenbegrenzung und Zulassung von API-Schlüsseln',
         notify: 'Benachrichtigungen zu Freigabeereignissen außerhalb der Site sowie E-Mail',
-        p2p: 'Site-übergreifender Verbund: Abholcodes mit anderen PigeonBox-Instanzen austauschen (codebasiert, der Datenverkehr umgeht den Server)'
+        p2p: 'Site-übergreifender Verbund: Abholcodes mit anderen PigeonBox-Instanzen austauschen (codebasiert, der Datenverkehr umgeht den Server)',
+        policy: 'Verstreute Anonymitäts-/Registrierungs-/Speicher-/Ablauf-Regler in benannte Vorlagen bündeln — in einem Schritt anwenden, mit Diff-Vorschau'
+      },
+      policy: {
+        intro: 'Eine Richtlinienvorlage ist ein vorkonfiguriertes Bündel von Einstellungen (keine Semantik-Änderung an einzelnen Reglern): Vorlage wählen, Diff prüfen, dann anwenden. Der Server validiert querschnittliche Invarianten beim Speichern (z. B. Sammelgröße ≥ Dateigröße) und weist ungültige Kombinationen sofort zurück.',
+        emptyList: 'Keine Richtlinienvorlagen erhalten (Server hat policy_templates nicht gesendet)',
+        selectLabel: 'Vorlage wählen',
+        selectPlaceholder: 'Richtlinienvorlage zum Anwenden auswählen',
+        diffTitle: 'Diff-Vorschau',
+        noChanges: 'Die aktuelle Konfiguration entspricht bereits dieser Vorlage — nichts zu ändern',
+        onlyChanged: 'Nur sich ändernde Felder werden aufgelistet; alle anderen bleiben unverändert.',
+        colField: 'Einstellung',
+        colFrom: 'Aktuell',
+        colTo: 'Nach dem Anwenden',
+        applyBtn: 'Vorlage anwenden',
+        confirmTitle: 'Richtlinienvorlage anwenden',
+        confirmMsg: 'Dadurch werden mehrere Einstellungen gleichzeitig gemäß „{name}“ übernommen. Prüfen Sie den Diff oben. Fortfahren?',
+        applySuccess: 'Vorlage angewendet, Konfiguration ist jetzt wirksam',
+        applyFailed: 'Vorlage konnte nicht angewendet werden',
+        on: 'Ein',
+        off: 'Aus',
+        templates: {
+          intranet: { name: 'Nur Intranet', desc: 'Vertrauenswürdiges LAN: Gast-Uploads und unbegrenzte Tageskontingente erlauben, Selbstregistrierung deaktivieren, Downloads ohne Anmeldung, standardmäßig 7 Tage/100 Abholungen' },
+          publicNoAnonymous: { name: 'Öffentlich, anonymlos', desc: 'Internet-exponierter Kasten: Gäste können nicht hochladen (Anmeldung erforderlich), Selbstregistrierung aktiv, Downloads ohne Anmeldung, standardmäßig 3 Tage/50 Abholungen' },
+          enterprise: { name: 'Standard für Unternehmen', desc: 'Kontrollierte Bereitstellung: Gast-Uploads aus, Selbstregistrierung aus, 10 GB Speicherkontingent, Sammelgröße an 2-GB-Dateigröße ausgerichtet, 12-Stunden-Sitzungen, standardmäßig 7 Tage/20 Abholungen' },
+        },
       },
       sections: {
         site: 'Site-Informationen',
