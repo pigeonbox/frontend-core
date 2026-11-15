@@ -59,6 +59,20 @@ jobs:
             exit 1
           fi
           echo "负对照通过: 钉回 5.1.5 即判红"
+      # 抬版门禁（frontend-core#96）：库线内容一变先抬自己的版本——package.json
+      # 有 diff 而 VERSION 未抬 ⇒ 红（依赖/契约变更必须与抬版同 PR 落地，
+      # 否则列车 bump 解析「最新已发布 tag」永远钉旧 tgz：core CI 绿测的是
+      # 本地新依赖集，发布物是旧依赖集，两套行为）。断言挂 pull_request 路径
+      # （放 push = 漏网版本已进 main 才报，与 action pin 门禁同取舍）；
+      # --selfcheck 先自证判据有牙齿（未抬版必红/同抬必绿/无关变更不误伤）。
+      - name: package.json 变更必须同 PR 抬 VERSION（frontend-core#96）
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          bash scripts/check-version-bump.sh --selfcheck
+          git fetch --quiet --no-tags origin "${BASE_SHA}"
+          bash scripts/check-version-bump.sh "${BASE_SHA}" HEAD
       - name: 平台零容忍守卫(core 依赖清单不得出现任何宿主 SDK)
         run: |
           ! grep -qE '"@trimjs/|"@qnap|"@synology|"@ugreen|"@terramaster' package.json || {
