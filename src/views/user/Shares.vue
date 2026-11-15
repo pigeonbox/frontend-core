@@ -148,7 +148,7 @@
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column :label="t('common.actions')" width="380" fixed="right" class-name="nowrap-actions">
+      <el-table-column :label="t('common.actions')" width="470" fixed="right" class-name="nowrap-actions">
         <template #default="{ row }">
           <template v-if="row.deleted_at">
             <el-button size="small" type="success" link @click="confirmRestore((row as UserShareItem))">
@@ -159,6 +159,9 @@
             </el-button>
           </template>
           <template v-else>
+            <el-button size="small" link @click="openTimeline((row as UserShareItem))">
+              <el-icon><View /></el-icon> {{ t('user.shares.timeline.open') }}
+            </el-button>
             <el-button size="small" link @click="copyLink((row as UserShareItem))">
               <el-icon><Link /></el-icon> {{ t('user.shares.copyLink') }}
             </el-button>
@@ -253,6 +256,9 @@
             </el-button>
           </template>
           <template v-else>
+            <el-button size="small" @click="openTimeline(row)">
+              <el-icon><View /></el-icon> {{ t('user.shares.timeline.open') }}
+            </el-button>
             <el-button size="small" @click="copyLink(row)">
               <el-icon><Link /></el-icon> {{ t('user.shares.copyLink') }}
             </el-button>
@@ -290,6 +296,43 @@
       />
     </div>
 
+    <!-- 取件时间线抽屉（frontend-core#93）：三态 + 成功/失败事件按时间序。
+         隐私拍板：不展示明文 IP——失败面只给「来源计数（failureSummary）+ 是否同一来源」，
+         原因是错误码语义枚举（20004 次数耗尽 ≠ 404 过期），不泄内部细节。 -->
+    <el-drawer v-model="showTimeline" :title="t('user.shares.timeline.title')" size="min(420px, 100%)">
+      <div v-loading="timelineLoading" class="timeline-box">
+        <div class="timeline-head">
+          <el-tag v-if="timeline?.state === 'never'" type="info">{{ t('user.shares.timeline.stateNever') }}</el-tag>
+          <el-tag v-else-if="timeline?.state === 'failed'" type="warning">{{ t('user.shares.timeline.stateFailed') }}</el-tag>
+          <el-tag v-else-if="timeline?.state === 'picked'" type="success">{{ t('user.shares.timeline.statePicked') }}</el-tag>
+          <span v-if="timeline && timeline.failure_count > 0" class="timeline-summary">
+            {{ t('user.shares.timeline.failureSummary', { n: timeline.failure_count, s: timeline.failure_sources }) }}
+          </span>
+        </div>
+        <el-empty
+          v-if="timeline && timeline.events.length === 0"
+          :description="t('user.shares.timeline.empty')"
+        />
+        <ul v-else class="timeline-list">
+          <li
+            v-for="(ev, i) in (timeline?.events || [])"
+            :key="i"
+            class="timeline-item"
+            :class="ev.result"
+          >
+            <span class="timeline-at">{{ formatDate(ev.at) }}</span>
+            <el-tag size="small" :type="ev.result === 'success' ? 'success' : 'warning'">
+              {{ ev.result === 'success' ? t('user.shares.timeline.resultSuccess') : t('user.shares.timeline.resultFailed') }}
+            </el-tag>
+            <span v-if="ev.result === 'failed'" class="timeline-detail">
+              {{ reasonLabel(ev.reason) }}<template v-if="ev.same_source !== undefined"> · {{ ev.same_source ? t('user.shares.timeline.sameSource') : t('user.shares.timeline.diffSource') }}</template>
+            </span>
+            <span v-if="ev.channel" class="timeline-channel">{{ timelineChannelLabel(ev.channel) }}</span>
+          </li>
+        </ul>
+      </div>
+    </el-drawer>
+
     <!-- 延期对话框 -->
     <el-dialog
       v-model="showExtendDialog"
@@ -325,7 +368,7 @@ import { useI18n } from 'vue-i18n'
 import {
   Search, Refresh, Delete, Link, Postcard, Clock, View, RefreshLeft
 } from '@element-plus/icons-vue'
-import { userSharesApi, type UserShareItem } from '@/api/userShares'
+import { userSharesApi, type UserShareItem, type PickupTimelineData } from '@/api/userShares'
 import { copyToClipboard } from '@/utils/clipboard'
 import { withBase } from '@/utils/base'
 import { useTableQuery } from '@/composables/useTableQuery'
@@ -531,6 +574,44 @@ const confirmHardDelete = async (row: UserShareItem) => {
   }
 }
 
+// ===== 取件时间线（frontend-core#93）=====
+// 寄件者视角「谁在何时因何失败」：三态（从未被访问/被尝试但失败/成功取件）+
+// 事件按时间倒序。隐私拍板：本面不展示明文 IP——失败只有原因枚举与
+// 「是否同一来源」布尔，来源计数由 failureSummary 聚合给。
+const showTimeline = ref(false)
+const timelineLoading = ref(false)
+const timeline = ref<PickupTimelineData | null>(null)
+
+const openTimeline = async (row: UserShareItem) => {
+  timeline.value = null
+  showTimeline.value = true
+  timelineLoading.value = true
+  try {
+    const res = await userSharesApi.timeline(row.code)
+    timeline.value = res.data
+  } catch (e) {
+    handleError(e)
+  } finally {
+    timelineLoading.value = false
+  }
+}
+
+// 失败原因：错误码语义枚举 → 五语文案（未知枚举原样回显，服务端加新原因不空白）
+const reasonLabel = (reason?: string) => {
+  if (reason === 'password_wrong') return t('user.shares.timeline.reasonPasswordWrong')
+  if (reason === 'count_exhausted') return t('user.shares.timeline.reasonCountExhausted')
+  if (reason === 'expired') return t('user.shares.timeline.reasonExpired')
+  return reason || '—'
+}
+
+// 交付面 → 文案（select/download(-text) 是本时间线的枚举；未知值原样回显）
+const timelineChannelLabel = (ch: string) => {
+  if (ch === 'select' || ch === 'select-text') return t('user.shares.timeline.channelSelect')
+  if (ch === 'download' || ch === 'download-text') return t('user.shares.timeline.channelDownload')
+  if (ch === 'retrieve') return t('user.shares.timeline.channelRetrieve')
+  return ch
+}
+
 const openExtendDialog = (row: UserShareItem) => {
   extendTarget.value = row
   extendHours.value = 24
@@ -587,6 +668,60 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ===== 取件时间线抽屉（frontend-core#93）=====
+   ⚠️ 本块是纯 CSS（<style scoped>，非 scss）⇒ 注释必须用 C 风格块注释。 */
+.timeline-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm, 8px);
+  margin-bottom: var(--spacing-md, 12px);
+}
+
+.timeline-summary {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.timeline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.timeline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 12px;
+  border-left: 2px solid var(--color-border, var(--el-border-color));
+}
+
+.timeline-item.success {
+  border-left-color: var(--el-color-success);
+}
+
+.timeline-item.failed {
+  border-left-color: var(--el-color-warning);
+}
+
+.timeline-at {
+  font-size: var(--text-sm);
+  color: var(--color-text-regular);
+}
+
+.timeline-detail,
+.timeline-channel {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.timeline-channel {
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+}
 /* 窄屏卡片形态（与 views/user/History.vue 同款）：
    表格与卡片**同时渲染**、纯 CSS 互斥（不用 JS 媒体查询 ⇒ 无首帧时序问题）。 */
 .shares-cards {
