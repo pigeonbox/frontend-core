@@ -18,6 +18,7 @@ import enUS from '@/i18n/locales/en-US'
 import {
   OIDC_ERROR_CODES,
   OIDC_ERROR_I18N_KEYS,
+  RETIRED_OIDC_ERROR_CODES,
   resolveOidcErrorCode,
   oidcErrorI18nKey,
   isOidcErrorRedirect,
@@ -68,10 +69,16 @@ describe('OIDC 失败回跳：必须消费 oidc_code', () => {
     const coreCodes = new Set<string>()
     for (const m of body.matchAll(/return\s+"([a-z_]+)"/g)) coreCodes.add(m[1]!)
     for (const m of core.matchAll(/redirectOIDCError\(c,\s*"([a-z_]+)"/g)) coreCodes.add(m[1]!)
-    expect(
-      [...coreCodes].sort(),
-      'core 的短码集合变了 ⇒ 前端要补映射（跨仓契约，前端不得自造新码）',
-    ).toEqual([...OIDC_ERROR_CODES].sort())
+    // 判据不是「集合全等」：core 会**退役**短码（如 admin_mfa_required 被半会话
+    // 流程取代），而前端与 core 独立发版、滚动升级期间可能对上仍下发旧码的中间
+    // 版本 core ⇒ 前端保留映射是正确的。因此：core 有的前端必须都有；前端多出来
+    // 的只能是显式登记的退役码（未登记的额外码仍是契约漂移，照样报红）。
+    const frontend: readonly string[] = OIDC_ERROR_CODES
+    const retired: readonly string[] = RETIRED_OIDC_ERROR_CODES
+    const missing = [...coreCodes].filter((c) => !frontend.includes(c)).sort()
+    expect(missing, 'core 新增短码 ⇒ 前端必须补映射（不得静默落回笼统失败提示）').toEqual([])
+    const unregistered = frontend.filter((c) => !coreCodes.has(c) && !retired.includes(c))
+    expect(unregistered, '前端多出未登记的短码 ⇒ 要么补映射，要么登记进 RETIRED_OIDC_ERROR_CODES').toEqual([])
   })
 
   it('每个短码都要有 i18n 文案（zh/en 两侧）', () => {

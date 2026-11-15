@@ -13,6 +13,9 @@ export function isAuthEndpointUrl(url: string): boolean {
     url.includes('/user/login') ||
     url.includes('/admin/login') ||
     url.includes('/user/refresh') ||
+    // OIDC 半会话换发（core#180）：401 语义是「半会话失效」，由二验页自己
+    // 提示重新登录。若走刷新/登出分支，用户会被弹回登录页且丢失已填输入框。
+    url.includes('/user/oidc/mfa') ||
     (host.ssoLoginPaths ?? []).some((p) => url.includes(p))
   )
 }
