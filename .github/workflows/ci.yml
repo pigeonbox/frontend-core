@@ -29,6 +29,36 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci
+      # npm 漏洞门禁（frontend-core#92）：与 Go 侧 govulncheck 同级——已知 high 才红。
+      # ⚠️ 必须显式官方 registry：npmmirror 对 /-/npm/v1/security/* 返回 404
+      #    ⇒ 任何默认走镜像源的 CI/本地审计都会**静默拿不到数据**（假绿）。
+      #    --package-lock-only 只读锁文件，不依赖 node_modules。
+      - name: npm 漏洞门禁(high 及以上判红, 显式官方 registry)
+        run: npm audit --package-lock-only --audit-level=high --registry=https://registry.npmjs.org
+      # 负对照自证（frontend-core#92）：把 immutable 钉回漏洞区间 5.1.5 后同一条
+      # 命令必须判红——仍绿 = 恒绿摆设。在临时目录里做，不碰工作区锁文件。
+      - name: npm 漏洞门禁自证(immutable 钉回 5.1.5 必须判红)
+        run: |
+          tmp="$(mktemp -d)"
+          cp package.json package-lock.json "$tmp"/
+          node -e '
+            const fs = require("fs");
+            const p = process.argv[1];
+            const lock = JSON.parse(fs.readFileSync(p, "utf8"));
+            lock.packages["node_modules/immutable"] = {
+              version: "5.1.5",
+              resolved: "https://registry.npmjs.org/immutable/-/immutable-5.1.5.tgz",
+              integrity: "sha512-t7xcm2siw+hlUM68I+UEOK+z84RzmN59as9DZ7P1l0994DKUWV7UXBMQZVxaoMSRQ+PBZbHCOoBt7a2wxOMt+A==",
+              devOptional: true,
+              license: "MIT",
+            };
+            fs.writeFileSync(p, JSON.stringify(lock, null, 2) + "\n");
+          ' "$tmp/package-lock.json"
+          if (cd "$tmp" && npm audit --package-lock-only --audit-level=high --registry=https://registry.npmjs.org); then
+            echo "::error::负对照未转红: immutable 钉回 5.1.5 后 npm audit 仍放行, 门禁是恒绿摆设"
+            exit 1
+          fi
+          echo "负对照通过: 钉回 5.1.5 即判红"
       - name: 平台零容忍守卫(core 依赖清单不得出现任何宿主 SDK)
         run: |
           ! grep -qE '"@trimjs/|"@qnap|"@synology|"@ugreen|"@terramaster' package.json || {
