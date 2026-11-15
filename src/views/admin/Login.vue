@@ -125,12 +125,13 @@ import { ElMessage } from 'element-plus'
 import { User, Lock, Back, Key } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
+import { translateError } from '@/utils/api-interceptor'
 
 const isDev = import.meta.env.DEV
 import { useUserStore } from '@/stores/user'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { handleError } = useErrorHandler()
 
 const router = useRouter()
@@ -140,6 +141,18 @@ const totpInputRef = ref<{ focus?: () => void }>()
 const loading = ref(false)
 // 认证失败就地展示（401/业务失败）；非认证类异常仍走全局 handleError
 const loginError = ref('')
+
+/**
+ * loginError 的展示文案：统一走 errcode → i18n 映射（frontend-core#103）。
+ * `te()` 判存在性——vue-i18n 缺键返回键名本身而非空串，`t(k) || fallback`
+ * 是死代码（与 user Login 同口径）。
+ */
+const displayError = (err: unknown): string => {
+  const tr = translateError(err)
+  return tr.i18nKey
+    ? (te(tr.i18nKey) ? t(tr.i18nKey) : tr.fallback)
+    : tr.fallback || t('login.failed')
+}
 
 /**
  * 是否进入「第二阶段」登录（账号已开二验）。
@@ -202,8 +215,9 @@ const loginRules = computed(() => ({
   password: [
     { required: true, message: t('admin.adminLogin.passwordRule'), trigger: 'blur' }
   ],
-  // 只在第二阶段（v-if=needTotp）注册字段才参与校验；恢复码 10 位（含连字符
-  // 14 位）⇒ 上限放到 20，下限放到 6（6 位 TOTP / 归一化后的恢复码都可能更短）
+  // 只在第二阶段（v-if=needTotp）注册字段才参与校验；恢复码形如 ABCD-EFGH
+  // 共 9 字符（含连字符，core pkg/totp Normalize 对分隔符不敏感）⇒ 上限放到
+  // 20，下限放到 6（6 位 TOTP / 归一化后的恢复码都可能更短）
   totpCode: [
     { required: true, message: () => t('admin.adminLogin.totpCodePlaceholder'), trigger: 'blur' },
     { min: 6, max: 20, message: t('admin.adminLogin.totpRule'), trigger: 'blur' }
@@ -249,7 +263,9 @@ const handleLogin = async () => {
         ElMessage.success(t('admin.adminLogin.success'))
         router.push(getAdminBase())
       } else {
-        loginError.value = res.message || t('login.failed')
+        // 统一错误映射（frontend-core#103）：非 200 业务码同样走 errcode → i18n，
+        // 否则英文界面直接吐服务端默认文案（与 user Login 同口径）
+        loginError.value = displayError(res)
       }
     } catch (error: any) {
       // 40012 = 口令已对、只缺二次验证码（服务端刻意不算失败、也不锁账号）
@@ -267,7 +283,9 @@ const handleLogin = async () => {
       // （40013 错码、密码错等其余失败 → 既有 loginError 就地展示）
       const status = error?.response?.status ?? error?.code
       if (status === 401 || status === 400) {
-        loginError.value = error?.message || t('login.failed')
+        // 统一错误映射（frontend-core#103）：40013 等 errcode 落中文 i18n 文案，
+        // 不再展示 errcode 英文默认文案（与 user Login 的 translateError 同口径）
+        loginError.value = displayError(error)
       } else {
         handleError(error)
       }
