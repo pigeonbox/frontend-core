@@ -468,6 +468,8 @@ export default {
       extend: '延期',
       restore: '恢复',
       hardDelete: '永久删除',
+      trashQuotaHint: '回收站中的分享仍占用存储配额',
+      trashQuotaHintDesc: '移入回收站不会立即释放配额；如需释放，请永久删除（清空）回收站中的分享。',
       batchDelete: '批量删除',
       batchExtend: '批量延期',
       batchRestore: '批量恢复',

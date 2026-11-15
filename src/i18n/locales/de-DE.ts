@@ -471,6 +471,8 @@ export default {
       extend: 'Verlängern',
       restore: 'Wiederherstellen',
       hardDelete: 'Endgültig löschen',
+      trashQuotaHint: 'Geteilte Inhalte im Papierkorb belegen weiterhin Ihr Speicherkontingent',
+      trashQuotaHintDesc: 'Das Verschieben in den Papierkorb gibt das Kontingent nicht sofort frei; löschen Sie die Einträge im Papierkorb endgültig, um es freizugeben.',
       batchDelete: 'Ausgewählte löschen',
       batchExtend: 'Ausgewählte verlängern',
       batchRestore: 'Ausgewählte wiederherstellen',

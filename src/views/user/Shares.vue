@@ -12,6 +12,18 @@
       <el-tab-pane name="deleted" :label="t('user.shares.tabDeleted')" />
     </el-tabs>
 
+    <!-- 回收站占额提示（core#186）：软删不释放配额，用户可感知「删了还占」⇒
+         说明占额事实 + 引导清空释放；不改任何配额计算逻辑。 -->
+    <el-alert
+      v-if="activeStatus === 'deleted'"
+      :title="t('user.shares.trashQuotaHint')"
+      :description="t('user.shares.trashQuotaHintDesc')"
+      type="info"
+      :closable="false"
+      show-icon
+      class="trash-quota-hint"
+    />
+
     <!-- 工具栏 -->
     <div class="toolbar">
       <el-input
@@ -825,6 +837,10 @@ onMounted(() => {
 }
 
 .status-tabs {
+  margin-bottom: var(--spacing-lg);
+}
+
+.trash-quota-hint {
   margin-bottom: var(--spacing-lg);
 }
 
