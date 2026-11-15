@@ -77,6 +77,11 @@
               <el-icon><List /></el-icon>
               <span>{{ t('admin.activities') }}</span>
             </el-menu-item>
+
+            <el-menu-item :index="adminBase + '/insights'">
+              <el-icon><TrendCharts /></el-icon>
+              <span>{{ t('admin.insights') }}</span>
+            </el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu :index="adminBase + '/g-system'">
@@ -181,7 +186,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import {
   Monitor, Folder, FolderOpened, User, Setting, ArrowDown, Bell,
-  Box, Document, Tools, Promotion, SwitchButton, List, View, Connection } from '@element-plus/icons-vue'
+  Box, Document, Tools, Promotion, SwitchButton, List, View, Connection,
+  TrendCharts } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { withBase } from '@/utils/base'
 import LocaleSwitcher from '@/components/LocaleSwitcher.vue'
