@@ -2,6 +2,7 @@
   <el-config-provider :locale="epLocale">
     <div class="app-root">
       <NotifyBanner />
+      <NetworkStatusBanner />
       <router-view />
       <ErrorToast />
     </div>
@@ -25,6 +26,7 @@ import { applyAccent } from '@/utils/accent'
 import { applyDynamicIcons } from '@/utils/favicon'
 import { host } from '@/host'
 import NotifyBanner from '@/components/NotifyBanner.vue'
+import NetworkStatusBanner from '@/components/NetworkStatusBanner.vue'
 import ErrorToast from '@/components/ErrorToast.vue'
 
 const { locale } = useI18n()

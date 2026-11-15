@@ -344,6 +344,14 @@ export default {
     failed: 'Download fehlgeschlagen',
     speed: '{speed}/s',
     eta: 'noch {time}',
+    retrying: 'Netz unterbrochen, Neuer Versuch (Versuch {attempt})…',
+    interrupted: 'Download unterbrochen ({percent}% gespeichert). „Download fortsetzen“ klicken, um an der Unterbrechung fortzufahren',
+    interruptedUnknown: 'Download unterbrochen. „Download fortsetzen“ klicken, um es erneut zu versuchen',
+    resume: 'Download fortsetzen',
+  },
+  network: {
+    offline: 'Netzwerk getrennt — Übertragungen schlagen fehl; nach Wiederherstellung können Sie fortfahren',
+    restored: 'Netzwerk wiederhergestellt, Sie können die Übertragung fortsetzen',
   },
   share: {
     passwordDownloadHint: 'Diese Freigabe ist passwortgeschützt; holen Sie die Download-Berechtigung auf der Abholseite',

@@ -344,6 +344,14 @@ export default {
     failed: 'Download failed',
     speed: '{speed}/s',
     eta: '{time} left',
+    retrying: 'Network interrupted, retrying (attempt {attempt})…',
+    interrupted: 'Download interrupted ({percent}% saved). Click "Resume download" to continue from the breakpoint',
+    interruptedUnknown: 'Download interrupted. Click "Resume download" to retry',
+    resume: 'Resume download',
+  },
+  network: {
+    offline: 'Network disconnected — transfers will fail; you can continue once it is back',
+    restored: 'Network restored, you can continue transferring',
   },
   share: {
     passwordDownloadHint: 'This share is password-protected; get the download credential from the pickup page',

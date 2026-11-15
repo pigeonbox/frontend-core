@@ -344,6 +344,14 @@ export default {
     failed: 'ダウンロードに失敗しました',
     speed: '{speed}/秒',
     eta: '残り{time}',
+    retrying: 'ネットワークが中断しました。再試行中（{attempt}回目）…',
+    interrupted: 'ダウンロードが中断しました（{percent}%保存済み）。「ダウンロードを再開」で続きを取得',
+    interruptedUnknown: 'ダウンロードが中断しました。「ダウンロードを再開」で再試行',
+    resume: 'ダウンロードを再開',
+  },
+  network: {
+    offline: 'ネットワークが切断されました——転送は失敗します。復帰後に続行できます',
+    restored: 'ネットワークが回復しました、続行できます',
   },
   share: {
     passwordDownloadHint: 'この共有はパスワードで保護されています。受取ページでダウンロード用の認証情報を取得してください',

@@ -2,6 +2,7 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig } from 'axios'
 import { appBase } from '@/utils/base'
 import { host } from '@/host'
+import { delay, retryDelayMs } from '@/utils/backoff'
 
 /**
  * 鉴权端点豁免:登录/刷新本身 + 宿主 SSO 登录端点(适配器经 SPI ssoLoginPaths
@@ -18,6 +19,41 @@ export function isAuthEndpointUrl(url: string): boolean {
     url.includes('/user/oidc/mfa') ||
     (host.ssoLoginPaths ?? []).some((p) => url.includes(p))
   )
+}
+
+/**
+ * 弱网退避重试（frontend-core#94，呼应 core#151 幂等整改）。
+ *
+ * 只重放**幂等**请求：GET/HEAD/PUT（PUT 语义幂等，重放=覆盖同一目标）。
+ * POST/DELETE/PATCH 一律不自动重试——重放可能造成重复创建/二次删除。
+ *
+ * 只在「发出去了没回来」（网络不通/超时，axios error.request 存在、无 response）
+ * 或网关瞬时故障（502/503/504）时重试；业务 4xx/500 不重试（服务端已给出
+ * 明确裁决，重放只会重复同样的拒绝）。
+ *
+ * 与既有 401 刷新重放（originalRequest._retry）是两条独立计数：
+ * _netRetry 管网络退避，_retry 管会话刷新，互不干扰、互不合并。
+ * 退避口径与下载器共用 utils/backoff（指数 + 半区间抖动）。
+ */
+export const MAX_NET_RETRIES = 3
+const NET_RETRY_METHODS = new Set(['get', 'head', 'put'])
+const NET_RETRY_STATUS = new Set([502, 503, 504])
+
+export function shouldNetRetry(
+  error: unknown,
+  config: { method?: string; signal?: AbortSignal; _netRetry?: number } | undefined
+): boolean {
+  if (!config) return false
+  const method = String(config.method ?? 'get').toLowerCase()
+  if (!NET_RETRY_METHODS.has(method)) return false
+  if (config.signal?.aborted) return false
+  if ((config._netRetry ?? 0) >= MAX_NET_RETRIES) return false
+  const e = error as { request?: unknown; response?: { status?: number } }
+  if (e?.response) {
+    return e.response.status != null && NET_RETRY_STATUS.has(e.response.status)
+  }
+  // 无 response 且压根没发出去（拦截器/配置错误）⇒ 不是网络问题，别重试
+  return e?.request != null
 }
 
 const instance: AxiosInstance = axios.create({
@@ -91,6 +127,15 @@ instance.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config
+    // 弱网退避重试（frontend-core#94）：幂等方法 + 网络层失败/502-504 才走这里。
+    // 放在 401 分支之前：401 有 response 且不在可重试状态集合里，shouldNetRetry
+    // 恒 false，两条路径互不抢占。
+    if (shouldNetRetry(error, originalRequest)) {
+      const attempt = (originalRequest._netRetry ?? 0) + 1
+      originalRequest._netRetry = attempt
+      await delay(retryDelayMs(attempt))
+      return instance(originalRequest)
+    }
     // 401 且未重试且非登录/刷新/宿主 SSO 端点 → 尝试刷新 token
     const url: string = originalRequest?.url || ''
     const isAuthEndpoint = isAuthEndpointUrl(url)
