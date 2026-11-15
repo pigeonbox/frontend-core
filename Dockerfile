@@ -26,7 +26,7 @@ COPY docker/nginx.conf.template /etc/nginx/templates/default.conf.template
 # envsubst 默认值：独立/边车模式直连本机后端；k8s 由 chart 注入 Service DNS
 ENV BACKEND_HOST=127.0.0.1 \
     BACKEND_PORT=12345 \
-    CLIENT_MAX_BODY_SIZE=20m
+    CLIENT_MAX_BODY_SIZE=8192m
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1
