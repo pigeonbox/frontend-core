@@ -73,6 +73,15 @@ export type AdminConfigUpdate = Partial<BasicConfigUpdate & SecurityConfigUpdate
   [key: string]: unknown
 }
 
+// 策略模板（hub#368）：一组配置项的命名集合，经 GET /admin/config 顶层
+// policy_templates 下发；patch = SystemConfig 局部 JSON（字段级合并语义）。
+export interface PolicyTemplate {
+  id: string
+  name: string
+  description: string
+  patch: Record<string, unknown>
+}
+
 // 备份包条目（/admin/backups 的 items）。
 export interface BackupItem {
   name: string
@@ -413,11 +422,22 @@ export const adminApi = {
   },
 
   // 获取系统配置(v0.13.5 起 data = SystemConfig 全量 JSON,按段读取;契约层
-  // 不锁形——自由格式对象,语义见 contracts idl/admin.thrift 注释)
+  // 不锁形——自由格式对象,语义见 contracts idl/admin.thrift 注释)。
+  // 顶层另有 policy_templates 策略模板清单(hub#368,复用本端点宽松响应面)。
   getConfig: () => {
-    return request<ApiResponse<Record<string, any>>>({
+    return request<ApiResponse<Record<string, any>> & { policy_templates?: PolicyTemplate[] }>({
       url: '/admin/config',
       method: 'GET',
+    })
+  },
+
+  // 应用策略模板(hub#368):body 为单键 {policy_template:<id>},服务端一次下发
+  // 多配置项并做跨配置不变量校验(非法组合 400 + 可操作文案)。
+  applyPolicyTemplate: (id: string) => {
+    return request<ApiResponse<void>>({
+      url: '/admin/config',
+      method: 'PUT',
+      data: { policy_template: id },
     })
   },
 

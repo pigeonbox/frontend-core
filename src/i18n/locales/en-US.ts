@@ -693,7 +693,8 @@ export default {
         account: 'Users & Login',
         security: 'Security & Rate Limiting',
         notify: 'Notifications & Email',
-        p2p: 'Federation'
+        p2p: 'Federation',
+        policy: 'Policy Templates'
       },
       navDesc: {
         site: 'Site identity and public appearance',
@@ -702,7 +703,32 @@ export default {
         account: 'Registration policy, per-user defaults and sign-in methods',
         security: 'Rate limiting rules and API key admission',
         notify: 'Off-site notifications for share events and email',
-        p2p: 'Cross-site federation: exchange pickup passcodes with other PigeonBox instances (code-based, traffic bypasses the server)'
+        p2p: 'Cross-site federation: exchange pickup passcodes with other PigeonBox instances (code-based, traffic bypasses the server)',
+        policy: 'Converge scattered anonymous/registration/storage/expiry knobs into named templates — apply in one shot, with a diff preview first'
+      },
+      policy: {
+        intro: 'A policy template is a preset bundle of settings (no single-knob semantics change): pick one, review the diff, then apply. The server validates cross-setting invariants at save time (e.g. total batch cap ≥ per-file cap) and rejects invalid combinations outright.',
+        emptyList: 'No policy templates received (server did not send policy_templates)',
+        selectLabel: 'Select template',
+        selectPlaceholder: 'Choose a policy template to apply',
+        diffTitle: 'Diff preview',
+        noChanges: 'Current configuration already matches this template — nothing to change',
+        onlyChanged: 'Only fields that will change are listed; all others stay as they are.',
+        colField: 'Setting',
+        colFrom: 'Current',
+        colTo: 'After apply',
+        applyBtn: 'Apply template',
+        confirmTitle: 'Apply policy template',
+        confirmMsg: 'This will push several settings at once according to “{name}”. Review the diff above. Continue?',
+        applySuccess: 'Template applied, configuration is now in effect',
+        applyFailed: 'Failed to apply template',
+        on: 'On',
+        off: 'Off',
+        templates: {
+          intranet: { name: 'Intranet only', desc: 'Trusted LAN deployment: allow guest uploads with unlimited daily quotas, disable self-service registration, downloads without sign-in, 7 days / 100 picks by default' },
+          publicNoAnonymous: { name: 'Public, no anonymous', desc: 'Internet-facing box: guests cannot upload (sign-in required), self-service registration on, downloads without sign-in, 3 days / 50 picks by default' },
+          enterprise: { name: 'Enterprise default', desc: 'Controlled deployment: guest uploads off, self-service registration off, 10GB storage quota, batch cap aligned with 2GB per-file cap, 12-hour sessions, 7 days / 20 picks by default' },
+        },
       },
       sections: {
         site: 'Site Info',

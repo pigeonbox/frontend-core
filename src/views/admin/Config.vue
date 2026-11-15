@@ -510,6 +510,82 @@
             </el-collapse>
           </el-form>
 
+          <!-- ============ 策略模板（hub#368：选模板 → 预览差异 → 应用） ============ -->
+          <el-form v-else-if="activeSection === 'policy'" label-width="180px" class="config-form">
+            <el-alert
+              type="info"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.policy.intro')"
+            />
+            <!-- env 恒覆盖提示：模板写 DB 意图，env 绑定键仍以 env 为准（与 p2p 分区同款提示） -->
+            <el-alert
+              type="info"
+              :closable="false"
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.envPriorityHint')"
+            />
+            <el-alert
+              v-if="policyTemplates.length === 0"
+              type="warning"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.policy.emptyList')"
+            />
+            <el-form-item :label="t('admin.configPage.policy.selectLabel')">
+              <el-select
+                v-model="selectedTemplateId"
+                :placeholder="t('admin.configPage.policy.selectPlaceholder')"
+                style="width: 360px"
+              >
+                <el-option
+                  v-for="tpl in policyTemplates"
+                  :key="tpl.id"
+                  :label="templateName(tpl)"
+                  :value="tpl.id"
+                />
+              </el-select>
+              <span v-if="selectedTemplate" class="field-hint">{{ templateDesc(selectedTemplate) }}</span>
+            </el-form-item>
+
+            <template v-if="selectedTemplate">
+              <el-divider content-position="left">{{ t('admin.configPage.policy.diffTitle') }}</el-divider>
+              <el-alert
+                v-if="policyDiff.length === 0"
+                type="success"
+                :closable="false"
+                show-icon
+                style="margin-bottom: 16px"
+                :title="t('admin.configPage.policy.noChanges')"
+              />
+              <template v-else>
+                <p class="field-hint" style="margin-bottom: 8px">{{ t('admin.configPage.policy.onlyChanged') }}</p>
+                <el-table :data="policyDiff" size="small" style="margin-bottom: 16px">
+                  <el-table-column :label="t('admin.configPage.policy.colField')" min-width="220">
+                    <template #default="{ row }">{{ fieldLabel(row.path) }}</template>
+                  </el-table-column>
+                  <el-table-column :label="t('admin.configPage.policy.colFrom')" min-width="160">
+                    <template #default="{ row }">{{ formatPolicyValue(row.path, row.from) }}</template>
+                  </el-table-column>
+                  <el-table-column :label="t('admin.configPage.policy.colTo')" min-width="160">
+                    <template #default="{ row }">{{ formatPolicyValue(row.path, row.to) }}</template>
+                  </el-table-column>
+                </el-table>
+              </template>
+              <!-- 加载失败时预览底座是出厂默认值 ⇒ 禁用应用（与保存按钮同一守卫） -->
+              <el-button
+                type="primary"
+                :loading="applyingTemplate"
+                :disabled="configLoadFailed || policyDiff.length === 0"
+                @click="applySelectedTemplate"
+              >
+                {{ t('admin.configPage.policy.applyBtn') }}
+              </el-button>
+            </template>
+          </el-form>
+
           <div class="config-save-bar">
             <!-- 加载失败 ⇒ 表单里是出厂默认值，保存会把真实配置整段覆盖掉
                  （2026-11-06）：此前只在 toast 里报「获取失败」，保存按钮照常
@@ -522,7 +598,10 @@
               :title="t('admin.configPage.loadFailedBlockSave')"
               style="margin-bottom: 12px"
             />
+            <!-- 策略模板分区的写动作是「应用模板」（区块内按钮），通用保存对其无语义
+                 （switch 无对应分支会假成功）⇒ 隐藏 -->
             <el-button
+              v-if="activeSection !== 'policy'"
               type="primary"
               :loading="saving"
               :disabled="configLoadFailed"
@@ -543,22 +622,23 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Picture, Upload, Download, User, Lock, Message, Connection } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Picture, Upload, Download, User, Lock, Message, Connection, SetUp } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { THEMES, matchThemePreset, type ThemePreset } from '@/config/themes'
 import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS } from '@/config/expireStyles'
-import { adminApi, type NotifyTestChannel } from '@/api/admin'
+import { adminApi, type NotifyTestChannel, type PolicyTemplate } from '@/api/admin'
 import { useConfigStore } from '@/stores/config'
 import { useErrorHandler } from '@/composables/useErrorHandler'
 import { uploadCapMismatch, alignedUploadCap } from '@/utils/uploadCap'
+import { diffPatch } from '@/utils/policyDiff'
 import { formatFileSize } from '@/utils/format'
 
-const { t } = useI18n()
+const { t, te } = useI18n()
 const { handleError } = useErrorHandler()
 
 // ==================== 分区导航（原 11 tab 收敛 7 分区，?section= 深链） ====================
-const SECTION_IDS = ['site', 'share', 'download', 'account', 'security', 'notify', 'p2p'] as const
+const SECTION_IDS = ['site', 'share', 'download', 'account', 'security', 'notify', 'p2p', 'policy'] as const
 type SectionId = (typeof SECTION_IDS)[number]
 
 const navItems: { id: SectionId; labelKey: string; descKey: string; icon: Component }[] = [
@@ -569,6 +649,7 @@ const navItems: { id: SectionId; labelKey: string; descKey: string; icon: Compon
   { id: 'security', labelKey: 'admin.configPage.nav.security', descKey: 'admin.configPage.navDesc.security', icon: Lock },
   { id: 'notify', labelKey: 'admin.configPage.nav.notify', descKey: 'admin.configPage.navDesc.notify', icon: Message },
   { id: 'p2p', labelKey: 'admin.configPage.nav.p2p', descKey: 'admin.configPage.navDesc.p2p', icon: Connection },
+  { id: 'policy', labelKey: 'admin.configPage.nav.policy', descKey: 'admin.configPage.navDesc.policy', icon: SetUp },
 ]
 
 const route = useRoute()
@@ -650,11 +731,18 @@ const fetchConfig = async () => {
       }
       // v0.7.3 扩容设置段预填
       fetchExSections(res.data as Record<string, unknown>)
+      // 策略模板清单（hub#368，GET /admin/config 顶层 policy_templates）
+      policyTemplates.value = res.policy_templates ?? []
+      // 默认选中首个模板，进入分区即能看到差异预览
+      if (!selectedTemplateId.value && policyTemplates.value.length > 0) {
+        selectedTemplateId.value = policyTemplates.value[0].id
+      }
       // 用户配置走独立端点（此前随通用配置保存会被后端丢弃——假开关）
       await fetchUserSettings()
     } else {
       // 非 200：没有可用的服务端值 ⇒ 表单仍是默认值，禁止保存（同上）
       configLoadFailed.value = true
+      policyTemplates.value = []
     }
   } catch (error) {
     configLoadFailed.value = true
@@ -894,6 +982,152 @@ const alignUploadCap = async () => {
     handleError(e)
   } finally {
     aligningCap.value = false
+  }
+}
+
+// ==================== 策略模板（hub#368：选模板 → 预览差异 → 应用） ====================
+const policyTemplates = ref<PolicyTemplate[]>([])
+const selectedTemplateId = ref('')
+const applyingTemplate = ref(false)
+
+// 模板 ID → 语言包键（静态表而非动态拼接：drift 守卫只认登记过的动态前缀）。
+// 缺键/未知模板回退后端下发的 name/description（新模板先出中文、后补翻译也不裸奔）。
+const TEMPLATE_I18N_KEYS: Record<string, { name: string; desc: string }> = {
+  intranet: {
+    name: 'admin.configPage.policy.templates.intranet.name',
+    desc: 'admin.configPage.policy.templates.intranet.desc',
+  },
+  'public-no-anonymous': {
+    name: 'admin.configPage.policy.templates.publicNoAnonymous.name',
+    desc: 'admin.configPage.policy.templates.publicNoAnonymous.desc',
+  },
+  enterprise: {
+    name: 'admin.configPage.policy.templates.enterprise.name',
+    desc: 'admin.configPage.policy.templates.enterprise.desc',
+  },
+}
+
+const selectedTemplate = computed(
+  () => policyTemplates.value.find((p) => p.id === selectedTemplateId.value) ?? null,
+)
+
+const templateName = (tpl: PolicyTemplate) => {
+  const key = TEMPLATE_I18N_KEYS[tpl.id]?.name
+  return key && te(key) ? t(key) : tpl.name
+}
+
+const templateDesc = (tpl: PolicyTemplate) => {
+  const key = TEMPLATE_I18N_KEYS[tpl.id]?.desc
+  return key && te(key) ? t(key) : tpl.description
+}
+
+// 差异预览的「当前值」快照：表单态即最近一次回读的服务端值。
+// allowuserregistration 表单存 0/1、模板 patch 是布尔 ⇒ 归一成布尔再对比，
+// 否则「值没变也会列出差异」（0 !== false 的假 diff）。
+const policyCurrentSnapshot = computed<Record<string, unknown>>(() => ({
+  upload_ex: { ...exForm.value.upload_ex },
+  user: {
+    allowuserregistration: Number(configForm.value.user.allowuserregistration) === 1,
+    useruploadsize: configForm.value.user.useruploadsize,
+    userstoragequota: configForm.value.user.userstoragequota,
+    sessionexpiryhours: configForm.value.user.sessionexpiryhours,
+  },
+  transfer: { ...configForm.value.transfer },
+  download: { ...exForm.value.download },
+}))
+
+const policyDiff = computed(() => {
+  const tpl = selectedTemplate.value
+  if (!tpl) return []
+  return diffPatch(policyCurrentSnapshot.value, tpl.patch)
+})
+
+// 差异行字段标签：复用既有分区字段 i18n（同一批旋钮、同一措辞）；未登记路径回退点分路径
+const POLICY_FIELD_LABEL_KEYS: Record<string, string> = {
+  'upload_ex.open_upload': 'admin.configPage.upload.openUpload',
+  'upload_ex.anonymous_daily_count': 'admin.configPage.upload.anonymousDailyCount',
+  'upload_ex.anonymous_daily_bytes': 'admin.configPage.upload.anonymousDailyBytes',
+  'upload_ex.max_file_size': 'admin.configPage.upload.maxFileSize',
+  'user.allowuserregistration': 'admin.configPage.user.allowRegistration',
+  'user.useruploadsize': 'admin.configPage.user.uploadLimit',
+  'user.userstoragequota': 'admin.configPage.user.storageQuota',
+  'user.sessionexpiryhours': 'admin.configPage.user.sessionExpiry',
+  'download.require_login': 'admin.configPage.download.requireLogin',
+  'transfer.max_count': 'admin.configPage.transfer.maxCount',
+  'transfer.expire_default': 'admin.configPage.transfer.expireDefault',
+}
+
+const fieldLabel = (path: string) => {
+  const key = POLICY_FIELD_LABEL_KEYS[path]
+  return key && te(key) ? t(key) : path
+}
+
+// 字节字段（0 = 不限）；次数字段 0 同样是「不限」语义
+const POLICY_BYTE_FIELDS = new Set([
+  'upload_ex.anonymous_daily_bytes',
+  'upload_ex.max_file_size',
+  'user.useruploadsize',
+  'user.userstoragequota',
+])
+const POLICY_UNLIMITED_FIELDS = new Set([
+  ...POLICY_BYTE_FIELDS,
+  'upload_ex.anonymous_daily_count',
+  'transfer.max_count',
+])
+
+const formatPolicyValue = (path: string, v: unknown): string => {
+  if (v === undefined || v === null) return '—'
+  if (typeof v === 'boolean') return v ? t('admin.configPage.policy.on') : t('admin.configPage.policy.off')
+  if (Array.isArray(v)) return v.join(', ')
+  if (typeof v === 'number') {
+    if (v === 0 && POLICY_UNLIMITED_FIELDS.has(path)) {
+      return t('admin.configPage.upload.batchCapUnlimited')
+    }
+    if (POLICY_BYTE_FIELDS.has(path)) return formatFileSize(v)
+  }
+  return String(v)
+}
+
+const applySelectedTemplate = async () => {
+  const tpl = selectedTemplate.value
+  if (!tpl) return
+  // 加载失败时预览底座是出厂默认值 ⇒ 与保存同一守卫，禁止应用
+  if (configLoadFailed.value) {
+    ElMessage.error(t('admin.configPage.loadFailedBlockSave'))
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      t('admin.configPage.policy.confirmMsg', { name: templateName(tpl) }),
+      t('admin.configPage.policy.confirmTitle'),
+      { type: 'warning' },
+    )
+  } catch {
+    return // 用户取消
+  }
+  applyingTemplate.value = true
+  try {
+    const res = await adminApi.applyPolicyTemplate(tpl.id)
+    if (res.code === 200) {
+      ElMessage.success(t('admin.configPage.policy.applySuccess'))
+      await configStore.refreshConfig()
+      // 回读服务端，表单与差异预览同步到应用后的实际值
+      await fetchConfig()
+    } else {
+      throw Object.assign(new Error(res.message || t('admin.configPage.policy.applyFailed')), {
+        code: res.code,
+      })
+    }
+  } catch (e) {
+    // 模板类 400 的后端 message 是可操作文案（点名矛盾项与修法）；剥掉 code 再进
+    // 统一 toast——否则 errcode.10001 的泛化「参数错误」会把具体指引盖掉。
+    const err = e as { message?: string; trace_id?: string }
+    handleError({
+      message: err?.message || t('admin.configPage.policy.applyFailed'),
+      trace_id: err?.trace_id,
+    })
+  } finally {
+    applyingTemplate.value = false
   }
 }
 
