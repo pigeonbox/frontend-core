@@ -31,6 +31,12 @@ describe('isAuthEndpointUrl（鉴权端点豁免·SSO 白名单 SPI 化）', () 
     expect(isAuthEndpointUrl('/user/refresh')).toBe(true)
   })
 
+  it('OIDC 半会话换发端点豁免：401 语义是「半会话失效」，不得触发刷新/登出', () => {
+    // core#180：半会话被所有认证中间件拒绝，只放行该换发端点。若这里不豁免，
+    // 401 会走 refresh → 失败 → logout + 跳登录，用户已填的二验码被清掉。
+    expect(isAuthEndpointUrl('/api/v1/user/oidc/mfa')).toBe(true)
+  })
+
   it('无适配器（neutral 部署）不豁免任何宿主端点——core 零平台字面量', () => {
     expect(isAuthEndpointUrl('/api/fnos/login')).toBe(false)
     expect(isAuthEndpointUrl('/api/qnap/login')).toBe(false)

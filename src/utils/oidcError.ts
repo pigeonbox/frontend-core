@@ -31,6 +31,19 @@ export const OIDC_ERROR_CODES = [
 
 export type OidcErrorCode = (typeof OIDC_ERROR_CODES)[number]
 
+/**
+ * core 已退役、但前端**仍需保留映射**的短码。
+ *
+ * `admin_mfa_required`：core#187 先「拒绝签发」，core#180/#189 改为「签发半会话 +
+ * 回跳 mfa_pending=1」后该码不再产生。前端保留映射的原因：core 与前端**独立发版**
+ * （frontend-core 走 tgz、core 走库线 tag），滚动升级期间可能对上仍会下发旧码的
+ * 中间版本 core；删掉映射只会让这类实例退回「登录失败」笼统提示。
+ *
+ * ⚠️ 新增退役码必须**显式**登记在这里：跨仓守卫按「core ⊆ 前端 + 前端多余项只能是
+ * 已登记退役码」核对，没登记的额外码照样报红（防止悄悄留下无人使用的死码）。
+ */
+export const RETIRED_OIDC_ERROR_CODES = ['admin_mfa_required'] as const
+
 /** 短码 → 前端 i18n key（前端自有文案，不展示 core 的 msg） */
 export const OIDC_ERROR_I18N_KEYS: Record<OidcErrorCode, string> = {
   state_invalid: 'login.oidcError.stateInvalid',
