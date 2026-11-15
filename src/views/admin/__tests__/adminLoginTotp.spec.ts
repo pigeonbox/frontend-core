@@ -40,10 +40,15 @@ describe('管理员登录 40012 → 第二阶段 TOTP 输入', () => {
 
   it('40012 先于 401/400 的 loginError 兜底（否则二验框永远弹不出来）', () => {
     const at40012 = src.indexOf('=== 40012')
-    const atLoginError = src.indexOf('loginError.value = error?.message')
+    // 兜底写法已按 frontend-core#103 换成 displayError（translateError 就地映射），
+    // 断言随之钉新布置；顺序断言（40012 先判）不变
+    const atLoginError = src.indexOf('loginError.value = displayError(error)')
     expect(at40012, '未找到 40012 判据').toBeGreaterThan(-1)
     expect(atLoginError, '未找到 401/400 loginError 兜底').toBeGreaterThan(-1)
     expect(at40012, '40012 必须先判，再落 loginError').toBeLessThan(atLoginError)
+    // frontend-core#103：兜底文案必须经 translateError（errcode → i18n），
+    // 否则 40013 等在 admin 登录页吐服务端英文默认文案
+    expect(src, 'displayError 未走 translateError').toContain('translateError(err)')
   })
 
   it('第二次提交才带 totp_code（首次不带 ⇒ 服务端回 40012；字段名必须 snake_case）', () => {
