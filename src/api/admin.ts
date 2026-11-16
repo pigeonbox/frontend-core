@@ -43,6 +43,27 @@ export interface ExpiryReminderNotifyUpdate {
   [key: string]: unknown
 }
 
+// 管理员 Passkey/WebAuthn（core#160，手写路由不进 contracts IDL ⇒ 手写副本）——
+// wire 形态与 core bootstrap/admin_webauthn.go 对齐：options 响应是
+// protocol.CredentialCreation/CredentialAssertion（{publicKey:{challenge:base64url,...}}），
+// verify 请求体 {challenge, credential, name?}；挑战由客户端原样回传。
+export interface WebAuthnOptionsData {
+  publicKey: Record<string, unknown>
+}
+
+export interface WebAuthnVerifyReq {
+  challenge: string
+  credential: Record<string, unknown>
+  name?: string
+}
+
+// 登记成功的凭证行（core model.WebAuthnCredential 子集：管理台只消费展示面）
+export interface WebAuthnCredentialRow {
+  id: number
+  name: string
+  created_at?: string
+}
+
 // 推送渠道测试发送（core#122）wire 类型——**手写副本**。
 // core#122 待 IDL 化后替换为 contracts 生成类型：该路由（POST /admin/notify/channels/test）
 // 暂以手写注册进 core 的 routes_custom.go，未进 contracts IDL ⇒ 无生成类型可用；
@@ -118,6 +139,42 @@ export const adminApi = {
   login: (data: adminContract.AdminLoginReq) => {
     return request<ApiResponse<adminContract.AdminLoginData>>({
       url: '/admin/login',
+      method: 'POST',
+      data,
+    })
+  },
+
+  // ===== 管理员 Passkey（core#160 四端点；register 两步挂 AdminMiddleware）=====
+  // 登记第一步：发挑战（已登记凭证进 excludeCredentials 防重复登记）
+  webauthnRegisterOptions: () => {
+    return request<ApiResponse<WebAuthnOptionsData>>({
+      url: '/admin/webauthn/register/options',
+      method: 'POST',
+    })
+  },
+
+  // 登记第二步：attestation 校验并落库（challenge 原样回传）
+  webauthnRegisterVerify: (data: WebAuthnVerifyReq) => {
+    return request<ApiResponse<WebAuthnCredentialRow>>({
+      url: '/admin/webauthn/register/verify',
+      method: 'POST',
+      data,
+    })
+  },
+
+  // 登录第一步（公开面）：按用户名发断言挑战；不存在/未登记也回同形诱饵挑战
+  webauthnLoginOptions: (data: { username: string }) => {
+    return request<ApiResponse<WebAuthnOptionsData>>({
+      url: '/admin/webauthn/login/options',
+      method: 'POST',
+      data,
+    })
+  },
+
+  // 登录第二步（公开面）：断言校验通过即签发与 /admin/login 同形的管理员 JWT
+  webauthnLoginVerify: (data: Omit<WebAuthnVerifyReq, 'name'>) => {
+    return request<ApiResponse<adminContract.AdminLoginData>>({
+      url: '/admin/webauthn/login/verify',
       method: 'POST',
       data,
     })

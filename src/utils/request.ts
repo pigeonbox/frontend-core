@@ -13,6 +13,9 @@ export function isAuthEndpointUrl(url: string): boolean {
   return (
     url.includes('/user/login') ||
     url.includes('/admin/login') ||
+    // Passkey 登录两步（core#160）：与 /admin/login 同族的访客登录入口，
+    // 401/400 语义是「断言本身失败」，绝不能触发 token 刷新/跳登录页
+    url.includes('/admin/webauthn/login/') ||
     url.includes('/user/refresh') ||
     // OIDC 半会话换发（core#180）：401 语义是「半会话失效」，由二验页自己
     // 提示重新登录。若走刷新/登出分支，用户会被弹回登录页且丢失已填输入框。
