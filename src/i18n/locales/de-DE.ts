@@ -664,6 +664,10 @@ export default {
       elevateOr: 'oder mit einem anderen Konto anmelden',
       demoTitle: 'Demo-Konto',
       demoBody: 'Standard ist admin / admin123; wurde beim Start PB_ADMIN_PASSWORD gesetzt, gilt stattdessen dieses Passwort',
+      passkeyDivider: 'oder mit einem Passkey anmelden',
+      passkeyLogin: 'Mit Passkey anmelden',
+      passkeyUsernameFirst: 'Gib zuerst den Benutzernamen ein und melde dich dann mit einem Passkey an',
+      passkeyFailed: 'Passkey-Anmeldung fehlgeschlagen. Versuche es erneut oder nutze das Passwort',
     },
     configPage: {
       yamlOnlyHint: 'Sperrrichtlinien, Download-Token, vertrauenswürdige Proxys, CORS und weitere Sicherheitsoptionen lassen sich nur über config.yaml / Umgebungsvariablen konfigurieren (Neustart nötig); alles hier nicht Aufgeführte folgt der wirksamen Serverkonfiguration',
@@ -1771,6 +1775,15 @@ export default {
     copied: 'Kopiert',
     copyFailed: 'Kopieren fehlgeschlagen – bitte markieren Sie den Text manuell',
     cancel: 'Abbrechen',
+    passkey: {
+      title: 'Passkey registrieren',
+      adminOnly: 'Nur Administratoren',
+      desc: 'Registriere einen Passkey und melde dich beim Konsole stattdessen mit Gerätebiometrie oder einem Sicherheitsschlüssel an statt mit dem Passwort.',
+      namePlaceholder: 'Passkey-Name (z. B. Arbeits-Laptop)',
+      register: 'Passkey registrieren',
+      registered: 'Passkey registriert — bei der nächsten Anmeldung verfügbar',
+      failed: 'Passkey-Registrierung fehlgeschlagen. Versuche es erneut',
+    },
     twoFactor: {
       title: 'Zwei-Faktor-Authentifizierung (TOTP)',
       desc: 'Nach dem Aktivieren benötigen Sie zum Anmelden zusätzlich zum Passwort einen 6-stelligen Code aus einer Authenticator-App (Google Authenticator, 1Password, Microsoft Authenticator, …).',

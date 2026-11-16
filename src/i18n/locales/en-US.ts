@@ -664,6 +664,10 @@ export default {
       elevateOr: 'or sign in with another account',
       demoTitle: 'Demo account',
       demoBody: 'Defaults to admin / admin123; if PB_ADMIN_PASSWORD was set at startup, use that password instead',
+      passkeyDivider: 'or sign in with a Passkey',
+      passkeyLogin: 'Sign in with Passkey',
+      passkeyUsernameFirst: 'Enter your username first, then sign in with a Passkey',
+      passkeyFailed: 'Passkey sign-in failed. Try again or use your password',
     },
     configPage: {
       yamlOnlyHint: 'Lockout, download tokens, trusted proxies, CORS and other security items are configured only via config.yaml / environment variables (restart required); anything not listed here follows the server-side effective config',
@@ -1771,6 +1775,15 @@ export default {
     copied: 'Copied',
     copyFailed: 'Copy failed — please select the text manually',
     cancel: 'Cancel',
+    passkey: {
+      title: 'Passkey registration',
+      adminOnly: 'Admins only',
+      desc: 'Register a Passkey to sign in to the console with device biometrics or a security key instead of a password.',
+      namePlaceholder: 'Passkey name (e.g. Work laptop)',
+      register: 'Register Passkey',
+      registered: 'Passkey registered — you can use it the next time you sign in',
+      failed: 'Passkey registration failed. Try again',
+    },
     twoFactor: {
       title: 'Two-factor authentication (TOTP)',
       desc: 'Once enabled, signing in requires a 6-digit code from an authenticator app (Google Authenticator, 1Password, Microsoft Authenticator, …) in addition to your password.',

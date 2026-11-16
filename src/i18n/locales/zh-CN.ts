@@ -662,6 +662,10 @@ export default {
       elevateOr: '或使用其他账号登录',
       demoTitle: '演示账号',
       demoBody: '默认 admin / admin123；若启动时设置了 PB_ADMIN_PASSWORD，以该口令为准',
+      passkeyDivider: '或使用 Passkey',
+      passkeyLogin: '使用 Passkey 登录',
+      passkeyUsernameFirst: '请先填写用户名，再使用 Passkey 登录',
+      passkeyFailed: 'Passkey 登录失败，请重试或改用口令',
     },
     configPage: {
       yamlOnlyHint: '失败锁定、下载令牌、可信代理、CORS 等其余安全项暂只能经 config.yaml / 环境变量配置（改后需重启）；此处未列出的项以服务端生效值为准',
@@ -1759,6 +1763,15 @@ export default {
     copied: '已复制',
     copyFailed: '复制失败，请手动选择文本',
     cancel: '取消',
+    passkey: {
+      title: 'Passkey 登记',
+      adminOnly: '仅管理员',
+      desc: '登记一张 Passkey，登录管理台时用系统指纹/面容或安全密钥替代口令。',
+      namePlaceholder: 'Passkey 名称（如：办公电脑）',
+      register: '登记 Passkey',
+      registered: 'Passkey 登记成功，下次登录即可选用',
+      failed: 'Passkey 登记失败，请重试',
+    },
     twoFactor: {
       title: '二次验证（TOTP）',
       desc: '开启后，登录除密码外还需要认证器 App（如 Google Authenticator、1Password、Microsoft Authenticator）生成的 6 位验证码。',

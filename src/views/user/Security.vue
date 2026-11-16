@@ -70,6 +70,35 @@
       </div>
     </el-card>
 
+    <!-- ============ Passkey 登记（管理员，core#160）============
+双条件降级：仅管理员（register 挂 AdminMiddleware，普通用户必然 401）
+且浏览器支持 WebAuthn（安全上下文）才渲染——不支持就当功能不存在，不报错。
+凭证列表/撤销待 core 补端点（见 PR 说明），当前只提供登记入口。 -->
+    <el-card v-if="passkeyVisible" class="sec-card" shadow="never">
+      <template #header>
+        <div class="card-head">
+          <span class="card-title">{{ t('security.passkey.title') }}</span>
+          <el-tag type="info" size="small" effect="plain">{{ t('security.passkey.adminOnly') }}</el-tag>
+        </div>
+      </template>
+
+      <p class="card-desc">{{ t('security.passkey.desc') }}</p>
+
+      <div class="passkey-row">
+        <el-input
+          v-model="passkeyName"
+          class="passkey-name"
+          :placeholder="t('security.passkey.namePlaceholder')"
+          maxlength="64"
+          clearable
+          @keyup.enter="handleRegisterPasskey"
+        />
+        <el-button type="primary" :loading="passkeyBusy" @click="handleRegisterPasskey">
+          {{ t('security.passkey.register') }}
+        </el-button>
+      </div>
+    </el-card>
+
     <!-- ============ 登录设备 ============ -->
     <el-card class="sec-card" shadow="never">
       <template #header>
@@ -214,8 +243,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import QRCode from 'qrcode'
 import { userApi } from '@/api/user'
+import { adminApi } from '@/api/admin'
 import { useUserStore } from '@/stores/user'
 import { translateError } from '@/utils/api-interceptor'
+import { isWebAuthnAvailable, registerPasskey, type PasskeyRegisterApi } from '@/utils/webauthn'
 
 const { t, te } = useI18n()
 const userStore = useUserStore()
@@ -234,6 +265,44 @@ const disableCode = ref('')
 
 const recoveryVisible = ref(false)
 const recoveryCodes = ref<string[]>([])
+
+// ---------- Passkey（管理员登记，core#160）----------
+// 双条件降级：浏览器支持（安全上下文+WebAuthn API）且当前会话是管理员——
+// register 端点挂 AdminMiddleware，普通用户看到入口也只会 401，干脆不渲染。
+const passkeyAvailable = isWebAuthnAvailable()
+const isAdmin = computed(() => userStore.userInfo?.role === 'admin')
+const passkeyVisible = computed(() => passkeyAvailable && isAdmin.value)
+const passkeyName = ref('')
+const passkeyBusy = ref(false)
+
+// 登记两段注入（登录两段在 admin/Login.vue）
+const passkeyApi: PasskeyRegisterApi = {
+  registerOptions: adminApi.webauthnRegisterOptions,
+  registerVerify: adminApi.webauthnRegisterVerify,
+}
+
+const handleRegisterPasskey = async () => {
+  passkeyBusy.value = true
+  try {
+    // 名称可留空（服务端回默认名）；取消系统弹窗（NotAllowedError）静默不报错
+    const res = await registerPasskey({
+      name: passkeyName.value.trim() || undefined,
+      api: passkeyApi,
+    })
+    if (res.ok) {
+      passkeyName.value = ''
+      ElMessage.success(t('security.passkey.registered'))
+      return
+    }
+    if (res.cancelled) return
+    ElMessage.error(t('security.passkey.failed'))
+  } catch (e) {
+    // 网络/服务端 4xx：走 errcode→i18n 统一提示（与本页 TOTP 同口径）
+    showError(e)
+  } finally {
+    passkeyBusy.value = false
+  }
+}
 
 // ---------- 登录设备 ----------
 interface SessionRow {
@@ -460,6 +529,18 @@ onMounted(() => {
 
 .setup-block {
   margin-top: var(--spacing-md);
+}
+
+/* Passkey 登记行：名称输入 + 按钮（窄屏自动换行） */
+.passkey-row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.passkey-name {
+  max-width: 320px;
 }
 
 .setup-alert,

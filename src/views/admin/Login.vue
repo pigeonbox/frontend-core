@@ -98,6 +98,22 @@
         </el-form-item>
       </el-form>
 
+      <!-- Passkey 登录（core#160 四端点）：与口令/TOTP 并列的**可选**路径。
+           降级隐藏：非安全上下文（http 内网）/浏览器不支持 WebAuthn 时整块不渲染
+           ——功能当不存在，不报错（issue #118 验收④）。 -->
+      <div v-if="passkeyAvailable" class="passkey-block">
+        <el-divider class="passkey-divider">{{ t('admin.adminLogin.passkeyDivider') }}</el-divider>
+        <el-button
+          class="passkey-button"
+          size="large"
+          :loading="passkeyLoading"
+          @click="handlePasskeyLogin"
+        >
+          <el-icon><Key /></el-icon>
+          {{ t('admin.adminLogin.passkeyLogin') }}
+        </el-button>
+      </div>
+
       <div class="login-footer">
         <el-button link type="primary" underline="never" @click="$router.push('/')">
           <el-icon><Back /></el-icon>
@@ -126,6 +142,7 @@ import { User, Lock, Back, Key } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { adminApi } from '@/api/admin'
 import { translateError } from '@/utils/api-interceptor'
+import { isWebAuthnAvailable, loginWithPasskey, type PasskeyLoginApi } from '@/utils/webauthn'
 
 const isDev = import.meta.env.DEV
 import { useUserStore } from '@/stores/user'
@@ -224,6 +241,32 @@ const loginRules = computed(() => ({
   ]
 }))
 
+/**
+ * 口令登录与 Passkey 登录**共用**的收尾（两路登录的会话/角色确认一字不差）：
+ * 会话标记 → 拉用户信息 → 角色确认 → 写 userRole → 入台。
+ * 返回 false = 角色非 admin（loginError 已置、会话已清）。
+ */
+const completeAdminLogin = async (): Promise<boolean> => {
+  // 会话 Cookie 由服务端下发（HttpOnly），前端不再持久化令牌。
+  // 会话标记统一入口（ref 响应式 + localStorage 双写）：admin 登录不走
+  // userStore.login，直接写 localStorage 会被 isLoggedIn computed 的缓存
+  // 击穿（首帧求值 false 后无响应式依赖变更不重算）→ fetchUserInfo 早退
+  // → 角色判断恒败 → 管理后台无法登录（v0.13.3 修复）。
+  userStore.markSessionActive()
+
+  // 登录后拉取用户信息获取 role（不再浏览器 atob 解析 JWT）
+  await userStore.fetchUserInfo()
+  if (userStore.userInfo?.role !== 'admin') {
+    loginError.value = t('admin.adminLogin.notAdmin')
+    userStore.logout()
+    return false
+  }
+  // userRole 写点收口（frontend-core#98）：角色已由服务端确认（上面 !== 'admin'
+  // 已挡），不再硬编码 'admin' 字面量
+  userStore.applyExternalSession(userStore.userInfo)
+  return true
+}
+
 const handleLogin = async () => {
   if (!loginFormRef.value) return
 
@@ -242,26 +285,10 @@ const handleLogin = async () => {
         totp_code: needTotp.value ? loginForm.totpCode.trim() : undefined
       })
       if (res.code === 200) {
-        // 会话 Cookie 由服务端下发（HttpOnly），前端不再持久化令牌。
-        // 会话标记统一入口（ref 响应式 + localStorage 双写）：admin 登录不走
-        // userStore.login，直接写 localStorage 会被 isLoggedIn computed 的缓存
-        // 击穿（首帧求值 false 后无响应式依赖变更不重算）→ fetchUserInfo 早退
-        // → 角色判断恒败 → 管理后台无法登录（v0.13.3 修复）。
-        userStore.markSessionActive()
-
-        // 登录后拉取用户信息获取 role（不再浏览器 atob 解析 JWT）
-        await userStore.fetchUserInfo()
-        if (userStore.userInfo?.role !== 'admin') {
-          loginError.value = t('admin.adminLogin.notAdmin')
-          userStore.logout()
-          return
+        if (await completeAdminLogin()) {
+          ElMessage.success(t('admin.adminLogin.success'))
+          router.push(getAdminBase())
         }
-        // userRole 写点收口（frontend-core#98）：角色已由服务端确认（上面 !== 'admin'
-        // 已挡），不再硬编码 'admin' 字面量
-        userStore.applyExternalSession(userStore.userInfo)
-
-        ElMessage.success(t('admin.adminLogin.success'))
-        router.push(getAdminBase())
       } else {
         // 统一错误映射（frontend-core#103）：非 200 业务码同样走 errcode → i18n，
         // 否则英文界面直接吐服务端默认文案（与 user Login 同口径）
@@ -294,6 +321,48 @@ const handleLogin = async () => {
     }
   })
 }
+
+// ---------- Passkey 登录（core#160） ----------
+// 降级判据在渲染期算一次：不支持 ⇒ 按钮不出现（不报错、不发请求）
+const passkeyAvailable = isWebAuthnAvailable()
+const passkeyLoading = ref(false)
+
+// 流程只用登录两段；登记两段在 user/Security.vue（PasskeyRegisterApi）
+const passkeyApi: PasskeyLoginApi = {
+  loginOptions: adminApi.webauthnLoginOptions,
+  loginVerify: adminApi.webauthnLoginVerify,
+}
+
+const handlePasskeyLogin = async () => {
+  // login/options 需要用户名（服务端按名发挑战；未登记/不存在的用户名由服务端
+  // 回同形诱饵挑战防枚举，前端不做「是否已登记」预告）
+  const username = loginForm.username.trim()
+  if (!username) {
+    loginError.value = t('admin.adminLogin.passkeyUsernameFirst')
+    return
+  }
+  passkeyLoading.value = true
+  loginError.value = ''
+  try {
+    const res = await loginWithPasskey({ username, api: passkeyApi })
+    if (res.ok) {
+      if (await completeAdminLogin()) {
+        ElMessage.success(t('admin.adminLogin.success'))
+        router.push(getAdminBase())
+      }
+      return
+    }
+    // 用户关掉系统弹窗（NotAllowedError）：静默收场，不算失败
+    if (res.cancelled) return
+    loginError.value = t('admin.adminLogin.passkeyFailed')
+  } catch (error) {
+    // 网络/拦截器异常与口令登录同口径：就地 loginError（errcode → i18n）
+    loginError.value = displayError(error)
+  } finally {
+    passkeyLoading.value = false
+  }
+}
+
 </script>
 
 <style scoped>
@@ -391,6 +460,18 @@ const handleLogin = async () => {
 
 .elevate-divider {
   margin: var(--spacing-md) 0 var(--spacing-xs);
+}
+
+.passkey-block {
+  margin-top: var(--spacing-xs);
+}
+
+.passkey-divider {
+  margin: var(--spacing-md) 0;
+}
+
+.passkey-button {
+  width: 100%;
 }
 
 .login-footer {
