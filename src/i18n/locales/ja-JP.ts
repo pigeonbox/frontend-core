@@ -664,6 +664,10 @@ export default {
       elevateOr: 'または別のアカウントでサインイン',
       demoTitle: 'デモアカウント',
       demoBody: '既定は admin / admin123 です。起動時に PB_ADMIN_PASSWORD を設定している場合は、そちらのパスワードを使用してください',
+      passkeyDivider: 'または Passkey でログイン',
+      passkeyLogin: 'Passkey でログイン',
+      passkeyUsernameFirst: 'ユーザー名を入力してから Passkey でログインしてください',
+      passkeyFailed: 'Passkey ログインに失敗しました。再試行するかパスワードを使用してください',
     },
     configPage: {
       yamlOnlyHint: 'ロックアウト、ダウンロードトークン、信頼するプロキシ、CORSなどのセキュリティ項目はconfig.yaml／環境変数でのみ設定できます（再起動が必要）。ここにない項目はサーバー側の有効設定に従います',

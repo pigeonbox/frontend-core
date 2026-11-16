@@ -664,6 +664,10 @@ export default {
       elevateOr: 'or sign in with another account',
       demoTitle: 'Demo account',
       demoBody: 'Defaults to admin / admin123; if PB_ADMIN_PASSWORD was set at startup, use that password instead',
+      passkeyDivider: 'or sign in with a Passkey',
+      passkeyLogin: 'Sign in with Passkey',
+      passkeyUsernameFirst: 'Enter your username first, then sign in with a Passkey',
+      passkeyFailed: 'Passkey sign-in failed. Try again or use your password',
     },
     configPage: {
       yamlOnlyHint: 'Lockout, download tokens, trusted proxies, CORS and other security items are configured only via config.yaml / environment variables (restart required); anything not listed here follows the server-side effective config',

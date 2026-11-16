@@ -664,6 +664,10 @@ export default {
       elevateOr: 'oder mit einem anderen Konto anmelden',
       demoTitle: 'Demo-Konto',
       demoBody: 'Standard ist admin / admin123; wurde beim Start PB_ADMIN_PASSWORD gesetzt, gilt stattdessen dieses Passwort',
+      passkeyDivider: 'oder mit einem Passkey anmelden',
+      passkeyLogin: 'Mit Passkey anmelden',
+      passkeyUsernameFirst: 'Gib zuerst den Benutzernamen ein und melde dich dann mit einem Passkey an',
+      passkeyFailed: 'Passkey-Anmeldung fehlgeschlagen. Versuche es erneut oder nutze das Passwort',
     },
     configPage: {
       yamlOnlyHint: 'Sperrrichtlinien, Download-Token, vertrauenswürdige Proxys, CORS und weitere Sicherheitsoptionen lassen sich nur über config.yaml / Umgebungsvariablen konfigurieren (Neustart nötig); alles hier nicht Aufgeführte folgt der wirksamen Serverkonfiguration',

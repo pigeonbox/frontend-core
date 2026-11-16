@@ -79,10 +79,10 @@ export function bytesToB64url(b: ArrayBuffer | Uint8Array): string {
   return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
-type RawOptions = { publicKey?: Record<string, unknown> } & Record<string, unknown>
+type RawOptions = { publicKey?: Record<string, unknown> }
 
 const unwrapPublicKey = (raw: RawOptions): Record<string, unknown> =>
-  (raw?.publicKey as Record<string, unknown> | undefined) ?? (raw as Record<string, unknown>)
+  raw.publicKey ?? (raw as unknown as Record<string, unknown>)
 
 const asBytes = (v: unknown): Uint8Array =>
   v instanceof Uint8Array ? v : b64urlToBytes(String(v))
@@ -162,20 +162,27 @@ export function serializeCredential(cred: unknown): Record<string, unknown> {
   return out
 }
 
-/** 四端点的最小 API 面（生产传 adminApi 的四个方法；单测传桩）。 */
-export interface PasskeyApi {
+/** 登记两段的最小 API 面（生产传 adminApi.webauthnRegister*；单测传桩）。 */
+export interface PasskeyRegisterApi {
   registerOptions: () => Promise<{ code: number; message?: string; data?: RawOptions }>
   registerVerify: (p: {
     challenge: string
     credential: Record<string, unknown>
     name?: string
   }) => Promise<{ code: number; message?: string; data?: unknown }>
+}
+
+/** 登录两段的最小 API 面（生产传 adminApi.webauthnLogin*；单测传桩）。 */
+export interface PasskeyLoginApi {
   loginOptions: (p: { username: string }) => Promise<{ code: number; message?: string; data?: RawOptions }>
   loginVerify: (p: {
     challenge: string
     credential: Record<string, unknown>
   }) => Promise<{ code: number; message?: string; data?: unknown }>
 }
+
+/** 四端点全量（测试整包注入用）。 */
+export interface PasskeyApi extends PasskeyRegisterApi, PasskeyLoginApi {}
 
 export interface PasskeyResult {
   ok: boolean
@@ -199,7 +206,7 @@ const errText = (e: unknown): string =>
  */
 export async function registerPasskey(opts: {
   name?: string
-  api: PasskeyApi
+  api: PasskeyRegisterApi
   credentials?: CredentialsLike
 }): Promise<PasskeyResult> {
   const creds = opts.credentials ?? readCredentials()
@@ -231,7 +238,7 @@ export async function registerPasskey(opts: {
  */
 export async function loginWithPasskey(opts: {
   username: string
-  api: PasskeyApi
+  api: PasskeyLoginApi
   credentials?: CredentialsLike
 }): Promise<PasskeyResult> {
   const creds = opts.credentials ?? readCredentials()
