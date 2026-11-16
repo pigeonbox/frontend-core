@@ -1774,6 +1774,15 @@ export default {
     copied: 'コピーしました',
     copyFailed: 'コピーに失敗しました。テキストを手動で選択してください',
     cancel: 'キャンセル',
+    passkey: {
+      title: 'Passkey の登録',
+      adminOnly: '管理者のみ',
+      desc: 'Passkey を登録すると、管理コンソールへのログイン時にパスワードの代わりに端末の生体認証やセキュリティキーを使えます。',
+      namePlaceholder: 'Passkey の名前（例：職場のノート PC）',
+      register: 'Passkey を登録',
+      registered: 'Passkey を登録しました。次回のログインから使えます',
+      failed: 'Passkey の登録に失敗しました。再試行してください',
+    },
     twoFactor: {
       title: '二要素認証（TOTP）',
       desc: '有効にすると、ログイン時にパスワードに加えて認証アプリ（Google Authenticator、1Password、Microsoft Authenticator など）の6桁コードが必要になります。',

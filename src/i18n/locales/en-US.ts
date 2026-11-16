@@ -1775,6 +1775,15 @@ export default {
     copied: 'Copied',
     copyFailed: 'Copy failed — please select the text manually',
     cancel: 'Cancel',
+    passkey: {
+      title: 'Passkey registration',
+      adminOnly: 'Admins only',
+      desc: 'Register a Passkey to sign in to the console with device biometrics or a security key instead of a password.',
+      namePlaceholder: 'Passkey name (e.g. Work laptop)',
+      register: 'Register Passkey',
+      registered: 'Passkey registered — you can use it the next time you sign in',
+      failed: 'Passkey registration failed. Try again',
+    },
     twoFactor: {
       title: 'Two-factor authentication (TOTP)',
       desc: 'Once enabled, signing in requires a 6-digit code from an authenticator app (Google Authenticator, 1Password, Microsoft Authenticator, …) in addition to your password.',
