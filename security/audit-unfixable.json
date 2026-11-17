@@ -1,0 +1,17 @@
+{
+  "schema": "1",
+  "note": "上游未出补丁的高危公告登记处。登记≠放行：每条必须带理由、跟踪单号与复核日期；未登记的高危 ⇒ 门禁判红。判据与实现见 scripts/audit-classify.mjs。",
+  "entries": [
+    {
+      "id": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "severity": "high",
+      "title": "picomatch vulnerable to ReDoS through single-branch repeated extglobs",
+      "vulnerable_range": "<= 4.0.7",
+      "first_patched_version": null,
+      "reason": "上游未出补丁版（GitHub Advisory API first_patched_version=null，2026-11-17 核实；4.0.7 即最新）⇒ 任何升级动作都消除不了。影响面：picomatch 由生产依赖 vue-router 5.4.0 引入，但只在 vue-router 的 unplugin/路由文件扫描（构建期）路径上使用；实测构建产物 dist 内 0 处引用 picomatch ⇒ 不进浏览器运行时。",
+      "tracking_issue": "https://github.com/pigeonbox/frontend-core/issues/127",
+      "review_by": "2026-12-17"
+    }
+  ]
+}
