@@ -29,12 +29,25 @@ jobs:
         with:
           node-version: "22"
       - run: npm ci
-      # npm 漏洞门禁（frontend-core#92）：与 Go 侧 govulncheck 同级——已知 high 才红。
+      # npm 漏洞门禁（frontend-core#92 建、#127 改判据）：与 Go 侧 govulncheck 同级。
       # ⚠️ 必须显式官方 registry：npmmirror 对 /-/npm/v1/security/* 返回 404
       #    ⇒ 任何默认走镜像源的 CI/本地审计都会**静默拿不到数据**（假绿）。
       #    --package-lock-only 只读锁文件，不依赖 node_modules。
-      - name: npm 漏洞门禁(high 及以上判红, 显式官方 registry)
-        run: npm audit --package-lock-only --audit-level=high --registry=https://registry.npmjs.org
+      # 判据 = **可动作性**（frontend-core#127）：
+      #   ① high/critical 且公告归属包**自身有补丁可升** ⇒ 判红（能消除就必须消除）；
+      #   ② high/critical 且归属包**无补丁可升**（上游未出修复，公告范围覆盖全部已发布
+      #     版本）⇒ 必须在 security/audit-unfixable.json **显式登记**（带跟踪单号与
+      #     复核日期）⇒ 未登记即判红。
+      # 为什么要分层：picomatch ≤4.0.7 的 ReDoS 公告（GHSA-fc5q-39xc-vjpf，
+      # first_patched_version=null ⇒ 无补丁可升）自 2026-11-17 起让原「有 high 就红」
+      # 变成**恒红**——恒红门禁形同虚设，还会连带拖红生态 CI 基线闸门 ⇒ 列车发不出车。
+      # 判据能自愈：上游一出补丁版，npm 的 fixAvailable 指向本包 ⇒ 自动回到 ① ⇒ 转红。
+      - name: npm 漏洞门禁(可修复高危判红 + 无补丁高危须显式登记, 显式官方 registry)
+        run: bash scripts/audit-gate.sh
+      # 判据自身的负对照（6 项，纯本地不联网）：可修复必红 / 本包有补丁必红 /
+      # 未登记必红 / npm 只建议升依赖方时仍走登记判据 / 已登记放行 / 无高危放行。
+      - name: npm 漏洞门禁判据自证(6 项负对照)
+        run: bash scripts/audit-gate.sh --selfcheck
       # 负对照自证（frontend-core#92）：把 immutable 钉回漏洞区间 5.1.5 后同一条
       # 命令必须判红——仍绿 = 恒绿摆设。在临时目录里做，不碰工作区锁文件。
       - name: npm 漏洞门禁自证(immutable 钉回 5.1.5 必须判红)
