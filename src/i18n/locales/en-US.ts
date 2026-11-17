@@ -693,6 +693,7 @@ export default {
       nav: {
         site: 'Site & Appearance',
         share: 'Upload & Sharing',
+        dirPolicy: 'Directory Policies',
         download: 'Download & Direct Upload',
         account: 'Users & Login',
         security: 'Security & Rate Limiting',
@@ -703,6 +704,7 @@ export default {
       navDesc: {
         site: 'Site identity and public appearance',
         share: 'Who can upload, and how shares are created by default',
+        dirPolicy: 'Per-directory quota caps and whether shares may be created',
         download: 'How downloads and object-storage direct transfers behave',
         account: 'Registration policy, per-user defaults and sign-in methods',
         security: 'Rate limiting rules and API key admission',
@@ -740,6 +742,7 @@ export default {
         uploadGate: 'Upload Access',
         shareDefault: 'Share Defaults',
         localImport: 'Local Import',
+        dirPolicy: 'Directory Policies',
         download: 'Download Behavior',
         direct: 'Direct Upload (Object Storage)',
         user: 'Users & Registration',
@@ -753,6 +756,22 @@ export default {
         expiryReminder: 'Expiry reminder',
         federation: 'Federation Registry'
 
+      },
+      dirPolicy: {
+        intro: 'Set a quota cap and sharing permission per directory: saving this section submits the whole share segment (an empty list is submitted when all policies are removed).',
+        empty: 'No directory policies configured yet',
+        root: 'Directory path',
+        rootPlaceholder: '/data/music',
+        rootRequired: 'Please fill in a directory path',
+        rootNotAbsolute: 'An absolute path (starting with /) is recommended',
+        quota: 'Quota cap (bytes)',
+        quotaHint: '0 means unlimited, otherwise the value is given in bytes',
+        shareMode: 'Sharing policy',
+        shareModeAllow: 'Allow',
+        shareModeDeny: 'Deny share creation',
+        shareModeHint: 'Allow = shares may be created in this directory; Deny = share creation is forbidden there',
+        add: 'Add policy',
+        remove: 'Remove'
       },
       p2p: {
         introFedTitle: 'Cross-site Federation',

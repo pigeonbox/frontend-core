@@ -202,6 +202,56 @@
             </el-form-item>
           </el-form>
 
+          <!-- ============ 目录策略（share 段：directory_policies） ============ -->
+          <!-- ⚠️ 保存语义：core 的 share 段是「整段替换」——PUT 带了 share 段就整体覆盖，
+               没带才是不改 ⇒ 本分区保存时**必须**把 share 段带上（哪怕管理员没改任何东西）；
+               管理员删光策略时提交**空列表**（不是省略该段），否则「删光后保存」不生效。 -->
+          <el-form v-else-if="activeSection === 'dirPolicy'" label-width="180px" class="config-form">
+            <el-divider content-position="left">{{ t('admin.configPage.sections.dirPolicy') }}</el-divider>
+            <el-alert
+              type="info"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.dirPolicy.intro')"
+            />
+            <p v-if="dirPolicies.length === 0" class="field-hint">{{ t('admin.configPage.dirPolicy.empty') }}</p>
+            <div v-for="(policy, index) in dirPolicies" :key="index" class="dir-policy">
+              <el-form-item :label="t('admin.configPage.dirPolicy.root')">
+                <el-input
+                  v-model="policy.root"
+                  :placeholder="t('admin.configPage.dirPolicy.rootPlaceholder')"
+                  style="max-width: 420px"
+                />
+                <!-- 只提示不硬拦：路径是否合法由服务端判定（前端硬拦会与服务端口径不一致） -->
+                <span v-if="!policy.root.trim()" class="field-warn">{{ t('admin.configPage.dirPolicy.rootRequired') }}</span>
+                <span v-else-if="!policy.root.trim().startsWith('/')" class="field-warn">{{ t('admin.configPage.dirPolicy.rootNotAbsolute') }}</span>
+              </el-form-item>
+              <el-form-item :label="t('admin.configPage.dirPolicy.quota')">
+                <el-input-number v-model="policy.quota_bytes" :min="0" :step="1048576" />
+                <span class="field-hint">
+                  {{ policy.quota_bytes > 0 ? formatFileSize(policy.quota_bytes) : t('admin.configPage.upload.batchCapUnlimited') }}
+                </span>
+                <span class="field-hint">{{ t('admin.configPage.dirPolicy.quotaHint') }}</span>
+              </el-form-item>
+              <el-form-item :label="t('admin.configPage.dirPolicy.shareMode')">
+                <el-select v-model="policy.share_mode" style="width: 240px">
+                  <el-option :label="t('admin.configPage.dirPolicy.shareModeAllow')" value="allow" />
+                  <el-option :label="t('admin.configPage.dirPolicy.shareModeDeny')" value="deny" />
+                </el-select>
+                <span class="field-hint">{{ t('admin.configPage.dirPolicy.shareModeHint') }}</span>
+              </el-form-item>
+              <el-form-item>
+                <el-button size="small" type="danger" plain @click="removeDirPolicy(index)">
+                  {{ t('admin.configPage.dirPolicy.remove') }}
+                </el-button>
+              </el-form-item>
+            </div>
+            <el-form-item>
+              <el-button size="small" @click="addDirPolicy">{{ t('admin.configPage.dirPolicy.add') }}</el-button>
+            </el-form-item>
+          </el-form>
+
           <!-- ============ 下载与直传（download） ============ -->
           <el-form v-else-if="activeSection === 'download'" label-width="180px" class="config-form">
             <el-divider content-position="left">{{ t('admin.configPage.sections.download') }}</el-divider>
@@ -623,7 +673,7 @@
 import { ref, computed, watch, onMounted, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Picture, Upload, Download, User, Lock, Message, Connection, SetUp } from '@element-plus/icons-vue'
+import { Picture, Upload, Download, User, Lock, Message, Connection, SetUp, Folder } from '@element-plus/icons-vue'
 import { useI18n } from 'vue-i18n'
 import { THEMES, matchThemePreset, type ThemePreset } from '@/config/themes'
 import { EXPIRE_STYLE_KEYS, EXPIRE_STYLE_I18N_KEYS } from '@/config/expireStyles'
@@ -638,12 +688,13 @@ const { t, te } = useI18n()
 const { handleError } = useErrorHandler()
 
 // ==================== 分区导航（原 11 tab 收敛 7 分区，?section= 深链） ====================
-const SECTION_IDS = ['site', 'share', 'download', 'account', 'security', 'notify', 'p2p', 'policy'] as const
+const SECTION_IDS = ['site', 'share', 'dirPolicy', 'download', 'account', 'security', 'notify', 'p2p', 'policy'] as const
 type SectionId = (typeof SECTION_IDS)[number]
 
 const navItems: { id: SectionId; labelKey: string; descKey: string; icon: Component }[] = [
   { id: 'site', labelKey: 'admin.configPage.nav.site', descKey: 'admin.configPage.navDesc.site', icon: Picture },
   { id: 'share', labelKey: 'admin.configPage.nav.share', descKey: 'admin.configPage.navDesc.share', icon: Upload },
+  { id: 'dirPolicy', labelKey: 'admin.configPage.nav.dirPolicy', descKey: 'admin.configPage.navDesc.dirPolicy', icon: Folder },
   { id: 'download', labelKey: 'admin.configPage.nav.download', descKey: 'admin.configPage.navDesc.download', icon: Download },
   { id: 'account', labelKey: 'admin.configPage.nav.account', descKey: 'admin.configPage.navDesc.account', icon: User },
   { id: 'security', labelKey: 'admin.configPage.nav.security', descKey: 'admin.configPage.navDesc.security', icon: Lock },
@@ -831,6 +882,40 @@ const localImportRootsText = computed({
   },
 })
 
+// ==================== 目录策略（core: conf.DirectoryPolicyConfig） ====================
+// GET /admin/config 的 data.share 段（core 新增，老实例不下发该段）：
+//   { share: { directory_policies: [{ root, quota_bytes, share_mode }] } }
+//   - root         绝对路径前缀
+//   - quota_bytes  字节；0 = 不限
+//   - share_mode   "" / "allow" = 放行；"deny" = 该目录禁止生成分享
+interface DirectoryPolicy {
+  root: string
+  quota_bytes: number
+  share_mode: 'allow' | 'deny'
+}
+
+// core 把 "" 与 "allow" 视为等价（都=放行），界面只给 allow/deny 两档
+// ⇒ 回读时归一为 allow（机械等价归一，不改变语义）。
+const normalizeDirPolicy = (raw: unknown): DirectoryPolicy => {
+  const p = (raw ?? {}) as Record<string, unknown>
+  const quota = Number(p.quota_bytes)
+  return {
+    root: typeof p.root === 'string' ? p.root : '',
+    quota_bytes: Number.isFinite(quota) && quota > 0 ? Math.floor(quota) : 0,
+    share_mode: p.share_mode === 'deny' ? 'deny' : 'allow',
+  }
+}
+
+const dirPolicies = ref<DirectoryPolicy[]>([])
+
+const addDirPolicy = () => {
+  dirPolicies.value.push({ root: '', quota_bytes: 0, share_mode: 'allow' })
+}
+
+const removeDirPolicy = (index: number) => {
+  dirPolicies.value.splice(index, 1)
+}
+
 // 单文件上限：配置以字节存储，界面以 MB 编辑（0 = 不限）。
 // 存回时按 1MB=1048576 字节换算并取整（4GiB 上限 = 4096MB = 4294967296 精确无误差）。
 const maxFileSizeMb = computed({
@@ -932,6 +1017,9 @@ const fetchExSections = (data: Record<string, unknown>) => {
   }
   if (sec.oidc) Object.assign(exForm.value.oidc, sec.oidc)
   if (sec.local_import) Object.assign(exForm.value.local_import, sec.local_import)
+  // 目录策略（core 新增的 share 段）：老实例不下发该段 ⇒ 归一为空列表
+  const policyList = sec.share?.directory_policies
+  dirPolicies.value = Array.isArray(policyList) ? policyList.map(normalizeDirPolicy) : []
   if (sec.api_token) Object.assign(exForm.value.api_token, sec.api_token)
   if (sec.p2p?.federation) {
     Object.assign(exForm.value.p2p.federation, sec.p2p.federation)
@@ -1177,6 +1265,20 @@ const saveCurrent = async () => {
           upload_ex: { ...exForm.value.upload_ex },
           transfer: configForm.value.transfer,
           local_import: { enabled: exForm.value.local_import.enabled, roots: exForm.value.local_import.roots },
+        })
+        break
+      case 'dirPolicy':
+        // ⚠️ core 的 share 段是**整段替换**语义：PUT 带了 share 段就整体覆盖，
+        // 没带才是不改 ⇒ 本分区保存时必须把 share 段带上（哪怕管理员没改任何东西）；
+        // 管理员删光策略时提交**空列表**（不是省略该段），否则「删光后保存」不生效。
+        await putConfig({
+          share: {
+            directory_policies: dirPolicies.value.map((p) => ({
+              root: p.root.trim(),
+              quota_bytes: Number.isFinite(p.quota_bytes) && p.quota_bytes > 0 ? Math.floor(p.quota_bytes) : 0,
+              share_mode: p.share_mode === 'deny' ? 'deny' : 'allow',
+            })),
+          },
         })
         break
       case 'download':
@@ -1431,6 +1533,16 @@ onMounted(() => {
   margin-left: 10px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+/* 目录策略的输入提示（前端只提示不硬拦：是否合法由服务端判定） */
+.field-warn {
+  margin-left: 10px;
+  color: var(--el-color-warning, #e6a23c);
+  font-size: 12px;
+}
+.dir-policy {
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--color-border, var(--el-border-color-lighter));
 }
 /* 过期样式多选：8 个标签一行放不下，给个宽度让标签换行 */
 .expire-style-select {
