@@ -692,6 +692,7 @@ export default {
       nav: {
         site: '站点与外观',
         share: '上传与分享',
+        dirPolicy: '目录策略',
         download: '下载与直传',
         account: '用户与登录',
         security: '安全与限流',
@@ -702,6 +703,7 @@ export default {
       navDesc: {
         site: '站点的基础信息与对外形象',
         share: '决定谁可以上传、分享如何默认创建',
+        dirPolicy: '按目录设置配额上限与是否允许生成分享',
         download: '决定下载与对象存储直传的运行方式',
         account: '注册开放策略、用户默认配额与登录方式',
         security: '接口限流规则与 API Key 准入',
@@ -739,6 +741,7 @@ export default {
         uploadGate: '上传准入',
         shareDefault: '分享默认值',
         localImport: '本地导入',
+        dirPolicy: '目录策略',
         download: '下载行为',
         direct: '直传（对象存储）',
         user: '用户与注册',
@@ -752,6 +755,22 @@ export default {
         expiryReminder: '分享到期提醒',
         federation: '联邦注册'
 
+      },
+      dirPolicy: {
+        intro: '按目录设置配额上限与分享权限：本节保存时整段提交 share 段（清空全部策略也会提交空列表）。',
+        empty: '尚未配置目录策略',
+        root: '目录路径',
+        rootPlaceholder: '/data/music',
+        rootRequired: '请填写目录路径',
+        rootNotAbsolute: '建议填写绝对路径（以 / 开头）',
+        quota: '配额上限（字节）',
+        quotaHint: '0 表示不限，其余按字节填写',
+        shareMode: '分享策略',
+        shareModeAllow: '放行',
+        shareModeDeny: '禁止生成分享',
+        shareModeHint: '放行＝该目录允许生成分享；禁止＝该目录下禁止生成分享',
+        add: '新增策略',
+        remove: '删除'
       },
       p2p: {
         introFedTitle: '跨站联邦',

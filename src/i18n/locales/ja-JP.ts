@@ -693,6 +693,7 @@ export default {
       nav: {
         site: 'サイトと外観',
         share: 'アップロードと共有',
+        dirPolicy: 'ディレクトリポリシー',
         download: 'ダウンロードと直接アップロード',
         account: 'ユーザーとログイン',
         security: 'セキュリティとレート制限',
@@ -703,6 +704,7 @@ export default {
       navDesc: {
         site: 'サイトの識別情報と公開時の見た目',
         share: 'アップロードできるユーザーと、共有の既定値',
+        dirPolicy: 'ディレクトリごとのクォータ上限と共有の可否',
         download: 'ダウンロードとオブジェクトストレージへの直接転送の動作',
         account: '登録ポリシー、ユーザーごとの既定値、サインイン方法',
         security: 'レート制限のルールとAPIキーの受け入れ',
@@ -740,6 +742,7 @@ export default {
         uploadGate: 'アップロードの許可',
         shareDefault: '共有の既定値',
         localImport: 'ローカルインポート',
+        dirPolicy: 'ディレクトリポリシー',
         download: 'ダウンロードの動作',
         direct: '直接アップロード（オブジェクトストレージ）',
         user: 'ユーザーと登録',
@@ -753,6 +756,22 @@ export default {
         expiryReminder: '期限の事前通知',
         federation: '連携レジストリ'
 
+      },
+      dirPolicy: {
+        intro: 'ディレクトリごとにクォータ上限と共有可否を設定します。このセクションを保存すると share セグメント全体を送信します（ポリシーをすべて削除した場合も空のリストを送信します）。',
+        empty: 'ディレクトリポリシーはまだ設定されていません',
+        root: 'ディレクトリパス',
+        rootPlaceholder: '/data/music',
+        rootRequired: 'ディレクトリパスを入力してください',
+        rootNotAbsolute: '絶対パス（/ で始まる）を推奨します',
+        quota: 'クォータ上限（バイト）',
+        quotaHint: '0 は無制限です。それ以外はバイト単位で指定します',
+        shareMode: '共有ポリシー',
+        shareModeAllow: '許可',
+        shareModeDeny: '共有を禁止',
+        shareModeHint: '許可＝このディレクトリで共有を作成できます。禁止＝このディレクトリでは共有を作成できません',
+        add: 'ポリシーを追加',
+        remove: '削除'
       },
       p2p: {
         introFedTitle: 'サイト間連携',

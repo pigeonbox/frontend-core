@@ -693,6 +693,7 @@ export default {
       nav: {
         site: 'Site & Erscheinungsbild',
         share: 'Upload & Teilen',
+        dirPolicy: 'Verzeichnisrichtlinien',
         download: 'Download & Direkt-Upload',
         account: 'Benutzer & Anmeldung',
         security: 'Sicherheit & Ratenbegrenzung',
@@ -703,6 +704,7 @@ export default {
       navDesc: {
         site: 'Identität der Site und öffentliches Erscheinungsbild',
         share: 'Wer hochladen darf und wie Freigaben standardmäßig entstehen',
+        dirPolicy: 'Kontingent-Obergrenze und Freigabeerlaubnis je Verzeichnis',
         download: 'Wie Downloads und Direktübertragungen in den Objektspeicher ablaufen',
         account: 'Registrierungsrichtlinie, Vorgaben pro Benutzer und Anmeldemethoden',
         security: 'Regeln zur Ratenbegrenzung und Zulassung von API-Schlüsseln',
@@ -740,6 +742,7 @@ export default {
         uploadGate: 'Upload-Zugang',
         shareDefault: 'Freigabe-Vorgaben',
         localImport: 'Lokaler Import',
+        dirPolicy: 'Verzeichnisrichtlinien',
         download: 'Download-Verhalten',
         direct: 'Direkt-Upload (Objektspeicher)',
         user: 'Benutzer & Registrierung',
@@ -753,6 +756,22 @@ export default {
         expiryReminder: 'Ablauf-Erinnerung',
         federation: 'Verbund-Registry'
 
+      },
+      dirPolicy: {
+        intro: 'Kontingent-Obergrenze und Freigabeerlaubnis je Verzeichnis festlegen: Beim Speichern wird das gesamte share-Segment übermittelt (auch als leere Liste, wenn alle Richtlinien entfernt wurden).',
+        empty: 'Noch keine Verzeichnisrichtlinien konfiguriert',
+        root: 'Verzeichnispfad',
+        rootPlaceholder: '/data/music',
+        rootRequired: 'Bitte einen Verzeichnispfad angeben',
+        rootNotAbsolute: 'Ein absoluter Pfad (beginnend mit /) wird empfohlen',
+        quota: 'Kontingent-Obergrenze (Bytes)',
+        quotaHint: '0 bedeutet unbegrenzt, sonst wird der Wert in Bytes angegeben',
+        shareMode: 'Freigaberichtlinie',
+        shareModeAllow: 'Erlauben',
+        shareModeDeny: 'Freigabe verbieten',
+        shareModeHint: 'Erlauben = in diesem Verzeichnis dürfen Freigaben erstellt werden; Verbot = dort ist das Erstellen von Freigaben untersagt',
+        add: 'Richtlinie hinzufügen',
+        remove: 'Entfernen'
       },
       p2p: {
         introFedTitle: 'Site-übergreifender Verbund',
