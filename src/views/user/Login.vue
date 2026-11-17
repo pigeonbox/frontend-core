@@ -115,6 +115,7 @@ import { useUserStore } from '@/stores/user'
 import { useConfigStore } from '@/stores/config'
 import { withBase } from '@/utils/base'
 import { isOidcErrorRedirect, oidcErrorI18nKey } from '@/utils/oidcError'
+import { safeRedirect } from '@/utils/safeRedirect'
 import { host } from '@/host'
 
 const router = useRouter()
@@ -150,8 +151,9 @@ const attemptHostSso = async () => {
   if (!sso) return
   userStore.applyExternalSession(sso)
   ElMessage.success(t('login.success'))
-  const redirect = router.currentRoute.value.query.redirect as string
-  router.push(redirect || '/')
+  // query.redirect 是外部输入（可能是数组/协议相对/超长串）⇒ 运行时校验后再跳
+  const redirect = safeRedirect(router.currentRoute.value.query.redirect)
+  router.push(redirect)
 }
 
 onMounted(() => {
@@ -215,9 +217,9 @@ const handleLogin = async () => {
 
     ElMessage.success(t('login.success'))
 
-    // 重定向到目标页面或首页
-    const redirect = router.currentRoute.value.query.redirect as string
-    router.push(redirect || '/')
+    // 重定向到目标页面或首页（query.redirect 先过 safeRedirect 运行时校验）
+    const redirect = safeRedirect(router.currentRoute.value.query.redirect)
+    router.push(redirect)
   } catch (error: any) {
     // 40012 = 口令已对、只缺二次验证码（服务端刻意不把它算作失败，也不锁账号）
     // ⇒ 切到第二阶段，保留已填的用户名口令，只多要一个码。
