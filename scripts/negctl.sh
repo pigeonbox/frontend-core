@@ -17,6 +17,7 @@ SPECS=(
   "src/utils/__tests__/setupToken.spec.ts"
   "src/utils/__tests__/orphanExports.spec.ts"
   "src/composables/__tests__/shareFetchRace.spec.ts"
+  "src/utils/__tests__/api-interceptor.spec.ts"
 )
 
 PASS=0
@@ -132,18 +133,20 @@ negctl "D6 管理台下载裸 axios" src/views/admin/Files.vue \
   src/utils/__tests__/adminFilesDownload.spec.ts - <<'PY'
 import pathlib
 p = pathlib.Path('src/views/admin/Files.vue'); s = p.read_text()
-old = """    const blob = await request<Blob>({
-      url: adminApi.fileDownloadUrl(row.id),
-      responseType: 'blob',
-      withCredentials: true,
-    })"""
-new = """    const { default: axios } = await import('axios')
-    const blob = (await axios.get(adminApi.fileDownloadUrl(row.id), {
-      responseType: 'blob',
-      withCredentials: true,
-    })).data"""
+# 注入 2026-10-26 的事故形态（裸 axios 下载）。
+# 旧注入锚点（request<Blob> 那段）已随「统一下载器」改造下线 ⇒ 改在当前源码形态上
+# 注入等价缺陷（守卫是源码级断言：不得再出现 await import('axios') / 裸 axios.get）。
+old = "import DownloadButton from '@/components/download/DownloadButton.vue'\n"
 assert old in s
-p.write_text(s.replace(old, new, 1))
+inj = old + """
+const __negctlBareAxiosDownload = async (id: number) => {
+  const { default: axios } = await import('axios')
+  return (
+    await axios.get(adminApi.fileDownloadUrl(id), { responseType: 'blob', withCredentials: true })
+  ).data
+}
+"""
+p.write_text(s.replace(old, inj, 1))
 PY
 
 negctl "D7 t()||fallback 死代码" src/views/user/Login.vue \
@@ -195,11 +198,14 @@ PY
 
 negctl "D11 dompurify 悬空依赖" package.json \
   src/utils/__tests__/orphanExports.spec.ts - <<'PY'
-import pathlib
+import pathlib, re
 p = pathlib.Path('package.json'); s = p.read_text()
-old = '    "axios": "1.13.6",\n'
-assert old in s
-p.write_text(s.replace(old, old + '    "dompurify": "^3.4.12",\n', 1))
+# 版本无关：按 axios 依赖行定位（旧写法钉死了版本号 ⇒ 依赖一升级就 PATCH FAILED，
+# 那条负对照等于没跑）。
+m = re.search(r'^(?P<indent>[ \t]*)"axios": "[^"]+",\n', s, re.M)
+assert m, 'package.json 里找不到 axios 依赖行'
+ins = m.group(0) + m.group('indent') + '"dompurify": "^3.4.12",\n'
+p.write_text(s[:m.start()] + ins + s[m.end():])
 PY
 
 negctl "D12 取数竞态守卫" src/views/share/View.vue \
@@ -232,6 +238,60 @@ import pathlib
 p = pathlib.Path('src/views/user/OidcCallback.vue'); s = p.read_text()
 old = "    error.value = t(oidcErrorI18nKey(route.query.oidc_code))"
 new = "    error.value = String(route.query.msg ?? '')"
+assert old in s
+p.write_text(s.replace(old, new, 1))
+PY
+
+# ─────────────────────────────────────────────────────────────────────────────
+# #620：errcode 契约守卫（映射表 ⇄ 五门语言包）必须有牙齿。
+# 旧版这条守卫是「单向 + 手抄」⇒ 契约新增码抓不到、手抄自己漏一条也没人发现。
+# 现改为机器推导（A 漏登记 / B 多出 / C 键形 / D 未知码兜底），下面 5 条逐个把
+# 源码改回「缺陷态」⇒ 对应 spec 必须变红。
+# ─────────────────────────────────────────────────────────────────────────────
+
+negctl "E1 errcode 映射表漏登记一条" src/utils/api-interceptor.ts \
+  src/utils/__tests__/api-interceptor.spec.ts - <<'PY'
+import pathlib
+p = pathlib.Path('src/utils/api-interceptor.ts'); s = p.read_text()
+old = "  30014: 'errcode.30014',\n"
+assert old in s
+p.write_text(s.replace(old, "", 1))
+PY
+
+negctl "E2 语言包少一个 errcode 键" src/i18n/locales/zh-CN.ts \
+  src/utils/__tests__/api-interceptor.spec.ts - <<'PY'
+import pathlib
+p = pathlib.Path('src/i18n/locales/zh-CN.ts'); s = p.read_text()
+old = "    '30014': '上传会话已完成，请重新发起上传',\n"
+assert old in s
+p.write_text(s.replace(old, "", 1))
+PY
+
+negctl "E3 映射值写错码" src/utils/api-interceptor.ts \
+  src/utils/__tests__/api-interceptor.spec.ts - <<'PY'
+import pathlib
+p = pathlib.Path('src/utils/api-interceptor.ts'); s = p.read_text()
+old = "  10002: 'errcode.10002',\n"
+new = "  10002: 'errcode.10003',\n"
+assert old in s
+p.write_text(s.replace(old, new, 1))
+PY
+
+negctl "E4 段位兜底被摘掉" src/utils/api-interceptor.ts \
+  src/utils/__tests__/api-interceptor.spec.ts - <<'PY'
+import pathlib
+p = pathlib.Path('src/utils/api-interceptor.ts'); s = p.read_text()
+old = "  { from: 30000, to: 39999, key: 'errcode.30001' }, // 3xxxx 存储\n"
+assert old in s
+p.write_text(s.replace(old, "", 1))
+PY
+
+negctl "E5 段位兜底指向未登记的码" src/utils/api-interceptor.ts \
+  src/utils/__tests__/api-interceptor.spec.ts - <<'PY'
+import pathlib
+p = pathlib.Path('src/utils/api-interceptor.ts'); s = p.read_text()
+old = "  { from: 30000, to: 39999, key: 'errcode.30001' }, // 3xxxx 存储\n"
+new = "  { from: 30000, to: 39999, key: 'errcode.39999' }, // 3xxxx 存储\n"
 assert old in s
 p.write_text(s.replace(old, new, 1))
 PY
