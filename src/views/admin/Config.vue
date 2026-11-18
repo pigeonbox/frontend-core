@@ -206,6 +206,8 @@
           <!-- ⚠️ 保存语义：core 的 share 段是「整段替换」——PUT 带了 share 段就整体覆盖，
                没带才是不改 ⇒ 本分区保存时**必须**把 share 段带上（哪怕管理员没改任何东西）；
                管理员删光策略时提交**空列表**（不是省略该段），否则「删光后保存」不生效。 -->
+          <!-- ⚠️ 校验语义：core 在**保存时**就硬校验（root 非空 + 绝对路径，否则 400 + 10001）
+               ⇒ 前端按同一口径**先拦**（下面红条 + 保存时点名第几条），不给「必然失败的保存」。 -->
           <el-form v-else-if="activeSection === 'dirPolicy'" label-width="180px" class="config-form">
             <el-divider content-position="left">{{ t('admin.configPage.sections.dirPolicy') }}</el-divider>
             <el-alert
@@ -215,6 +217,20 @@
               style="margin-bottom: 16px"
               :title="t('admin.configPage.dirPolicy.intro')"
             />
+            <el-alert
+              v-if="dirPolicyIssues.length > 0"
+              type="error"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 16px"
+              :title="t('admin.configPage.dirPolicy.invalidTitle')"
+            >
+              <ul class="dir-policy-issues">
+                <li v-for="issue in dirPolicyIssues" :key="issue.index">
+                  {{ t('admin.configPage.dirPolicy.invalid', { n: issue.index + 1, reason: t(DIR_POLICY_ISSUE_KEY[issue.reason]) }) }}
+                </li>
+              </ul>
+            </el-alert>
             <p v-if="dirPolicies.length === 0" class="field-hint">{{ t('admin.configPage.dirPolicy.empty') }}</p>
             <div v-for="(policy, index) in dirPolicies" :key="index" class="dir-policy">
               <el-form-item :label="t('admin.configPage.dirPolicy.root')">
@@ -223,9 +239,10 @@
                   :placeholder="t('admin.configPage.dirPolicy.rootPlaceholder')"
                   style="max-width: 420px"
                 />
-                <!-- 只提示不硬拦：路径是否合法由服务端判定（前端硬拦会与服务端口径不一致） -->
-                <span v-if="!policy.root.trim()" class="field-warn">{{ t('admin.configPage.dirPolicy.rootRequired') }}</span>
-                <span v-else-if="!policy.root.trim().startsWith('/')" class="field-warn">{{ t('admin.configPage.dirPolicy.rootNotAbsolute') }}</span>
+                <!-- 与 core 同口径：core 保存时硬校验（root 非空 + 绝对路径 ⇒ 400 + 10001）
+                     ⇒ 标红是提前告知，保存时会被拦下（见 saveCurrent 的 dirPolicy 分支）。 -->
+                <span v-if="!policy.root.trim()" class="field-error">{{ t('admin.configPage.dirPolicy.rootRequired') }}</span>
+                <span v-else-if="!policy.root.trim().startsWith('/')" class="field-error">{{ t('admin.configPage.dirPolicy.rootNotAbsolute') }}</span>
               </el-form-item>
               <el-form-item :label="t('admin.configPage.dirPolicy.quota')">
                 <el-input-number v-model="policy.quota_bytes" :min="0" :step="1048576" />
@@ -248,7 +265,7 @@
               </el-form-item>
             </div>
             <el-form-item>
-              <el-button size="small" @click="addDirPolicy">{{ t('admin.configPage.dirPolicy.add') }}</el-button>
+              <el-button class="dir-policy-add" size="small" @click="addDirPolicy">{{ t('admin.configPage.dirPolicy.add') }}</el-button>
             </el-form-item>
           </el-form>
 
@@ -916,6 +933,57 @@ const removeDirPolicy = (index: number) => {
   dirPolicies.value.splice(index, 1)
 }
 
+// ---- 提交前校验（与 core 同口径）----
+//
+// core 在**保存时**就硬校验（core app/config/config.go 的配置校验）：
+//   root 为空 / 非绝对路径 / quota_bytes < 0 / share_mode 非法
+//   ⇒ ErrSharePolicyInvalid ⇒ HTTP 400 + 10001 + 点名字段。
+// ⇒ 前端若「只提示不硬拦」，管理员点保存必然撞 400（整个配置保存失败，
+//   报错还指向配置段而不是「哪一条策略的哪个字段」）⇒ 这里按**与服务端完全
+//   相同的口径**先拦，并点名第几条、哪个字段。core 侧注释写着「配置必须用
+//   绝对路径，管理台校验后续补」——这就是那件"后续补"。
+//
+// ⚠️ 校验对象是**将要提交的载荷**（buildDirPolicyPayload 的返回值）⇒
+//    校验过的就是发出去的，杜绝「校验通过但载荷里仍是非法值」的缝。
+type DirPolicyIssueReason = 'rootRequired' | 'rootNotAbsolute'
+
+interface DirPolicyIssue {
+  index: number
+  reason: DirPolicyIssueReason
+}
+
+// 原因 → i18n 键（写**字面量**而非模板串：i18n 死键守卫按源码子串判活）
+const DIR_POLICY_ISSUE_KEY: Record<DirPolicyIssueReason, string> = {
+  rootRequired: 'admin.configPage.dirPolicy.rootRequired',
+  rootNotAbsolute: 'admin.configPage.dirPolicy.rootNotAbsolute',
+}
+
+// buildDirPolicyPayload 把表单行归一成 core 要的提交形状（core: conf.DirectoryPolicyConfig）。
+const buildDirPolicyPayload = () =>
+  dirPolicies.value.map((p) => ({
+    root: p.root.trim(),
+    quota_bytes: Number.isFinite(p.quota_bytes) && p.quota_bytes > 0 ? Math.floor(p.quota_bytes) : 0,
+    share_mode: p.share_mode === 'deny' ? 'deny' : 'allow',
+  }))
+
+// validateDirPolicyPayload 按 core 口径校验载荷，返回**全部**非法项（无则空数组）。
+const validateDirPolicyPayload = (
+  payload: ReturnType<typeof buildDirPolicyPayload>,
+): DirPolicyIssue[] => {
+  const issues: DirPolicyIssue[] = []
+  payload.forEach((item, index) => {
+    if (!item.root) {
+      issues.push({ index, reason: 'rootRequired' })
+    } else if (!item.root.startsWith('/')) {
+      issues.push({ index, reason: 'rootNotAbsolute' })
+    }
+  })
+  return issues
+}
+
+// 当前表单里的非法项（分区级红条与提交前拦截共用同一份判定）。
+const dirPolicyIssues = computed(() => validateDirPolicyPayload(buildDirPolicyPayload()))
+
 // 单文件上限：配置以字节存储，界面以 MB 编辑（0 = 不限）。
 // 存回时按 1MB=1048576 字节换算并取整（4GiB 上限 = 4096MB = 4294967296 精确无误差）。
 const maxFileSizeMb = computed({
@@ -1267,20 +1335,30 @@ const saveCurrent = async () => {
           local_import: { enabled: exForm.value.local_import.enabled, roots: exForm.value.local_import.roots },
         })
         break
-      case 'dirPolicy':
+      case 'dirPolicy': {
         // ⚠️ core 的 share 段是**整段替换**语义：PUT 带了 share 段就整体覆盖，
         // 没带才是不改 ⇒ 本分区保存时必须把 share 段带上（哪怕管理员没改任何东西）；
         // 管理员删光策略时提交**空列表**（不是省略该段），否则「删光后保存」不生效。
+        const payload = buildDirPolicyPayload()
+        // 提交前按 core 同口径校验（core 保存时硬校验 ⇒ 不拦就是必然 400）。
+        const issues = validateDirPolicyPayload(payload)
+        if (issues.length > 0) {
+          const first = issues[0]
+          ElMessage.error(
+            t('admin.configPage.dirPolicy.invalid', {
+              n: first.index + 1,
+              reason: t(DIR_POLICY_ISSUE_KEY[first.reason]),
+            }),
+          )
+          return
+        }
         await putConfig({
           share: {
-            directory_policies: dirPolicies.value.map((p) => ({
-              root: p.root.trim(),
-              quota_bytes: Number.isFinite(p.quota_bytes) && p.quota_bytes > 0 ? Math.floor(p.quota_bytes) : 0,
-              share_mode: p.share_mode === 'deny' ? 'deny' : 'allow',
-            })),
+            directory_policies: payload,
           },
         })
         break
+      }
       case 'download':
         await putConfig({ download: { ...exForm.value.download } })
         break
@@ -1534,11 +1612,18 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
-/* 目录策略的输入提示（前端只提示不硬拦：是否合法由服务端判定） */
-.field-warn {
+/* 目录策略的行内错误（core 保存时硬校验 ⇒ 这些行会让保存被拦下） */
+.field-error {
   margin-left: 10px;
-  color: var(--el-color-warning, #e6a23c);
+  color: var(--el-color-danger, #f56c6c);
   font-size: 12px;
+}
+/* 目录策略非法条目清单（分区级红条里逐条点名） */
+.dir-policy-issues {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
 }
 .dir-policy {
   padding: 8px 0;

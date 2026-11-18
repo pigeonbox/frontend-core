@@ -762,8 +762,8 @@ export default {
         empty: 'ディレクトリポリシーはまだ設定されていません',
         root: 'ディレクトリパス',
         rootPlaceholder: '/data/music',
-        rootRequired: 'ディレクトリパスを入力してください',
-        rootNotAbsolute: '絶対パス（/ で始まる）を推奨します',
+        rootRequired: 'ディレクトリパスは必須です',
+        rootNotAbsolute: 'ディレクトリパスは絶対パス（/ で始まる）である必要があります',
         quota: 'クォータ上限（バイト）',
         quotaHint: '0 は無制限です。それ以外はバイト単位で指定します',
         shareMode: '共有ポリシー',
@@ -771,7 +771,9 @@ export default {
         shareModeDeny: '共有を禁止',
         shareModeHint: '許可＝このディレクトリで共有を作成できます。禁止＝このディレクトリでは共有を作成できません',
         add: 'ポリシーを追加',
-        remove: '削除'
+        remove: '削除',
+        invalidTitle: '一部のポリシーが検証に失敗しました。修正してから保存してください',
+        invalid: 'ポリシー {n} が無効です：{reason}'
       },
       p2p: {
         introFedTitle: 'サイト間連携',

@@ -19,7 +19,11 @@
 //   ④ 保存：**整段替换**语义——core 的 share 段「带了=整体覆盖、缺省=不改」⇒ 本分区
 //      保存必须把 share 段带上，且**清空全部策略时提交空列表**（不是省略该段）。
 //      这是本守卫最要紧的一条：省略该段 ⇒ 管理员删光策略后保存不生效（假成功）；
-//   ⑤ i18n：五个语言包都齐全部键且非空（漏一个语言 ⇒ 该语种面板出现原始键名）。
+//   ⑤ i18n：五个语言包都齐全部键且非空（漏一个语言 ⇒ 该语种面板出现原始键名）；
+//   ⑥ 提交前校验：core 在**保存时**就硬校验（root 非空 + 绝对路径 ⇒ 400 + 10001）
+//      ⇒ 前端必须同口径先拦，且**在发出 PUT 之前**拦下——只提示不拦 ⇒ 管理员点保存
+//      必然撞 400（整个配置保存失败，报错还指向配置段而不是「哪条策略哪个字段」）；
+//      且「被校验的对象」必须**就是**「被提交的对象」（归一只有一处出处）。
 import { describe, it, expect } from 'vitest'
 import zhCN from '@/i18n/locales/zh-CN'
 import enUS from '@/i18n/locales/en-US'
@@ -52,6 +56,8 @@ const I18N_KEYS = [
   'admin.configPage.dirPolicy.shareModeHint',
   'admin.configPage.dirPolicy.add',
   'admin.configPage.dirPolicy.remove',
+  'admin.configPage.dirPolicy.invalidTitle',
+  'admin.configPage.dirPolicy.invalid',
 ]
 
 describe('目录策略分区入口', () => {
@@ -103,6 +109,12 @@ describe('目录策略回读链路', () => {
 describe('目录策略保存链路（整段替换语义）', () => {
   const at = configVue.indexOf("case 'dirPolicy':")
   const block = at > -1 ? configVue.slice(at, configVue.indexOf('break', at)) : ''
+  // 载荷归一的**唯一出处**（校验对象 == 提交对象 ⇒ 两处表达式分叉就会漏检）
+  const builderAt = configVue.indexOf('const buildDirPolicyPayload')
+  const builder =
+    builderAt > -1
+      ? configVue.slice(builderAt, configVue.indexOf('const validateDirPolicyPayload', builderAt))
+      : ''
 
   it("存在 dirPolicy 保存分支，且载荷带 share 段（段缺省=不改 ⇒ 漏段=改了不生效)", () => {
     expect(at, "应存在 case 'dirPolicy': 分支").toBeGreaterThan(-1)
@@ -118,11 +130,55 @@ describe('目录策略保存链路（整段替换语义）', () => {
   })
 
   it('提交前做机械归一（root 去空白、quota 取整、share_mode 只留两档）', () => {
-    expect(block).toMatch(/root: p\.root\.trim\(\)/)
-    expect(block).toMatch(
+    expect(builderAt, '载荷归一应有唯一出处（buildDirPolicyPayload）').toBeGreaterThan(-1)
+    expect(builder).toMatch(/root: p\.root\.trim\(\)/)
+    expect(builder).toMatch(
       /quota_bytes: Number\.isFinite\(p\.quota_bytes\) && p\.quota_bytes > 0 \? Math\.floor\(p\.quota_bytes\) : 0/
     )
-    expect(block).toMatch(/share_mode: p\.share_mode === 'deny' \? 'deny' : 'allow'/)
+    expect(builder).toMatch(/share_mode: p\.share_mode === 'deny' \? 'deny' : 'allow'/)
+    // 分支必须提交**这个**归一结果（否则「校验过的」与「发出去的」不是同一份）
+    expect(block, '保存分支必须取 buildDirPolicyPayload() 的结果').toMatch(
+      /const payload = buildDirPolicyPayload\(\)/
+    )
+    expect(block, '保存分支必须把 payload 交给 share 段').toMatch(/directory_policies: payload/)
+  })
+})
+
+describe('目录策略提交前校验（与 core 同口径）', () => {
+  const at = configVue.indexOf("case 'dirPolicy':")
+  const block = at > -1 ? configVue.slice(at, configVue.indexOf('break', at)) : ''
+
+  it('core 保存时硬校验（root 非空 + 绝对路径 ⇒ 400 + 10001）⇒ 前端必须同口径判非法', () => {
+    expect(configVue, '应有提交前校验函数').toMatch(/const validateDirPolicyPayload/)
+    expect(configVue, '空 root 应判非法').toMatch(/if \(!item\.root\)/)
+    expect(configVue, '非绝对路径应判非法').toMatch(/!item\.root\.startsWith\('\/'\)/)
+  })
+
+  it('校验不过 ⇒ 不得发出 PUT（必然 400 的保存没有意义）', () => {
+    const validateAt = block.indexOf('validateDirPolicyPayload')
+    const putAt = block.indexOf('await putConfig(')
+    expect(validateAt, '保存分支必须先校验').toBeGreaterThan(-1)
+    expect(putAt, '保存分支必须有 putConfig').toBeGreaterThan(-1)
+    expect(validateAt, '校验必须发生在 putConfig 之前').toBeLessThan(putAt)
+    // ⚠️ 闸门必须**真判**：写成 \`if (false && issues.length > 0)\` 之类恒假短路时，
+    //    只匹配「issues.length > 0」这串子串的断言照样绿 ⇒ 这里钉住完整的 if 头。
+    expect(block, '拦截闸必须真判（不得被短路成恒假）').toMatch(/if \(issues\.length > 0\) \{/)
+    expect(block, '校验不过必须 return（不得继续提交）').toMatch(
+      /if \(issues\.length > 0\) \{[\s\S]*?return/
+    )
+  })
+
+  it('分区级红条：非法条目要看得见（不只是保存时一闪而过的 toast）', () => {
+    expect(configVue).toMatch(/v-if="dirPolicyIssues\.length > 0"/)
+    expect(configVue, '红条标题键须字面量出现（i18n 死键守卫按源码子串判活）').toMatch(
+      /admin\.configPage\.dirPolicy\.invalidTitle/
+    )
+    expect(configVue).toMatch(/admin\.configPage\.dirPolicy\.invalid'/)
+  })
+
+  it('原因 → i18n 键的映射必须写字面量（模板串 ⇒ 死键守卫判死）', () => {
+    expect(configVue).toMatch(/rootRequired: 'admin\.configPage\.dirPolicy\.rootRequired'/)
+    expect(configVue).toMatch(/rootNotAbsolute: 'admin\.configPage\.dirPolicy\.rootNotAbsolute'/)
   })
 })
 

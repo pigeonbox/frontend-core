@@ -762,8 +762,8 @@ export default {
         empty: 'No directory policies configured yet',
         root: 'Directory path',
         rootPlaceholder: '/data/music',
-        rootRequired: 'Please fill in a directory path',
-        rootNotAbsolute: 'An absolute path (starting with /) is recommended',
+        rootRequired: 'Directory path is required',
+        rootNotAbsolute: 'Directory path must be an absolute path (starting with /)',
         quota: 'Quota cap (bytes)',
         quotaHint: '0 means unlimited, otherwise the value is given in bytes',
         shareMode: 'Sharing policy',
@@ -771,7 +771,9 @@ export default {
         shareModeDeny: 'Deny share creation',
         shareModeHint: 'Allow = shares may be created in this directory; Deny = share creation is forbidden there',
         add: 'Add policy',
-        remove: 'Remove'
+        remove: 'Remove',
+        invalidTitle: 'Some policies failed validation; fix them before saving',
+        invalid: 'Policy {n} is invalid: {reason}'
       },
       p2p: {
         introFedTitle: 'Cross-site Federation',
