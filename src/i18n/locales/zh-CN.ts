@@ -768,7 +768,9 @@ export default {
         shareMode: '分享策略',
         shareModeAllow: '放行',
         shareModeDeny: '禁止生成分享',
-        shareModeHint: '放行＝该目录允许生成分享；禁止＝该目录下禁止生成分享',
+        shareModeInternalOnly: '仅站内可取',
+        shareModeHint:
+          '放行＝该目录允许生成分享；禁止＝该目录下禁止生成分享；仅站内＝允许生成分享，但只限站内已登录用户取件（不生成公网取件码）',
         add: '新增策略',
         remove: '删除',
         invalidTitle: '有策略未通过校验，修正后才能保存',

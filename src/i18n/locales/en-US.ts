@@ -769,7 +769,9 @@ export default {
         shareMode: 'Sharing policy',
         shareModeAllow: 'Allow',
         shareModeDeny: 'Deny share creation',
-        shareModeHint: 'Allow = shares may be created in this directory; Deny = share creation is forbidden there',
+        shareModeInternalOnly: 'Internal only',
+        shareModeHint:
+          'Allow = shares may be created in this directory; Deny = share creation is forbidden there; Internal only = shares may be created but can only be picked up by logged-in users on this site (no public pickup code)',
         add: 'Add policy',
         remove: 'Remove',
         invalidTitle: 'Some policies failed validation; fix them before saving',

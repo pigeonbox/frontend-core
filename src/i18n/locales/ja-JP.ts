@@ -769,7 +769,9 @@ export default {
         shareMode: '共有ポリシー',
         shareModeAllow: '許可',
         shareModeDeny: '共有を禁止',
-        shareModeHint: '許可＝このディレクトリで共有を作成できます。禁止＝このディレクトリでは共有を作成できません',
+        shareModeInternalOnly: 'サイト内のみ',
+        shareModeHint:
+          '許可＝このディレクトリで共有を作成できます。禁止＝このディレクトリでは共有を作成できません。サイト内のみ＝共有は作成できますが、このサイトのログイン済みユーザーだけが取得できます（公開の取り出しコードは発行しません）',
         add: 'ポリシーを追加',
         remove: '削除',
         invalidTitle: '一部のポリシーが検証に失敗しました。修正してから保存してください',

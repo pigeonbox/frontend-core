@@ -255,6 +255,7 @@
                 <el-select v-model="policy.share_mode" style="width: 240px">
                   <el-option :label="t('admin.configPage.dirPolicy.shareModeAllow')" value="allow" />
                   <el-option :label="t('admin.configPage.dirPolicy.shareModeDeny')" value="deny" />
+                  <el-option :label="t('admin.configPage.dirPolicy.shareModeInternalOnly')" value="internal_only" />
                 </el-select>
                 <span class="field-hint">{{ t('admin.configPage.dirPolicy.shareModeHint') }}</span>
               </el-form-item>
@@ -904,22 +905,26 @@ const localImportRootsText = computed({
 //   { share: { directory_policies: [{ root, quota_bytes, share_mode }] } }
 //   - root         绝对路径前缀
 //   - quota_bytes  字节；0 = 不限
-//   - share_mode   "" / "allow" = 放行；"deny" = 该目录禁止生成分享
+//   - share_mode   "" / "allow" = 放行；"deny" = 该目录禁止生成分享；
+//                   "internal_only" = 仅站内（不铸公网取件码 + 取件强制登录，core#233）
 interface DirectoryPolicy {
   root: string
   quota_bytes: number
-  share_mode: 'allow' | 'deny'
+  share_mode: 'allow' | 'deny' | 'internal_only'
 }
 
-// core 把 "" 与 "allow" 视为等价（都=放行），界面只给 allow/deny 两档
+// core 把 "" 与 "allow" 视为等价（都=放行），界面只给 allow/deny/internal_only 三档
 // ⇒ 回读时归一为 allow（机械等价归一，不改变语义）。
+// ⚠️ internal_only 必须**原样保留**：归一成 allow = 把「仅站内」静默降级成「公开」
+//   （比报错更坏——管理员以为还限着，实际已放开）。
 const normalizeDirPolicy = (raw: unknown): DirectoryPolicy => {
   const p = (raw ?? {}) as Record<string, unknown>
   const quota = Number(p.quota_bytes)
   return {
     root: typeof p.root === 'string' ? p.root : '',
     quota_bytes: Number.isFinite(quota) && quota > 0 ? Math.floor(quota) : 0,
-    share_mode: p.share_mode === 'deny' ? 'deny' : 'allow',
+    share_mode:
+      p.share_mode === 'deny' || p.share_mode === 'internal_only' ? p.share_mode : 'allow',
   }
 }
 
@@ -963,7 +968,8 @@ const buildDirPolicyPayload = () =>
   dirPolicies.value.map((p) => ({
     root: p.root.trim(),
     quota_bytes: Number.isFinite(p.quota_bytes) && p.quota_bytes > 0 ? Math.floor(p.quota_bytes) : 0,
-    share_mode: p.share_mode === 'deny' ? 'deny' : 'allow',
+    share_mode:
+      p.share_mode === 'deny' || p.share_mode === 'internal_only' ? p.share_mode : 'allow',
   }))
 
 // validateDirPolicyPayload 按 core 口径校验载荷，返回**全部**非法项（无则空数组）。

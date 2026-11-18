@@ -53,6 +53,7 @@ const I18N_KEYS = [
   'admin.configPage.dirPolicy.shareMode',
   'admin.configPage.dirPolicy.shareModeAllow',
   'admin.configPage.dirPolicy.shareModeDeny',
+  'admin.configPage.dirPolicy.shareModeInternalOnly',
   'admin.configPage.dirPolicy.shareModeHint',
   'admin.configPage.dirPolicy.add',
   'admin.configPage.dirPolicy.remove',
@@ -74,7 +75,7 @@ describe('目录策略分区入口', () => {
     expect(configVue, '分区应有 divider 标题').toMatch(/t\('admin\.configPage\.sections\.dirPolicy'\)/)
   })
 
-  it('三个字段都可编辑：root 文本 / quota_bytes 数字 / share_mode 下拉两档', () => {
+  it('三个字段都可编辑：root 文本 / quota_bytes 数字 / share_mode 下拉三档（allow/deny/internal_only）', () => {
     expect(configVue, 'root 应绑定到策略行的 root').toMatch(/v-model="policy\.root"/)
     expect(configVue, 'quota_bytes 应是数字输入且 0 为下限（0=不限）').toMatch(
       /v-model="policy\.quota_bytes"[^>]*:min="0"/
@@ -82,6 +83,14 @@ describe('目录策略分区入口', () => {
     expect(configVue, 'share_mode 应绑定到策略行').toMatch(/v-model="policy\.share_mode"/)
     expect(configVue, 'share_mode 下拉应有 allow 档（放行）').toMatch(/value="allow"/)
     expect(configVue, 'share_mode 下拉应有 deny 档（禁止生成分享）').toMatch(/value="deny"/)
+    expect(configVue, 'share_mode 下拉应有 internal_only 档（仅站内，core#233）').toMatch(
+      /value="internal_only"/
+    )
+    // 顺序也被钉住：e2e 的「仅站内」用例按**位置**选第三档（不依赖语种文案，
+    // 否则 CI 跑在别的语种下会选错档）⇒ 顺序变了 e2e 必须红。
+    expect(configVue, '三档顺序须为 allow → deny → internal_only').toMatch(
+      /value="allow"[\s\S]*value="deny"[\s\S]*value="internal_only"/
+    )
   })
 
   it('可增删策略行', () => {
@@ -99,7 +108,15 @@ describe('目录策略回读链路', () => {
   })
 
   it('归一：share_mode 空串按 allow 处理（core 视 "" 与 allow 等价）；quota 非法值归 0', () => {
-    expect(configVue).toMatch(/share_mode: p\.share_mode === 'deny' \? 'deny' : 'allow'/)
+    // ⚠️ internal_only 必须原样保留：归一成 allow = 把「仅站内」静默降级成「公开」
+    //   （管理员以为还限着，实际已放开——比报错更坏）。这条断言同时钉住旧形态
+    //   （=== 'deny' ? 'deny' : 'allow'）不得复活。
+    expect(configVue, '归一必须原样保留 internal_only').toMatch(
+      /share_mode:\s*p\.share_mode === 'deny' \|\| p\.share_mode === 'internal_only' \? p\.share_mode : 'allow'/
+    )
+    expect(configVue, '归一不得把 internal_only 降级成 allow').not.toMatch(
+      /p\.share_mode === 'deny' \? 'deny' : 'allow'/
+    )
     expect(configVue).toMatch(
       /quota_bytes: Number\.isFinite\(quota\) && quota > 0 \? Math\.floor\(quota\) : 0/
     )
@@ -135,7 +152,9 @@ describe('目录策略保存链路（整段替换语义）', () => {
     expect(builder).toMatch(
       /quota_bytes: Number\.isFinite\(p\.quota_bytes\) && p\.quota_bytes > 0 \? Math\.floor\(p\.quota_bytes\) : 0/
     )
-    expect(builder).toMatch(/share_mode: p\.share_mode === 'deny' \? 'deny' : 'allow'/)
+    expect(builder, '载荷归一必须原样保留 internal_only（不得降级成 allow）').toMatch(
+      /share_mode:\s*p\.share_mode === 'deny' \|\| p\.share_mode === 'internal_only' \? p\.share_mode : 'allow'/
+    )
     // 分支必须提交**这个**归一结果（否则「校验过的」与「发出去的」不是同一份）
     expect(block, '保存分支必须取 buildDirPolicyPayload() 的结果').toMatch(
       /const payload = buildDirPolicyPayload\(\)/

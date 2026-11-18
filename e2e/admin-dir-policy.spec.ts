@@ -90,4 +90,32 @@ test.describe('管理台目录策略：提交前校验（与 core 同口径）',
     expect(body.share.directory_policies[0].root).toBe('/data/music')
     expect(body.share.directory_policies[0].share_mode).toBe('allow')
   })
+
+  test('仅站内档位：选 internal_only ⇒ 提交载荷带 internal_only（不得被降级成 allow）', async ({ page }) => {
+    const mock = await installApiMocks(page, [
+      ...siteBootstrap(),
+      { method: 'GET', url: '/admin/config', body: envelope({ share: { directory_policies: [] } }) },
+      { method: 'PUT', url: '/admin/config', body: envelope({}) },
+    ])
+    await gotoDirPolicy(page)
+
+    await page.locator('.dir-policy-add').click()
+    await page.locator('.dir-policy input').first().fill('/data/secret')
+
+    // 选第三档「仅站内」：按**位置**选（不依赖语种文案——e2e 可能跑在任意语种下）
+    await page.locator('.dir-policy .el-select').click()
+    const options = page.locator('.el-select-dropdown__item:visible')
+    await expect(options, '分享策略下拉应是三档').toHaveCount(3)
+    await options.nth(2).click()
+
+    await page.locator('.config-content .el-button--primary').click()
+
+    await expect.poll(() => configPuts(mock.requests).length).toBe(1)
+    const body = JSON.parse(configPuts(mock.requests)[0].body)
+    expect(body.share.directory_policies[0].root).toBe('/data/secret')
+    expect(
+      body.share.directory_policies[0].share_mode,
+      '仅站内档位不得被降级成 allow（core#233：internal_only = 不铸公网取件码 + 取件强制登录）',
+    ).toBe('internal_only')
+  })
 })

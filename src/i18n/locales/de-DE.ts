@@ -769,7 +769,9 @@ export default {
         shareMode: 'Freigaberichtlinie',
         shareModeAllow: 'Erlauben',
         shareModeDeny: 'Freigabe verbieten',
-        shareModeHint: 'Erlauben = in diesem Verzeichnis dürfen Freigaben erstellt werden; Verbot = dort ist das Erstellen von Freigaben untersagt',
+        shareModeInternalOnly: 'Nur intern',
+        shareModeHint:
+          'Erlauben = in diesem Verzeichnis dürfen Freigaben erstellt werden; Verbot = dort ist das Erstellen von Freigaben untersagt; Nur intern = Freigaben dürfen erstellt werden, können aber nur von angemeldeten Nutzern dieser Site abgeholt werden (kein öffentlicher Abholcode)',
         add: 'Richtlinie hinzufügen',
         remove: 'Entfernen',
         invalidTitle: 'Einige Richtlinien haben die Validierung nicht bestanden; bitte vor dem Speichern korrigieren',
