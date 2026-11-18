@@ -81,6 +81,7 @@ declare module 'vue' {
     LocaleSwitcher: typeof import('./components/LocaleSwitcher.vue')['default']
     LocalHistoryDialog: typeof import('./components/history/LocalHistoryDialog.vue')['default']
     NarrowCardList: typeof import('./components/admin/NarrowCardList.vue')['default']
+    NetworkStatusBanner: typeof import('./components/NetworkStatusBanner.vue')['default']
     NotifyBanner: typeof import('./components/NotifyBanner.vue')['default']
     NotifyBell: typeof import('./components/NotifyBell.vue')['default']
     PageHeader: typeof import('./components/data/PageHeader.vue')['default']

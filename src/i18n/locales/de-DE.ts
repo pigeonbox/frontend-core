@@ -762,8 +762,8 @@ export default {
         empty: 'Noch keine Verzeichnisrichtlinien konfiguriert',
         root: 'Verzeichnispfad',
         rootPlaceholder: '/data/music',
-        rootRequired: 'Bitte einen Verzeichnispfad angeben',
-        rootNotAbsolute: 'Ein absoluter Pfad (beginnend mit /) wird empfohlen',
+        rootRequired: 'Verzeichnispfad ist erforderlich',
+        rootNotAbsolute: 'Verzeichnispfad muss ein absoluter Pfad sein (beginnend mit /)',
         quota: 'Kontingent-Obergrenze (Bytes)',
         quotaHint: '0 bedeutet unbegrenzt, sonst wird der Wert in Bytes angegeben',
         shareMode: 'Freigaberichtlinie',
@@ -771,7 +771,9 @@ export default {
         shareModeDeny: 'Freigabe verbieten',
         shareModeHint: 'Erlauben = in diesem Verzeichnis dürfen Freigaben erstellt werden; Verbot = dort ist das Erstellen von Freigaben untersagt',
         add: 'Richtlinie hinzufügen',
-        remove: 'Entfernen'
+        remove: 'Entfernen',
+        invalidTitle: 'Einige Richtlinien haben die Validierung nicht bestanden; bitte vor dem Speichern korrigieren',
+        invalid: 'Richtlinie {n} ist ungültig: {reason}'
       },
       p2p: {
         introFedTitle: 'Site-übergreifender Verbund',

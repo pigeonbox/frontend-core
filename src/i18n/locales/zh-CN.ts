@@ -761,8 +761,8 @@ export default {
         empty: '尚未配置目录策略',
         root: '目录路径',
         rootPlaceholder: '/data/music',
-        rootRequired: '请填写目录路径',
-        rootNotAbsolute: '建议填写绝对路径（以 / 开头）',
+        rootRequired: '目录路径不能为空',
+        rootNotAbsolute: '目录路径必须是绝对路径（以 / 开头）',
         quota: '配额上限（字节）',
         quotaHint: '0 表示不限，其余按字节填写',
         shareMode: '分享策略',
@@ -770,7 +770,9 @@ export default {
         shareModeDeny: '禁止生成分享',
         shareModeHint: '放行＝该目录允许生成分享；禁止＝该目录下禁止生成分享',
         add: '新增策略',
-        remove: '删除'
+        remove: '删除',
+        invalidTitle: '有策略未通过校验，修正后才能保存',
+        invalid: '第 {n} 条策略无效：{reason}'
       },
       p2p: {
         introFedTitle: '跨站联邦',
