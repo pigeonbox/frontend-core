@@ -77,6 +77,18 @@ MUTATIONS = [
         "    } catch {\n      // 变异：吞掉保存取消\n    }",
         "e2e/download.spec.ts",
     ),
+    (
+        # admin-dir-policy.spec.ts 的变异点（core#233 internal_only）：
+        # 语义：提交载荷的归一把「仅站内」降级成 allow ⇒ 管理员以为还限着站内，
+        # 实际已放开（比报错更坏——静默降级）。
+        # 锚点取 buildDirPolicyPayload 的整块（含 "  }))" 收尾）⇒ 在仓内唯一命中
+        # （回读归一那块形似但收尾不同、quota 表达式也不同）。
+        "M6 仅站内档位被静默降级成放行",
+        "src/views/admin/Config.vue",
+        "    quota_bytes: Number.isFinite(p.quota_bytes) && p.quota_bytes > 0 ? Math.floor(p.quota_bytes) : 0,\n    share_mode:\n      p.share_mode === 'deny' || p.share_mode === 'internal_only' ? p.share_mode : 'allow',\n  }))",
+        "    quota_bytes: Number.isFinite(p.quota_bytes) && p.quota_bytes > 0 ? Math.floor(p.quota_bytes) : 0,\n    share_mode: p.share_mode === 'deny' ? 'deny' : 'allow',\n  }))",
+        "e2e/admin-dir-policy.spec.ts",
+    ),
 ]
 
 
